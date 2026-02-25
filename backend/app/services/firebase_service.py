@@ -81,6 +81,10 @@ class FirebaseService:
         Verify Firebase ID token
         Returns user data if valid
         """
+        if not self._initialized or not self.app:
+            logger.error("Firebase not initialized - cannot verify token")
+            raise AuthenticationError("Firebase authentication service not available")
+        
         try:
             decoded_token = auth.verify_id_token(token)
             firebase_claims = decoded_token.get("firebase", {}) or {}
@@ -93,11 +97,13 @@ class FirebaseService:
                 "is_anonymous": is_anonymous,
             }
         except auth.InvalidIdTokenError:
+            logger.warning("Invalid Firebase token provided")
             raise AuthenticationError("Invalid authentication token")
         except auth.ExpiredIdTokenError:
+            logger.warning("Expired Firebase token provided")
             raise AuthenticationError("Authentication token has expired")
         except Exception as e:
-            logger.error("Token verification failed", error=str(e))
+            logger.error("Token verification failed", error=str(e), error_type=type(e).__name__)
             raise AuthenticationError("Authentication failed")
     
     async def get_user(self, uid: str) -> Optional[Dict[str, Any]]:

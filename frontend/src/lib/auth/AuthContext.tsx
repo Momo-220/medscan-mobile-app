@@ -47,6 +47,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   // Initialize Firebase Auth dynamically (avoids undici SSR issue)
   useEffect(() => {
     let unsubscribe: (() => void) | null = null;
+    let refreshTokenHandler: (() => void) | null = null;
 
     const init = async () => {
       try {
@@ -55,12 +56,19 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         const authModule = await import('firebase/auth');
         authModuleRef.current = authModule;
 
-        const handleAuthState = (fbUser: any) => {
+        const handleAuthState = async (fbUser: any) => {
           if (fbUser) {
             setUser(mapUser(fbUser));
-            fbUser.getIdToken().then((token: string) => apiClient.setAuthToken(token)).catch((e: any) => console.error('Failed to get token:', e));
+            try {
+              // Récupérer le token avec rafraîchissement forcé si nécessaire
+              const token = await fbUser.getIdToken(false);
+              apiClient.setAuthToken(token);
+            } catch (e: any) {
+              console.error('Failed to get token:', e);
+            }
           } else {
             setUser(null);
+            apiClient.setAuthToken('');
           }
           setLoading(false);
         };
@@ -68,9 +76,25 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         await authModule.setPersistence(auth, authModule.browserLocalPersistence).catch(() => {});
         const redirectResult = await authModule.getRedirectResult(auth).catch(() => null);
         if (redirectResult?.user) {
-          handleAuthState(redirectResult.user);
+          await handleAuthState(redirectResult.user);
         }
         unsubscribe = authModule.onAuthStateChanged(auth, handleAuthState);
+
+        // Écouter les événements de rafraîchissement de token depuis l'API client
+        refreshTokenHandler = async () => {
+          const authInstance = authRef.current;
+          if (authInstance?.currentUser) {
+            try {
+              const token = await authInstance.currentUser.getIdToken(true);
+              apiClient.setAuthToken(token);
+            } catch (e) {
+              console.error('Failed to refresh token:', e);
+            }
+          }
+        };
+        if (typeof window !== 'undefined') {
+          window.addEventListener('refreshFirebaseToken', refreshTokenHandler);
+        }
       } catch (e) {
         console.error('Firebase init error:', e);
         setLoading(false);
@@ -78,7 +102,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     };
 
     init();
-    return () => { if (unsubscribe) unsubscribe(); };
+    return () => {
+      if (unsubscribe) unsubscribe();
+      if (typeof window !== 'undefined' && refreshTokenHandler) {
+        window.removeEventListener('refreshFirebaseToken', refreshTokenHandler);
+      }
+    };
   }, []);
 
   const signIn = useCallback(async (email: string, password: string) => {

@@ -71,9 +71,12 @@ export function ScanScreen() {
       setStep('analyzing');
       setError(null);
 
+      // S'assurer qu'on a un token Firebase valide AVANT d'appeler le backend
       const token = await getIdToken();
-      if (token) {
-        apiClient.setAuthToken(token);
+      if (!token) {
+        setError(t('authErrorGeneric') || 'Veuillez vous reconnecter pour scanner un médicament.');
+        setStep('upload');
+        return;
       }
 
       const result = await apiClient.scanMedication(fileToScan, language);

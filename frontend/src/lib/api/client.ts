@@ -33,7 +33,8 @@ class APIClient {
     // Response interceptor for error handling
     this.client.interceptors.response.use(
       (response) => response,
-      (error) => {
+      async (error) => {
+        const status = error.response?.status || error.status;
         const isTimeoutOrNetwork =
           error.code === 'ECONNABORTED' ||
           error.code === 'ERR_NETWORK' ||
@@ -44,6 +45,27 @@ class APIClient {
 
         // Pendant le cold start, ne pas afficher l'alerte timeout/réseau : le skeleton fait office de feedback
         if (backendWaking && isTimeoutOrNetwork) {
+          return Promise.reject(error);
+        }
+
+        // Cas spécial 401: essayer de rafraîchir le token en silence, sans afficher le gros toast
+        if (status === 401) {
+          if (typeof window !== 'undefined') {
+            const event = new CustomEvent('refreshFirebaseToken');
+            window.dispatchEvent(event);
+            // Attendre un peu pour que le token soit rafraîchi
+            await new Promise((resolve) => setTimeout(resolve, 1000));
+            // Réessayer la requête avec le nouveau token si disponible
+            const newToken = this.getStoredToken();
+            if (newToken && error.config && !error.config.__retried) {
+              (error.config as any).__retried = true;
+              error.config.headers = error.config.headers || {};
+              (error.config.headers as any).Authorization = `Bearer ${newToken}`;
+              return this.client.request(error.config);
+            }
+          }
+          // Si le rafraîchissement échoue, supprimer le token mais ne pas afficher de toast
+          this.clearStoredToken();
           return Promise.reject(error);
         }
 
@@ -58,10 +80,7 @@ class APIClient {
           }
         }
 
-        if (error.response?.status === 401) {
-          this.clearStoredToken();
-        }
-        if (error.response?.status === 402 && typeof window !== 'undefined') {
+        if (status === 402 && typeof window !== 'undefined') {
           window.dispatchEvent(new CustomEvent('insufficientCredits'));
         }
         return Promise.reject(error);
