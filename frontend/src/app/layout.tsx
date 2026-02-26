@@ -69,6 +69,7 @@ export default function RootLayout({
         <link rel="icon" type="image/png" href="/logo.png" />
         <link rel="apple-touch-icon" href="/logo.png" />
         <link rel="preconnect" href="https://fonts.googleapis.com" />
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
         <link rel="dns-prefetch" href="https://storage.googleapis.com" />
         <meta name="mobile-web-app-capable" content="yes" />
         <meta name="Permissions-Policy" content="camera=(self), microphone=()" />
