@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useEffect, useState } from 'react';
+import Image from 'next/image';
 
 interface SplashScreenProps {
   onComplete: () => void;
@@ -91,17 +92,16 @@ export function SplashScreen({ onComplete, duration = 2500 }: SplashScreenProps)
           }`}
         />
         
-        {/* Logo uniquement */}
+        {/* Logo LCP: next/image + priority pour chargement immédiat */}
         <div className="relative z-10">
-          <img 
-            src="/logo.png" 
+          <Image
+            src="/logo.png"
             alt="MediScan"
+            width={160}
+            height={160}
             className="w-40 h-40 object-contain drop-shadow-2xl"
-            onError={(e) => {
-              e.currentTarget.style.display = 'none';
-              const fallback = e.currentTarget.nextElementSibling as HTMLElement;
-              if (fallback) fallback.style.display = 'flex';
-            }}
+            priority
+            fetchPriority="high"
           />
           <div 
             className="hidden w-40 h-40 rounded-3xl bg-gradient-to-br from-primary to-cyan-500 items-center justify-center shadow-2xl"

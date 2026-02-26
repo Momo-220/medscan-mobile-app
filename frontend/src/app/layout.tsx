@@ -70,6 +70,10 @@ export default function RootLayout({
         <link rel="apple-touch-icon" href="/logo.png" />
         <link rel="preconnect" href="https://fonts.googleapis.com" />
         <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
+        <link rel="preconnect" href="https://apis.google.com" />
+        {process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN && (
+          <link rel="preconnect" href={`https://${process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN}`} />
+        )}
         <link rel="dns-prefetch" href="https://storage.googleapis.com" />
         <meta name="mobile-web-app-capable" content="yes" />
         <meta name="Permissions-Policy" content="camera=(self), microphone=()" />
