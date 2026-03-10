@@ -34,6 +34,14 @@ class CreditsService:
 
     def _get_daily_quota(self, is_anonymous: bool) -> int:
         return self.DAILY_QUOTA_TRIAL if is_anonymous else self.DAILY_QUOTA_FULL
+    
+    def _can_reset_quota(self, is_anonymous: bool) -> bool:
+        """
+        Règle produit:
+        - Compte inscrit: quota quotidien reset chaque jour.
+        - Mode trial (anonyme): pack unique, pas de reset quotidien.
+        """
+        return not is_anonymous
 
     def _should_reset_quota(self, doc: dict) -> bool:
         today = date.today()
@@ -61,7 +69,7 @@ class CreditsService:
             logger.info("New user created with daily quota", user_id=user_id, credits=quota, is_trial=is_anonymous)
             return doc
 
-        if self._should_reset_quota(doc):
+        if self._can_reset_quota(is_anonymous) and self._should_reset_quota(doc):
             quota = self._get_daily_quota(is_anonymous)
             coll.update_one(
                 {"user_id": user_id},
@@ -96,12 +104,20 @@ class CreditsService:
 
         qd = doc.get("quota_reset_date")
         qd_date = qd.date() if isinstance(qd, datetime) else qd
-        if doc.get("credits") == 0 and qd_date == date.today():
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail="Votre quota journalier est épuisé. Revenez demain pour obtenir votre nouveau quota de gemmes.",
-            )
-        if self._should_reset_quota(doc):
+        if doc.get("credits") == 0:
+            # Trial: pack unique, pas de reset -> proposer l'inscription.
+            if is_anonymous:
+                raise HTTPException(
+                    status_code=status.HTTP_403_FORBIDDEN,
+                    detail="Votre essai est terminé. Inscrivez-vous pour recevoir 30 gemmes par jour.",
+                )
+            # Compte inscrit: quota quotidien épuisé -> revenir demain.
+            if qd_date == date.today():
+                raise HTTPException(
+                    status_code=status.HTTP_403_FORBIDDEN,
+                    detail="Votre quota journalier est épuisé. Revenez demain pour obtenir votre nouveau quota de gemmes.",
+                )
+        if self._can_reset_quota(is_anonymous) and self._should_reset_quota(doc):
             doc["credits"] = self._get_daily_quota(is_anonymous)
             doc["quota_reset_date"] = _today_datetime()
         new_credits = doc["credits"] + amount
@@ -143,7 +159,7 @@ class CreditsService:
             })
             doc = {"credits": quota}
 
-        if self._should_reset_quota(doc):
+        if self._can_reset_quota(is_anonymous) and self._should_reset_quota(doc):
             doc["credits"] = self._get_daily_quota(is_anonymous)
             coll.update_one(
                 {"user_id": user_id},

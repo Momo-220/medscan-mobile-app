@@ -33,13 +33,15 @@ async def get_my_credits(
 ) -> CreditsResponse:
     """
     Get current AI credits (gemmes) for the authenticated user.
-    Quota journalier : 30 gemmes (compte inscrit) ou 10 (mode essai). Reset automatique chaque jour.
+    Règle:
+    - Compte inscrit : 30 gemmes/jour (reset quotidien).
+    - Mode essai (anonyme) : pack unique (pas de reset quotidien).
     """
     user_id = user["uid"]
     is_anonymous = user.get("is_anonymous", False)
     credits_obj = credits_service.get_or_create(user_id, is_anonymous)
     credits = credits_obj.get("credits", 0)
-    next_reset_at = _next_reset_utc()
+    next_reset_at = None if is_anonymous else _next_reset_utc()
     logger.info("Credits retrieved", user_id=user_id, credits=credits, is_trial=is_anonymous)
     return CreditsResponse(credits=credits, next_reset_at=next_reset_at)
 
@@ -68,7 +70,7 @@ async def add_credits(
         is_anonymous = user.get("is_anonymous", False)
         credits = credits_service.add_credits(user_id, amount, is_anonymous)
         logger.info("Credits added", user_id=user_id, amount=amount, total=credits)
-        return CreditsResponse(credits=credits, next_reset_at=_next_reset_utc())
+        return CreditsResponse(credits=credits, next_reset_at=None if is_anonymous else _next_reset_utc())
     except HTTPException:
         raise
     except Exception as e:
