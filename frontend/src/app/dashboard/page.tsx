@@ -129,22 +129,17 @@ export default function DashboardPage() {
       .catch(() => setStats(null))
       .finally(() => setLoading(false));
   }, [token, days]);
-
-  // Rafraîchissement automatique quasi temps réel
-  useEffect(() => {
+  const handleManualRefresh = async () => {
     if (!token) return;
-    const interval = setInterval(() => {
-      fetchStats(token, days)
-        .then((data) => {
-          setStats(data);
-          setLastUpdated(new Date());
-        })
-        .catch(() => {
-          // on ignore les erreurs ponctuelles pour ne pas casser le dashboard
-        });
-    }, 15000); // toutes les 15s
-    return () => clearInterval(interval);
-  }, [token, days]);
+    setLoading(true);
+    try {
+      const data = await fetchStats(token, days);
+      setStats(data);
+      setLastUpdated(new Date());
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -229,13 +224,12 @@ export default function DashboardPage() {
         <p className="text-gray-400 text-sm mb-2">Analytique propriétaire</p>
         {lastUpdated && (
           <p className="text-xs text-gray-500 mb-6">
-            Actualisation auto toutes les 15&nbsp;s – Dernière mise à jour&nbsp;:
-            {' '}
+            Dernière mise à jour&nbsp;:
             {lastUpdated.toLocaleTimeString('fr-FR')}
           </p>
         )}
 
-        <div className="flex gap-2 mb-8">
+        <div className="flex flex-wrap gap-2 mb-8 items-center">
           {[7, 30, 90].map((d) => (
             <button
               key={d}
@@ -247,6 +241,13 @@ export default function DashboardPage() {
               {d} jours
             </button>
           ))}
+          <button
+            onClick={handleManualRefresh}
+            disabled={loading || !token}
+            className="px-4 py-2 rounded-lg text-sm font-medium bg-gray-800 text-gray-200 hover:bg-gray-700 disabled:opacity-50"
+          >
+            {loading ? 'Chargement...' : 'Rafraîchir'}
+          </button>
         </div>
 
         {loading ? (
