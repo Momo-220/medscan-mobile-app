@@ -95,12 +95,16 @@ async def get_stats(days: int = 30) -> Dict[str, Any]:
     if not firebase_service.db:
         return _empty_stats()
     try:
-        since = datetime.utcnow() - timedelta(days=days)
+        now = datetime.utcnow()
+        since = now - timedelta(days=days)
+        active_since = now - timedelta(minutes=5)
         ref = firebase_service.db.collection(settings.FIRESTORE_COLLECTION_ANALYTICS)
         docs = ref.where("timestamp", ">=", since.isoformat()).stream()
 
         events: List[Dict[str, Any]] = []
         users = set()
+        active_users_5min = set()
+        events_last_5min = 0
         trial_devices = set()
         countries: Dict[str, int] = {}
         countries_trial: Dict[str, int] = {}
@@ -125,9 +129,21 @@ async def get_stats(days: int = 30) -> Dict[str, Any]:
 
             countries[country] = countries.get(country, 0) + 1
             by_type[etype] = by_type.get(etype, 0) + 1
-            ts = d.get("timestamp", "")[:10]
-            if ts:
-                by_day[ts] = by_day.get(ts, 0) + 1
+            ts_full = d.get("timestamp", "")
+            ts_day = ts_full[:10]
+            if ts_day:
+                by_day[ts_day] = by_day.get(ts_day, 0) + 1
+
+            # Temps réel: activité des 5 dernières minutes
+            if ts_full:
+                try:
+                    event_dt = datetime.fromisoformat(ts_full)
+                except Exception:
+                    event_dt = None
+                if event_dt and event_dt >= active_since:
+                    events_last_5min += 1
+                    if uid and uid != "anonymous":
+                        active_users_5min.add(uid)
 
         trial_count = await _get_trial_devices_count()
         firebase_users = await firebase_service.get_auth_user_stats()
@@ -155,6 +171,8 @@ async def get_stats(days: int = 30) -> Dict[str, Any]:
             "unique_users": len(users),
             "unique_trial_users": len(trial_devices),
             "trial_devices_count": trial_count,
+            "events_last_5min": events_last_5min,
+            "active_users_5min": len(active_users_5min),
             "firebase_users": firebase_users,
             "countries": dict(sorted(countries.items(), key=lambda x: -x[1])),
             "countries_detail": countries_list,
@@ -175,6 +193,8 @@ def _empty_stats() -> Dict[str, Any]:
         "unique_users": 0,
         "unique_trial_users": 0,
         "trial_devices_count": 0,
+        "events_last_5min": 0,
+        "active_users_5min": 0,
         "firebase_users": {"total": 0, "anonymous": 0, "registered": 0, "by_provider": {}, "users": []},
         "countries": {},
         "countries_detail": [],

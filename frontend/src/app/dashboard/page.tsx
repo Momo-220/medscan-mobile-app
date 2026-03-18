@@ -35,6 +35,8 @@ interface Stats {
   unique_users: number;
   unique_trial_users: number;
   trial_devices_count: number;
+  events_last_5min: number;
+  active_users_5min: number;
   firebase_users?: FirebaseUsersStats;
   countries: Record<string, number>;
   countries_detail: CountryDetail[];
@@ -101,6 +103,7 @@ export default function DashboardPage() {
   const [stats, setStats] = useState<Stats | null>(null);
   const [loading, setLoading] = useState(true);
   const [days, setDays] = useState(30);
+  const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
 
   // Login form (auth dashboard indépendante)
   const [loginEmail, setLoginEmail] = useState('');
@@ -119,9 +122,28 @@ export default function DashboardPage() {
     }
     setLoading(true);
     fetchStats(token, days)
-      .then(setStats)
+      .then((data) => {
+        setStats(data);
+        setLastUpdated(new Date());
+      })
       .catch(() => setStats(null))
       .finally(() => setLoading(false));
+  }, [token, days]);
+
+  // Rafraîchissement automatique quasi temps réel
+  useEffect(() => {
+    if (!token) return;
+    const interval = setInterval(() => {
+      fetchStats(token, days)
+        .then((data) => {
+          setStats(data);
+          setLastUpdated(new Date());
+        })
+        .catch(() => {
+          // on ignore les erreurs ponctuelles pour ne pas casser le dashboard
+        });
+    }, 15000); // toutes les 15s
+    return () => clearInterval(interval);
   }, [token, days]);
 
   const handleLogin = async (e: React.FormEvent) => {
@@ -204,7 +226,14 @@ export default function DashboardPage() {
         </div>
 
         <h1 className="text-2xl sm:text-3xl font-bold mb-2">Dashboard MediScan</h1>
-        <p className="text-gray-400 text-sm mb-8">Analytique propriétaire</p>
+        <p className="text-gray-400 text-sm mb-2">Analytique propriétaire</p>
+        {lastUpdated && (
+          <p className="text-xs text-gray-500 mb-6">
+            Actualisation auto toutes les 15&nbsp;s – Dernière mise à jour&nbsp;:
+            {' '}
+            {lastUpdated.toLocaleTimeString('fr-FR')}
+          </p>
+        )}
 
         <div className="flex gap-2 mb-8">
           {[7, 30, 90].map((d) => (
@@ -233,6 +262,11 @@ export default function DashboardPage() {
                 value={stats.total_events}
               />
               <StatCard
+                icon={<Activity className="w-6 h-6" />}
+                label="Événements (5 dernières min)"
+                value={stats.events_last_5min}
+              />
+              <StatCard
                 icon={<Users className="w-6 h-6" />}
                 label="Firebase total"
                 value={stats.firebase_users?.total ?? 0}
@@ -246,6 +280,11 @@ export default function DashboardPage() {
                 icon={<Users className="w-6 h-6" />}
                 label="Anonymes (essai)"
                 value={stats.firebase_users?.anonymous ?? 0}
+              />
+              <StatCard
+                icon={<Users className="w-6 h-6" />}
+                label="Utilisateurs actifs (5 min)"
+                value={stats.active_users_5min}
               />
               <StatCard
                 icon={<Globe className="w-6 h-6" />}
