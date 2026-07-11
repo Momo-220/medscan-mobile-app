@@ -28,8 +28,9 @@ class Settings(BaseSettings):
     
     # Google Gemini AI
     GEMINI_API_KEY: str
-    GEMINI_MODEL_VISION: str = "gemini-2.5-flash"  # Gemini 2.5 Flash for vision
-    GEMINI_MODEL_CHAT: str = "gemini-2.5-flash"  # Gemini 2.5 Flash for chat
+    GEMINI_API_KEY_2: Optional[str] = None
+    GEMINI_MODEL_VISION: str = "gemini-flash-latest"  # Gemini 1.5 Flash for vision
+    GEMINI_MODEL_CHAT: str = "gemini-flash-latest"  # Gemini 1.5 Flash for chat
     GEMINI_MAX_TOKENS: int = 4096  # Reduced for faster responses
     GEMINI_TEMPERATURE: float = 0.7
     
@@ -69,6 +70,7 @@ class Settings(BaseSettings):
     class Config:
         env_file = ".env"
         case_sensitive = True
+        extra = "ignore"
     
     @property
     def database_url(self) -> str:

@@ -4,8 +4,9 @@ Upload and analyze medication images
 """
 
 from fastapi import APIRouter, UploadFile, File, Depends, HTTPException, status, Query
-from typing import Dict, Any
+from typing import Dict, Any, Optional
 from datetime import datetime
+import asyncio
 import structlog
 
 from app.models.schemas import ScanResponse
@@ -171,21 +172,45 @@ async def scan_medication(
                 detail="Service temporairement surchargé. Réessayez demain.",
             )
         
-        # 3. Analyze image with Gemini AI - OBLIGATOIRE, pas de fallback
-        logger.info("Analyzing medication image with AI", user_id=user_id)
+        # 3. Run Gemini analysis and GridFS image storage upload in parallel
+        logger.info("Starting Gemini analysis and Image storage upload concurrently...", user_id=user_id)
         
+        async def upload_image_task():
+            try:
+                await storage_service.initialize()
+                return await storage_service.upload_image(
+                    image_bytes=image_bytes,
+                    user_id=user_id,
+                    content_type=file.content_type or "image/jpeg",
+                )
+            except Exception as e:
+                logger.warning("Image upload failed (continuing without image URL)", error=str(e), user_id=user_id)
+                return None
+
         try:
-            # Analyse RÉELLE uniquement - lever une erreur si Gemini n'est pas disponible
-            analysis = await gemini_service.analyze_medication_image(
+            # Create concurrent coroutines
+            analysis_coro = gemini_service.analyze_medication_image(
                 image_bytes=image_bytes,
                 mime_type=file.content_type or "image/jpeg",
                 user_language=language,
             )
             
-            logger.info("Gemini analysis successful", 
+            # Execute both in parallel
+            analysis, image_url = await asyncio.gather(analysis_coro, upload_image_task())
+            
+            # Ensure output is fully translated to requested app language
+            if language:
+                try:
+                    logger.info("Translating analysis to requested language", target_language=language)
+                    analysis = await gemini_service.translate_analysis(analysis, language)
+                except Exception as tr_err:
+                    logger.warning("Failed to translate analysis during scan", error=str(tr_err))
+            
+            logger.info("Gemini analysis and image upload successful", 
                        medication=analysis.get("medication_name"),
                        category=analysis.get("category"),
-                       confidence=analysis.get("confidence"))
+                       confidence=analysis.get("confidence"),
+                       has_image_url=bool(image_url))
         except AIServiceError as e:
             # Gérer spécifiquement les erreurs Gemini (quota, etc.)
             error_str = str(e)
@@ -201,18 +226,6 @@ async def scan_medication(
                     status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
                     detail=f"Impossible d'analyser l'image: {error_str}"
                 )
-        
-        # 3. Upload image to storage (non-bloquant: si échec, on continue sans image_url)
-        image_url = None
-        try:
-            await storage_service.initialize()
-            image_url = await storage_service.upload_image(
-                image_bytes=image_bytes,
-                user_id=user_id,
-                content_type=file.content_type or "image/jpeg",
-            )
-        except Exception as e:
-            logger.warning("Image upload failed (continuing without image URL)", error=str(e), user_id=user_id)
         
         # 4. Build response - Notice pharmaceutique complète
         # CRITIQUE : S'assurer que packaging_language et category ont TOUJOURS des valeurs
@@ -284,24 +297,28 @@ async def scan_medication(
             "category": category,
         }
         
-        if not is_anonymous:
-            try:
-                saved_scan_id = scan_history_service.save_scan(
-                    user_id=user_id,
-                    scan_data=scan_data,
-                )
-                scan_id = saved_scan_id
-                logger.info("Scan saved to MongoDB", scan_id=scan_id)
-            except Exception as e:
-                logger.error("Failed to save scan to MongoDB", error=str(e))
+        try:
+            saved_scan_id = scan_history_service.save_scan(
+                user_id=user_id,
+                scan_data=scan_data,
+            )
+            scan_id = saved_scan_id
+            logger.info("Scan saved to MongoDB", scan_id=scan_id)
+        except Exception as e:
+            logger.error("Failed to save scan to MongoDB", error=str(e))
         
         # 6. Consommer les crédits seulement si identification réussie (pas si "Médicament non identifié")
         med_name = (analysis.get("medication_name") or "").strip()
         confidence = (analysis.get("confidence") or "low").lower()
+        med_name_lower = med_name.lower()
         identification_failed = (
-            "non identifié" in med_name.lower()
-            or "not identified" in med_name.lower()
-            or (confidence == "low" and (not med_name or med_name.lower() in ("unknown", "médicament non identifié")))
+            not med_name
+            or med_name_lower in ("unknown", "médicament non identifié", "non identifié", "not identified", "inconnu", "aucun", "non détecté", "not detected")
+            or "non identifié" in med_name_lower
+            or "not identified" in med_name_lower
+            or "inconnu" in med_name_lower
+            or "non détecté" in med_name_lower
+            or confidence == "low"
         )
         if not identification_failed:
             credits_service.consume(user_id, credits_service.SCAN_COST, is_anonymous=is_anonymous)
@@ -417,6 +434,7 @@ async def scan_medication(
 @router.get("/{scan_id}", response_model=ScanResponse)
 async def get_scan(
     scan_id: str,
+    language: Optional[str] = Query(None, description="Optional target language for dynamic translation"),
     user: Dict[str, Any] = Depends(get_current_user),
 ) -> ScanResponse:
     """
@@ -426,7 +444,7 @@ async def get_scan(
     """
     
     user_id = user["uid"]
-    logger.info("Retrieving scan from MongoDB", user_id=user_id, scan_id=scan_id)
+    logger.info("Retrieving scan from MongoDB", user_id=user_id, scan_id=scan_id, language=language)
     
     # Get scan from MongoDB
     scan_data = scan_history_service.get_scan_by_id(scan_id, user_id)
@@ -439,22 +457,74 @@ async def get_scan(
     
     # Build response
     analysis = scan_data.get("analysis_data", {})
-    
+    if not isinstance(analysis, dict):
+        analysis = {}
+
+    db_translations = scan_data.get("translations", {}) or {}
+
+    if language:
+        orig_lang = analysis.get("packaging_language") or scan_data.get("packaging_language") or "fr"
+        if language.lower() != orig_lang.lower():
+            target_lang_key = language.lower()
+            cached_trans = db_translations.get(target_lang_key)
+            if isinstance(cached_trans, dict) and ("indications" in cached_trans or "side_effects" in cached_trans) and "excipients" in cached_trans:
+                # Cache hit!
+                logger.info("Translation cache hit", scan_id=scan_id, language=language)
+                analysis = cached_trans
+            else:
+                # Cache miss!
+                try:
+                    from app.services.gemini_service import gemini_service
+                    analysis = await gemini_service.translate_analysis(analysis, language)
+                    db_translations[target_lang_key] = analysis
+                    scan_history_service.update_scan_translations(scan_id, db_translations)
+                except Exception as e:
+                    logger.error("Error during scan translation", error=str(e))
+
+    def to_string(value, default=""):
+        if value is None:
+            return default
+        if isinstance(value, list):
+            return "\n".join(str(item) for item in value) if value else default
+        return str(value)
+
+    # Convert lists to strings where expected by the schema
+    contraindications_str = to_string(analysis.get("contraindications") or scan_data.get("contraindications"))
+    side_effects_str = to_string(analysis.get("side_effects") or scan_data.get("side_effects"))
+    interactions_str = to_string(analysis.get("interactions") or scan_data.get("interactions"))
+    dosage_instructions_str = to_string(analysis.get("posology") or analysis.get("usage_instructions") or analysis.get("dosage_instructions"))
+
     response = ScanResponse(
         scan_id=scan_id,
         medication_name=scan_data.get("medication_name", "Unknown"),
-        generic_name=scan_data.get("generic_name") or analysis.get("generic_name"),
-        dosage=scan_data.get("dosage"),
-        form=scan_data.get("form"),
-        manufacturer=scan_data.get("manufacturer"),
-        expiry_date=analysis.get("expiry_date") if isinstance(analysis, dict) else None,
-        usage_instructions=analysis.get("usage_instructions") if isinstance(analysis, dict) else None,
-        warnings=scan_data.get("warnings", []),
-        contraindications=scan_data.get("contraindications", []),
-        interactions=scan_data.get("interactions", []),
-        confidence=scan_data.get("confidence", "low"),
-        disclaimer=analysis.get("disclaimer", "⚕️ This is for informational purposes only.") if isinstance(analysis, dict) else "⚕️ This is for informational purposes only.",
+        generic_name=analysis.get("generic_name") or scan_data.get("generic_name"),
+        brand_name=analysis.get("brand_name") or scan_data.get("brand_name"),
+        dosage=analysis.get("dosage") or scan_data.get("dosage"),
+        form=analysis.get("form") or scan_data.get("form"),
+        category=analysis.get("category") or scan_data.get("category", "antidouleur"),
+        active_ingredient=analysis.get("active_ingredient") or scan_data.get("active_ingredient"),
+        excipients=analysis.get("excipients") or scan_data.get("excipients"),
+        indications=analysis.get("indications") or scan_data.get("indications"),
+        contraindications=contraindications_str,
+        side_effects=side_effects_str,
+        dosage_instructions=dosage_instructions_str,
+        posology=analysis.get("posology") or analysis.get("usage_instructions"),
+        precautions=analysis.get("precautions") or scan_data.get("precautions"),
+        interactions=interactions_str,
+        overdose=analysis.get("overdose") or scan_data.get("overdose"),
+        storage=analysis.get("storage") or scan_data.get("storage"),
+        additional_info=analysis.get("additional_info") or scan_data.get("additional_info"),
+        manufacturer=analysis.get("manufacturer") or scan_data.get("manufacturer"),
+        lot_number=analysis.get("lot_number") or scan_data.get("lot_number"),
+        expiry_date=analysis.get("expiry_date") or scan_data.get("expiry_date"),
+        packaging_language=analysis.get("packaging_language") or scan_data.get("packaging_language", "fr"),
         image_url=scan_data.get("image_url"),
+        confidence=scan_data.get("confidence", "low"),
+        disclaimer=analysis.get("disclaimer", "⚕️ This is for informational purposes only."),
+        warnings=scan_data.get("warnings", []),
+        analysis_data=analysis,
+        scanned_at=scan_data.get("scanned_at") or datetime.utcnow(),
+        analyzed_at=scan_data.get("analyzed_at") or datetime.utcnow().isoformat(),
     )
     
     return response

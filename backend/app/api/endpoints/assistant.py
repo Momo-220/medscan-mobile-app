@@ -82,6 +82,7 @@ async def chat_with_assistant(
         ai_response = await gemini_service.chat(
             message=request.message,
             chat_history=chat_history,
+            language=request.language,
         )
 
         # 3) Consommer les crédits après succès basé sur les tokens réels
@@ -121,13 +122,22 @@ async def chat_with_assistant(
             message_id=message_id,
         )
         
-    except AIServiceError:
-        raise
+    except AIServiceError as e:
+        error_str = str(e)
+        if "quota" in error_str.lower() or "429" in error_str or "surchargé" in error_str.lower():
+            raise HTTPException(
+                status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+                detail="Service de chat temporairement surchargé. Réessayez dans quelques minutes."
+            )
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail=error_str
+        )
     except Exception as e:
         logger.exception("Chat failed", user_id=user_id, error=str(e))
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Failed to generate response",
+            detail="Impossible de générer une réponse.",
         )
 
 
@@ -149,16 +159,21 @@ async def chat_with_assistant_stream(
             detail="Token d'authentification requis"
         )
     token = auth_header.replace("Bearer ", "")
-    try:
-        user_data = await firebase_service.verify_token(token)
-        user_id = user_data["uid"]
-        is_anonymous = user_data.get("is_anonymous", False)
-    except Exception as e:
-        logger.error("Stream auth failed", error=str(e))
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Token invalide"
-        )
+    from app.services.auth_service import _try_local_jwt
+    
+    user_data = _try_local_jwt(token)
+    if not user_data:
+        try:
+            user_data = await firebase_service.verify_token(token)
+        except Exception as e:
+            logger.error("Stream auth failed", error=str(e))
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Token invalide"
+            )
+            
+    user_id = user_data["uid"]
+    is_anonymous = user_data.get("is_anonymous", False)
     
     # Parser le body JSON
     try:

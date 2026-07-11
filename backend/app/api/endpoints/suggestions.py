@@ -6,6 +6,7 @@ Get similar medications from local BDPM database (FREE - 0 tokens!)
 from fastapi import APIRouter, Query
 from typing import Optional
 import structlog
+import asyncio
 
 from app.models.schemas import SuggestionsResponse, MedicationSuggestionResponse
 from app.services.medication_db_service import medication_db_service
@@ -39,8 +40,9 @@ async def get_suggestions(
     logger.info("Fetching suggestions from local BDPM", category=category, limit=limit)
     
     try:
-        # Utiliser la base de données locale (0 tokens Gemini!)
-        suggestions = medication_db_service.get_suggestions(
+        # Utiliser la base de données locale (0 tokens Gemini!) dans un thread séparé
+        suggestions = await asyncio.to_thread(
+            medication_db_service.get_suggestions,
             category=category,
             limit=limit,
             exclude_name=medication_name,

@@ -142,6 +142,18 @@ class ScanHistoryService:
             logger.error("Failed to get scan count", error=str(e))
             return 0
 
+    @staticmethod
+    def update_scan_translations(scan_id: str, translations: Dict[str, Any]) -> None:
+        try:
+            coll = get_collection(COLLECTION)
+            coll.update_one(
+                {"scan_id": scan_id},
+                {"$set": {"translations": translations, "updated_at": datetime.utcnow()}}
+            )
+            logger.info("Updated scan translations in database", scan_id=scan_id, languages=list(translations.keys()))
+        except Exception as e:
+            logger.error("Failed to update scan translations", scan_id=scan_id, error=str(e))
+
 
 def _doc_to_scan_dict(d: dict) -> dict:
     return {
@@ -162,8 +174,9 @@ def _doc_to_scan_dict(d: dict) -> dict:
         "image_url": d.get("image_url"),
         "packaging_language": d.get("packaging_language"),
         "category": d.get("category"),
-        "created_at": d.get("created_at").isoformat() if d.get("created_at") else None,
-        "updated_at": d.get("updated_at").isoformat() if d.get("updated_at") else None,
+        "created_at": d.get("created_at"),
+        "updated_at": d.get("updated_at"),
+        "translations": d.get("translations", {}),
     }
 
 

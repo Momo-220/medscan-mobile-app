@@ -8,6 +8,7 @@ from google.generativeai.types import HarmCategory, HarmBlockThreshold
 from typing import Dict, Any, List, Optional, AsyncGenerator
 from PIL import Image
 import io
+import asyncio
 import structlog
 from tenacity import retry, stop_after_attempt, wait_exponential
 
@@ -350,6 +351,30 @@ class GeminiService:
         self.vision_model = None
         self.chat_model = None
         self._initialized = False
+        self._active_key = settings.GEMINI_API_KEY or ""
+
+    async def _rotate_api_key(self) -> bool:
+        """
+        Bascule circulairement à chaud entre GEMINI_API_KEY et GEMINI_API_KEY_2.
+        Retourne True si le basculement a réussi.
+        """
+        if not settings.GEMINI_API_KEY_2:
+            return False
+            
+        if self._active_key == settings.GEMINI_API_KEY:
+            self._active_key = settings.GEMINI_API_KEY_2
+            logger.info("Switching to GEMINI_API_KEY_2 (secondary key)")
+        else:
+            self._active_key = settings.GEMINI_API_KEY
+            logger.info("Switching back to GEMINI_API_KEY (primary key)")
+            
+        try:
+            await asyncio.to_thread(genai.configure, api_key=self._active_key, transport="rest")
+            await self.initialize(force_reinit=True)
+            return True
+        except Exception as e:
+            logger.error("Failed to rotate API key", error=str(e))
+            return False
     
     async def initialize(self, force_reinit: bool = False):
         """Initialize Gemini models - REQUIRES REAL API KEY
@@ -361,10 +386,12 @@ class GeminiService:
             return
         
         # Vérifier si la clé API existe - OBLIGATOIRE
-        if not settings.GEMINI_API_KEY or settings.GEMINI_API_KEY == "your-gemini-api-key-here":
-            error_msg = "GEMINI_API_KEY n'est pas configurée. Configurez-la dans backend/.env pour utiliser l'analyse réelle."
-            logger.error(error_msg)
-            raise AIServiceError(error_msg)
+        if not self._active_key or self._active_key == "your-gemini-api-key-here":
+            self._active_key = settings.GEMINI_API_KEY or ""
+            if not self._active_key or self._active_key == "your-gemini-api-key-here":
+                error_msg = "GEMINI_API_KEY n'est pas configurée. Configurez-la dans backend/.env pour utiliser l'analyse réelle."
+                logger.error(error_msg)
+                raise AIServiceError(error_msg)
         
         try:
             # Réinitialiser les modèles si force_reinit
@@ -373,13 +400,13 @@ class GeminiService:
                 self.chat_model = None
                 self._initialized = False
             
-            api_key = settings.GEMINI_API_KEY or ""
+            api_key = self._active_key
             if not api_key or "PLACEHOLDER" in api_key.upper() or len(api_key) < 20:
                 logger.error("GEMINI_API_KEY invalide ou non configurée (PLACEHOLDER?) - Le scan échouera en prod!")
             logger.info("Configuring Gemini with API key", 
-                       key_length=len(api_key),
-                       key_preview=api_key[:10] + "..." if len(api_key) > 10 else "N/A")
-            genai.configure(api_key=api_key)
+                       key_length=len(self._active_key),
+                       key_preview=self._active_key[:10] + "..." if len(api_key) > 10 else "N/A")
+            genai.configure(api_key=self._active_key, transport="rest")
             
             logger.info(f" Initializing Gemini models: Vision={settings.GEMINI_MODEL_VISION}, Chat={settings.GEMINI_MODEL_CHAT}")
             
@@ -456,12 +483,28 @@ Analyze this medication image. Return ONLY a valid JSON object - no explanations
             }
             
             try:
-                response = await self.vision_model.generate_content_async(
+                response = await asyncio.to_thread(
+                    self.vision_model.generate_content,
                     [prompt, image],
                     generation_config=generation_config,
                     safety_settings=MEDICAL_SAFETY_SETTINGS,
                 )
             except Exception as e:
+                error_str = str(e)
+                if settings.GEMINI_API_KEY_2 and ("quota" in error_str.lower() or "429" in error_str or "surchargé" in error_str.lower()):
+                    rotated = await self._rotate_api_key()
+                    if rotated:
+                        logger.info("Retrying vision analysis with rotated API key")
+                        response = await asyncio.to_thread(
+                            self.vision_model.generate_content,
+                            [prompt, image],
+                            generation_config=generation_config,
+                            safety_settings=MEDICAL_SAFETY_SETTINGS,
+                        )
+                    else:
+                        raise
+                else:
+                    raise
                 error_str = str(e)
                 error_type = type(e).__name__
                 
@@ -630,8 +673,20 @@ Analyze this medication image. Return ONLY a valid JSON object - no explanations
             # Start or continue chat session
             chat_session = self.chat_model.start_chat(history=formatted_history)
             
-            # Send message with system context reminder if needed
-            response = await chat_session.send_message_async(message)
+            try:
+                response = await asyncio.to_thread(chat_session.send_message, message)
+            except Exception as e:
+                error_str = str(e)
+                if settings.GEMINI_API_KEY_2 and ("quota" in error_str.lower() or "429" in error_str or "surchargé" in error_str.lower()):
+                    rotated = await self._rotate_api_key()
+                    if rotated:
+                        logger.info("Retrying chat send_message with rotated API key")
+                        chat_session = self.chat_model.start_chat(history=formatted_history)
+                        response = await asyncio.to_thread(chat_session.send_message, message)
+                    else:
+                        raise
+                else:
+                    raise
             
             # Récupérer les tokens utilisés
             tokens_used = 0
@@ -702,11 +757,24 @@ Analyze this medication image. Return ONLY a valid JSON object - no explanations
             
             chat_session = self.chat_model.start_chat(history=formatted_history)
             
-            response = await chat_session.send_message_async(message, stream=True)
+            try:
+                response = await asyncio.to_thread(chat_session.send_message, message, stream=True)
+            except Exception as e:
+                error_str = str(e)
+                if settings.GEMINI_API_KEY_2 and ("quota" in error_str.lower() or "429" in error_str or "surchargé" in error_str.lower()):
+                    rotated = await self._rotate_api_key()
+                    if rotated:
+                        logger.info("Retrying chat stream send_message with rotated API key")
+                        chat_session = self.chat_model.start_chat(history=formatted_history)
+                        response = await asyncio.to_thread(chat_session.send_message, message, stream=True)
+                    else:
+                        raise
+                else:
+                    raise
             
-            async for chunk in response:
+            for chunk in response:
                 if chunk.text:
-                    yield (chunk.text, 0)  # Tokens seront calculés à la fin
+                    yield (chunk.text, 0)
                 
                 # Récupérer les tokens du dernier chunk (qui contient usage_metadata)
                 if hasattr(chunk, 'usage_metadata') and chunk.usage_metadata:

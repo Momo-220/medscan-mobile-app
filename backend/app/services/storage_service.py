@@ -27,21 +27,13 @@ class StorageService:
         if self._initialized:
             return
         try:
-            if settings.ENVIRONMENT == "development":
-                os.makedirs("./uploads", exist_ok=True)
-                self._initialized = True
-                logger.info("Storage initialized (local uploads)")
-                return
             db = get_db()
             self._fs = GridFS(db, collection="scan_images")
             self._initialized = True
             logger.info("Storage initialized (MongoDB GridFS)")
         except Exception as e:
             logger.error("Storage init failed", error=str(e))
-            if settings.ENVIRONMENT == "development":
-                self._initialized = True
-            else:
-                raise ImageProcessingError("Failed to initialize storage service")
+            raise ImageProcessingError("Failed to initialize storage service")
 
     async def upload_image(
         self,
@@ -50,17 +42,6 @@ class StorageService:
         content_type: str = "image/jpeg",
     ) -> str:
         try:
-            if settings.ENVIRONMENT == "development" and not self._fs:
-                file_extension = content_type.split("/")[-1]
-                filename = f"{uuid.uuid4()}.{file_extension}"
-                filepath = f"./uploads/{filename}"
-                with open(filepath, "wb") as f:
-                    f.write(image_bytes)
-                base_url = (settings.API_PUBLIC_URL or os.getenv("API_PUBLIC_URL") or "http://localhost:8888").rstrip("/")
-                image_url = f"{base_url}/uploads/{filename}"
-                logger.info("DEV: Image saved locally", filename=filename, user_id=user_id)
-                return image_url
-
             if not self._fs:
                 raise ImageProcessingError("Storage non configuré")
 
