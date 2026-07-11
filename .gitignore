@@ -31,6 +31,7 @@ dist/
 # Firebase
 firebase-admin-key.json
 service-account-key.json
+serviceAccountKey.json
 *-firebase-adminsdk-*.json
 *.key.json
 

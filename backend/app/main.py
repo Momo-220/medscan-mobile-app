@@ -38,6 +38,8 @@ async def _background_init_heavy_services():
     """
     from app.services.gemini_service import gemini_service
     from app.services.storage_service import storage_service
+    from app.services.medication_db_service import medication_db_service
+    
     try:
         await gemini_service.initialize()
         logger.info("Background init: Gemini ready")
@@ -48,6 +50,13 @@ async def _background_init_heavy_services():
         logger.info("Background init: Storage ready")
     except Exception as e:
         logger.warning("Background Storage init failed (scan will init on first use)", error=str(e))
+    try:
+        # Charger la base de données locale dans un thread séparé pour ne pas bloquer l'event loop
+        logger.info("Background init: Loading local medication database...")
+        await asyncio.to_thread(medication_db_service.load_data)
+        logger.info("Background init: Local medication database loaded")
+    except Exception as e:
+        logger.error("Background local DB init failed", error=str(e))
 
 
 @asynccontextmanager

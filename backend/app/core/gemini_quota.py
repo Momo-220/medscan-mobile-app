@@ -38,14 +38,11 @@ def _save(data: dict) -> None:
 def check_and_increment() -> bool:
     """
     Vérifie si on peut faire un appel, puis incrémente le compteur.
-    Retourne True si l'appel est autorisé, False si limite atteinte.
+    Retourne True pour laisser les clés API gérer le relais dynamiquement.
     """
     today = date.today().isoformat()
     data = _load()
     count = data.get(today, 0)
-    if count >= DAILY_LIMIT:
-        logger.warning("Daily Gemini quota reached", count=count, limit=DAILY_LIMIT)
-        return False
     data[today] = count + 1
     _save(data)
     return True

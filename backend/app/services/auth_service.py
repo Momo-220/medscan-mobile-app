@@ -7,9 +7,11 @@ from fastapi import Depends, HTTPException, status, Request
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from typing import Dict, Any, Optional
 import structlog
+import jwt as pyjwt
 
 from app.services.firebase_service import firebase_service
 from app.core.exceptions import AuthenticationError, AuthorizationError
+from app.config import settings
 
 logger = structlog.get_logger()
 
@@ -18,17 +20,35 @@ security = HTTPBearer()
 security_optional = HTTPBearer(auto_error=False)
 
 
+def _try_local_jwt(token: str) -> Optional[Dict[str, Any]]:
+    """Try to decode a backend-signed trial JWT. Returns None if not valid."""
+    try:
+        payload = pyjwt.decode(token, settings.JWT_SECRET_KEY, algorithms=[settings.JWT_ALGORITHM])
+        # Only accept tokens explicitly marked as trial
+        if payload.get("is_trial"):
+            return payload
+    except Exception:
+        pass
+    return None
+
+
 # Fonctions de dependance simples (pas de static methods - meilleure compat FastAPI)
 
 async def verify_token(
     credentials: HTTPAuthorizationCredentials = Depends(security),
 ) -> Dict[str, Any]:
     """
-    Verify Firebase JWT token
+    Verify Firebase JWT token or backend-signed trial JWT token.
     Use as FastAPI dependency for protected routes
     """
     token = credentials.credentials
-    
+
+    # First, try a local trial JWT (no Firebase needed)
+    local_payload = _try_local_jwt(token)
+    if local_payload:
+        logger.info("Trial user authenticated (local JWT)", uid=local_payload.get("uid"))
+        return local_payload
+
     try:
         user_data = await firebase_service.verify_token(token)
         
@@ -61,6 +81,10 @@ async def get_current_user_optional(
     """
     if not credentials or not credentials.credentials:
         return None
+    # Try local trial JWT first
+    local_payload = _try_local_jwt(credentials.credentials)
+    if local_payload:
+        return local_payload
     try:
         return await firebase_service.verify_token(credentials.credentials)
     except Exception:

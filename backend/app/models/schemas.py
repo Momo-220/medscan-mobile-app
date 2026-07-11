@@ -68,7 +68,7 @@ class ChatMessage(BaseModel):
 class ChatResponse(BaseModel):
     """Response schema for chat"""
     message: str
-    message_id: str
+    message_id: Optional[str] = None
     timestamp: datetime = Field(default_factory=datetime.utcnow)
 
 
