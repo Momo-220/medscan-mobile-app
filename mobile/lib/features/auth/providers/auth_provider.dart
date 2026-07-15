@@ -2,9 +2,13 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_sign_in/google_sign_in.dart';
+import 'package:sign_in_with_apple/sign_in_with_apple.dart';
 import '../../../core/di/providers.dart';
+import '../../../shared/services/username_service.dart';
 
-// Stream of Firebase Auth State (Safe guarded if Firebase is not initialized)
+// ─────────────────────────────────────────────────────────────────
+// Firebase Auth State Stream (Riverpod 3.x: StreamProvider)
+// ─────────────────────────────────────────────────────────────────
 final firebaseAuthStateProvider = StreamProvider<User?>((ref) {
   try {
     return FirebaseAuth.instance.authStateChanges();
@@ -14,43 +18,62 @@ final firebaseAuthStateProvider = StreamProvider<User?>((ref) {
   }
 });
 
-class AuthNotifier extends StateNotifier<AsyncValue<User?>> {
-  final Ref _ref;
+// ─────────────────────────────────────────────────────────────────
+// AuthNotifier — migrated from StateNotifier to Notifier (Riverpod 3.x)
+// ─────────────────────────────────────────────────────────────────
+class AuthNotifier extends Notifier<AsyncValue<User?>> {
   FirebaseAuth? _auth;
-  final GoogleSignIn _googleSignIn = GoogleSignIn();
 
-  AuthNotifier(this._ref) : super(const AsyncValue.data(null)) {
-    // Sync current user state on launch safely
+  // build() replaces the old StateNotifier constructor
+  @override
+  AsyncValue<User?> build() {
     try {
       _auth = FirebaseAuth.instance;
-      state = AsyncValue.data(_auth?.currentUser);
+      return AsyncValue.data(_auth?.currentUser);
     } catch (e) {
       debugPrint('Firebase Auth initialization failed for AuthNotifier: $e');
-      state = const AsyncValue.data(null);
+      return const AsyncValue.data(null);
     }
   }
 
-  // Register Token to secure storage
+  // ── Token helpers ──────────────────────────────────────────────
+
   Future<void> _saveToken() async {
     if (_auth == null) return;
     final user = _auth!.currentUser;
     if (user != null) {
       final token = await user.getIdToken();
       if (token != null) {
-        await _ref.read(secureStorageServiceProvider).setAuthToken(token);
+        await ref.read(secureStorageServiceProvider).setAuthToken(token);
       }
     }
   }
 
-  // Sign In with Email & Password
-  Future<void> signIn(String email, String password) async {
+  // ── Email / Password ──────────────────────────────────────────
+
+  /// Sign In — accepts email OR @username.
+  Future<void> signIn(String emailOrUsername, String password) async {
     if (_auth == null) {
       throw Exception("Le service d'authentification Firebase n'est pas configuré.");
     }
     state = const AsyncValue.loading();
     try {
+      // Resolve username → email if no @ detected
+      String resolvedEmail = emailOrUsername.trim();
+      if (!resolvedEmail.contains('@')) {
+        final lookedUp = await usernameService.lookupEmail(resolvedEmail);
+        if (lookedUp == null) {
+          state = AsyncValue.error(
+            Exception('Nom d\'utilisateur introuvable.'),
+            StackTrace.current,
+          );
+          throw Exception('Nom d\'utilisateur introuvable.');
+        }
+        resolvedEmail = lookedUp;
+      }
+
       final credential = await _auth!.signInWithEmailAndPassword(
-        email: email,
+        email: resolvedEmail,
         password: password,
       );
       await _saveToken();
@@ -61,22 +84,44 @@ class AuthNotifier extends StateNotifier<AsyncValue<User?>> {
     }
   }
 
-  // Sign Up / Register with Email & Password
-  Future<void> signUp(String email, String password, String displayName) async {
+  /// Register with email, password, displayName and optional username.
+  /// Falls back to signIn if the email is already in use.
+  Future<void> signUp(
+    String email,
+    String password,
+    String displayName, {
+    String? username,
+  }) async {
     if (_auth == null) {
       throw Exception("Le service d'authentification Firebase n'est pas configuré.");
     }
     state = const AsyncValue.loading();
     try {
+      // Validate & claim username before creating account
+      if (username != null && username.isNotEmpty) {
+        final validationError = UsernameService.validate(username);
+        if (validationError != null) {
+          state = AsyncValue.error(Exception(validationError), StackTrace.current);
+          throw Exception(validationError);
+        }
+        final available = await usernameService.isAvailable(username);
+        if (!available) {
+          state = AsyncValue.error(
+            Exception('Ce nom d\'utilisateur est déjà pris.'),
+            StackTrace.current,
+          );
+          throw Exception('Ce nom d\'utilisateur est déjà pris.');
+        }
+      }
+
       UserCredential credential;
       try {
         credential = await _auth!.createUserWithEmailAndPassword(
           email: email,
           password: password,
         );
-      } catch (err) {
-        // Handle email-already-in-use by logging in instead (matches Next.js auth logic exactly)
-        if (err is FirebaseAuthException && err.code == 'email-already-in-use') {
+      } on FirebaseAuthException catch (err) {
+        if (err.code == 'email-already-in-use') {
           credential = await _auth!.signInWithEmailAndPassword(
             email: email,
             password: password,
@@ -86,11 +131,18 @@ class AuthNotifier extends StateNotifier<AsyncValue<User?>> {
         }
       }
 
-      // Update user display name
       if (credential.user != null) {
         await credential.user!.updateDisplayName(displayName);
-        // Reload to apply changes
         await credential.user!.reload();
+
+        // Save username to Firestore if provided
+        if (username != null && username.isNotEmpty) {
+          await usernameService.claimUsername(
+            username: username,
+            uid: credential.user!.uid,
+            email: email,
+          );
+        }
       }
 
       await _saveToken();
@@ -101,7 +153,8 @@ class AuthNotifier extends StateNotifier<AsyncValue<User?>> {
     }
   }
 
-  // Sign In Anonymously (Trial mode)
+  // ── Anonymous (Trial mode) ────────────────────────────────────
+
   Future<void> signInAnonymously() async {
     if (_auth == null) {
       throw Exception("Le service d'authentification Firebase n'est pas configuré.");
@@ -117,23 +170,36 @@ class AuthNotifier extends StateNotifier<AsyncValue<User?>> {
     }
   }
 
-  // Sign In with Google
+  // ── Google Sign‑In (google_sign_in v7.x API) ─────────────────
+
   Future<void> signInWithGoogle() async {
     if (_auth == null) {
       throw Exception("Le service d'authentification Firebase n'est pas configuré.");
     }
     state = const AsyncValue.loading();
     try {
-      final GoogleSignInAccount? googleUser = await _googleSignIn.signIn();
-      if (googleUser == null) {
+      // google_sign_in v7.x: use singleton + authenticate()
+      final GoogleSignInAccount? account =
+          await GoogleSignIn.instance.authenticate();
+      if (account == null) {
+        // User cancelled
         state = const AsyncValue.data(null);
-        return; // Sign-in cancelled
+        return;
       }
 
-      final GoogleSignInAuthentication googleAuth = await googleUser.authentication;
+      // idToken is a sync getter on the account (v7.x change)
+      final String? idToken = account.authentication.idToken;
+
+      // accessToken requires explicit authorization (v7.x change)
+      final authorization =
+          await account.authorizationClient.authorizeScopes([
+        'email',
+        'profile',
+      ]);
+
       final OAuthCredential credential = GoogleAuthProvider.credential(
-        accessToken: googleAuth.accessToken,
-        idToken: googleAuth.idToken,
+        idToken: idToken,
+        accessToken: authorization.accessToken,
       );
 
       final userCredential = await _auth!.signInWithCredential(credential);
@@ -145,7 +211,58 @@ class AuthNotifier extends StateNotifier<AsyncValue<User?>> {
     }
   }
 
-  // Update profile attributes
+  // ── Apple Sign‑In (required by Apple Guideline 4.8) ──────────
+
+  Future<void> signInWithApple() async {
+    if (_auth == null) {
+      throw Exception("Le service d'authentification Firebase n'est pas configuré.");
+    }
+    state = const AsyncValue.loading();
+    try {
+      final appleCredential = await SignInWithApple.getAppleIDCredential(
+        scopes: [
+          AppleIDAuthorizationScopes.email,
+          AppleIDAuthorizationScopes.fullName,
+        ],
+      );
+
+      final oAuthProvider = OAuthProvider('apple.com');
+      final credential = oAuthProvider.credential(
+        idToken: appleCredential.identityToken,
+        accessToken: appleCredential.authorizationCode,
+      );
+
+      final userCredential = await _auth!.signInWithCredential(credential);
+
+      // Apple returns displayName only on the first sign-in
+      final givenName = appleCredential.givenName;
+      final familyName = appleCredential.familyName;
+      if (givenName != null || familyName != null) {
+        final displayName =
+            [givenName, familyName].where((n) => n != null).join(' ');
+        if (displayName.isNotEmpty && userCredential.user != null) {
+          await userCredential.user!.updateDisplayName(displayName);
+          await userCredential.user!.reload();
+        }
+      }
+
+      await _saveToken();
+      state = AsyncValue.data(_auth!.currentUser);
+    } on SignInWithAppleAuthorizationException catch (e) {
+      if (e.code == AuthorizationErrorCode.canceled) {
+        state = const AsyncValue.data(null);
+        return;
+      }
+      state = AsyncValue.error(e, StackTrace.current);
+      rethrow;
+    } catch (e, stack) {
+      state = AsyncValue.error(e, stack);
+      rethrow;
+    }
+  }
+
+  // ── Profile update ────────────────────────────────────────────
+
   Future<void> updateProfile({String? displayName, String? photoURL}) async {
     if (_auth == null) return;
     final user = _auth!.currentUser;
@@ -158,34 +275,38 @@ class AuthNotifier extends StateNotifier<AsyncValue<User?>> {
     }
   }
 
-  // Sign Out
+  // ── Sign Out ──────────────────────────────────────────────────
+
   Future<void> signOut() async {
     final user = _auth?.currentUser;
-    final prefs = _ref.read(sharedPrefsServiceProvider);
-    
+    final prefs = ref.read(sharedPrefsServiceProvider);
+
     if (user != null && !user.isAnonymous) {
       await prefs.clearUserSession(user.uid);
     }
-    
+
     try {
       await prefs.clearLocalName();
     } catch (_) {}
-    
+
     try {
       await _auth?.signOut();
     } catch (_) {}
     try {
-      await _googleSignIn.signOut();
+      await GoogleSignIn.instance.signOut();
     } catch (_) {}
-    // Always clear stored token (covers both Firebase and trial JWT tokens)
     try {
-      await _ref.read(secureStorageServiceProvider).clearAuthToken();
+      await ref.read(secureStorageServiceProvider).clearAuthToken();
     } catch (_) {}
+
     state = const AsyncValue.data(null);
   }
 }
 
-// Auth provider
-final authProvider = StateNotifierProvider<AuthNotifier, AsyncValue<User?>>((ref) {
-  return AuthNotifier(ref);
+// ─────────────────────────────────────────────────────────────────
+// Riverpod 3.x: NotifierProvider (replaces StateNotifierProvider)
+// ─────────────────────────────────────────────────────────────────
+final authProvider =
+    NotifierProvider<AuthNotifier, AsyncValue<User?>>(() {
+  return AuthNotifier();
 });

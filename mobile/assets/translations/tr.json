@@ -26,6 +26,7 @@
   "authSubtitle": "Akıllı eczane arkadaşınız",
   "authOr": "veya",
   "authGoogle": "Google ile devam et",
+  "authApple": "Apple ile devam et",
   "authErrorInvalid": "Geçersiz e-posta veya şifre",
   "authErrorEmailUsed": "Bu e-posta zaten kullanılıyor",
   "authErrorEmailExistsSignIn": "Bu e-posta zaten kayıtlı. Şifrenizle giriş yapın.",

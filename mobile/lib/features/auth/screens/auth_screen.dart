@@ -2,12 +2,14 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:sign_in_with_apple/sign_in_with_apple.dart';
 
 import '../../../core/constants/colors.dart';
 import '../../../core/constants/text_styles.dart';
 import '../../../shared/utils/localization.dart';
 import '../../../shared/widgets/button.dart';
 import '../../../shared/widgets/card.dart';
+import '../../../shared/widgets/google_logo.dart';
 import '../../../shared/widgets/input.dart';
 import '../providers/auth_provider.dart';
 
@@ -24,6 +26,7 @@ class _AuthPageState extends ConsumerState<AuthPage> {
   final _passwordController = TextEditingController();
   final _passwordConfirmController = TextEditingController();
   final _nameController = TextEditingController();
+  final _usernameController = TextEditingController();
 
   bool _showPassword = false;
   bool _showPasswordConfirm = false;
@@ -66,6 +69,12 @@ class _AuthPageState extends ConsumerState<AuthPage> {
     }
     
     final errStr = err.toString();
+    if (errStr.contains('introuvable') || errStr.contains('not found')) {
+      return 'Nom d\'utilisateur introuvable. Essayez avec votre email.';
+    }
+    if (errStr.contains('déjà pris') || errStr.contains('taken')) {
+      return 'Ce nom d\'utilisateur est déjà pris.';
+    }
     if (errStr.contains('mediscan-email-exists-signin')) {
       return ref.t('authErrorEmailExistsSignIn');
     }
@@ -84,12 +93,13 @@ class _AuthPageState extends ConsumerState<AuthPage> {
       _error = null;
     });
 
-    final email = _emailController.text.trim();
+    final emailOrUsername = _emailController.text.trim();
     final password = _passwordController.text;
     final confirm = _passwordConfirmController.text;
     final name = _nameController.text.trim();
+    final username = _usernameController.text.trim();
 
-    if (email.isEmpty || password.isEmpty) {
+    if (emailOrUsername.isEmpty || password.isEmpty) {
       setState(() {
         _error = ref.t('authErrorGeneric');
       });
@@ -109,12 +119,17 @@ class _AuthPageState extends ConsumerState<AuthPage> {
 
     try {
       if (_isLogin) {
-        await ref.read(authProvider.notifier).signIn(email, password);
+        await ref.read(authProvider.notifier).signIn(emailOrUsername, password);
         if (mounted) {
           context.go('/home');
         }
       } else {
-        await ref.read(authProvider.notifier).signUp(email, password, name);
+        await ref.read(authProvider.notifier).signUp(
+          emailOrUsername,
+          password,
+          name,
+          username: username.isEmpty ? null : username,
+        );
         if (mounted) {
           context.go('/choose-avatar');
         }
@@ -154,12 +169,44 @@ class _AuthPageState extends ConsumerState<AuthPage> {
     }
   }
 
+  Future<void> _handleAppleSignIn() async {
+    setState(() {
+      _error = null;
+      _loading = true;
+    });
+
+    try {
+      await ref.read(authProvider.notifier).signInWithApple();
+      if (mounted) {
+        final user = FirebaseAuth.instance.currentUser;
+        if (user != null) {
+          // Si pas de nom ou nom générique → demander le nom
+          final name = user.displayName ?? '';
+          final needsName = name.isEmpty || name.toLowerCase() == 'user';
+          if (needsName) {
+            context.go('/ask-name');
+          } else {
+            context.go('/home');
+          }
+        } else {
+          setState(() { _loading = false; });
+        }
+      }
+    } catch (err) {
+      setState(() {
+        _error = _getAuthErrorMessage(err);
+        _loading = false;
+      });
+    }
+  }
+
   @override
   void dispose() {
     _emailController.dispose();
     _passwordController.dispose();
     _passwordConfirmController.dispose();
     _nameController.dispose();
+    _usernameController.dispose();
     super.dispose();
   }
 
@@ -375,13 +422,30 @@ class _AuthPageState extends ConsumerState<AuthPage> {
                               icon: const Icon(Icons.person_outline, size: 20),
                             ),
                             const SizedBox(height: 16),
+                            CustomInput(
+                              controller: _usernameController,
+                              hintText: '@nom_utilisateur',
+                              icon: const Icon(Icons.alternate_email, size: 20),
+                              keyboardType: TextInputType.text,
+                              textInputAction: TextInputAction.next,
+                            ),
+                            const SizedBox(height: 16),
                           ],
 
                           CustomInput(
                             controller: _emailController,
-                            hintText: ref.t('email'),
-                            keyboardType: TextInputType.emailAddress,
-                            icon: const Icon(Icons.mail_outline, size: 20),
+                            hintText: _isLogin
+                                ? 'Email ou @nom_utilisateur'
+                                : ref.t('email'),
+                            keyboardType: _isLogin
+                                ? TextInputType.text
+                                : TextInputType.emailAddress,
+                            icon: Icon(
+                              _isLogin
+                                  ? Icons.person_outline
+                                  : Icons.mail_outline,
+                              size: 20,
+                            ),
                           ),
                           const SizedBox(height: 16),
 
@@ -507,41 +571,95 @@ class _AuthPageState extends ConsumerState<AuthPage> {
                             ),
                           ),
 
-                          // Google Sign-In Button
-                          GestureDetector(
-                            onTap: _loading ? null : _handleGoogleSignIn,
-                            child: Container(
-                              width: double.infinity,
-                              padding: const EdgeInsets.symmetric(vertical: 14.0),
-                              decoration: BoxDecoration(
-                                color: isDark ? AppColors.cardDark : Colors.white,
-                                border: Border.all(
-                                  color: isDark ? const Color(0x1AFFFFFF) : const Color(0xFFE2E8F0),
-                                  width: 1,
-                                ),
-                                borderRadius: BorderRadius.circular(16),
-                              ),
-                              child: Row(
-                                mainAxisAlignment: MainAxisAlignment.center,
-                                children: [
-                                  Image.asset(
-                                    'assets/images/google_logo.png', // Add simple asset or draw icon
-                                    width: 20,
-                                    height: 20,
-                                    errorBuilder: (context, error, stackTrace) => const Icon(
-                                      Icons.g_mobiledata,
-                                      size: 20,
-                                      color: Colors.red,
+                          // ── Social Sign-In Row (Apple & Google Side-by-Side) ──
+                          Row(
+                            children: [
+                              // Apple Button
+                              Expanded(
+                                child: GestureDetector(
+                                  onTap: _loading ? null : _handleAppleSignIn,
+                                  child: Container(
+                                    height: 48,
+                                    decoration: BoxDecoration(
+                                      color: isDark ? Colors.white : Colors.black,
+                                      borderRadius: BorderRadius.circular(14),
+                                      boxShadow: isDark
+                                          ? null
+                                          : [
+                                              BoxShadow(
+                                                color: Colors.black.withOpacity(0.08),
+                                                blurRadius: 4,
+                                                offset: const Offset(0, 1),
+                                              ),
+                                            ],
+                                    ),
+                                    child: Row(
+                                      mainAxisAlignment: MainAxisAlignment.center,
+                                      children: [
+                                        Icon(
+                                          Icons.apple,
+                                          color: isDark ? Colors.black : Colors.white,
+                                          size: 20,
+                                        ),
+                                        const SizedBox(width: 8),
+                                        Text(
+                                          ref.t('authApple'),
+                                          style: TextStyle(
+                                            fontSize: 14,
+                                            fontWeight: FontWeight.w600,
+                                            color: isDark ? Colors.black : Colors.white,
+                                          ),
+                                        ),
+                                      ],
                                     ),
                                   ),
-                                  const SizedBox(width: 12),
-                                  Text(
-                                    ref.t('authGoogle'),
-                                    style: AppTextStyles.bodySemiBold(isDark: isDark).copyWith(fontSize: 14),
-                                  ),
-                                ],
+                                ),
                               ),
-                            ),
+                              const SizedBox(width: 12),
+                              // Google Button
+                              Expanded(
+                                child: GestureDetector(
+                                  onTap: _loading ? null : _handleGoogleSignIn,
+                                  child: Container(
+                                    height: 48,
+                                    decoration: BoxDecoration(
+                                      color: isDark ? const Color(0xFF1D1B20) : Colors.white,
+                                      border: Border.all(
+                                        color: isDark
+                                            ? const Color(0xFF49454F)
+                                            : const Color(0xFFDADCE0),
+                                        width: 1,
+                                      ),
+                                      borderRadius: BorderRadius.circular(14),
+                                      boxShadow: isDark
+                                          ? null
+                                          : [
+                                              BoxShadow(
+                                                color: Colors.black.withOpacity(0.06),
+                                                blurRadius: 4,
+                                                offset: const Offset(0, 1),
+                                              ),
+                                            ],
+                                    ),
+                                    child: Row(
+                                      mainAxisAlignment: MainAxisAlignment.center,
+                                      children: [
+                                        const GoogleLogo(size: 18),
+                                        const SizedBox(width: 8),
+                                        Text(
+                                          ref.t('authGoogle'),
+                                          style: TextStyle(
+                                            fontSize: 14,
+                                            fontWeight: FontWeight.w600,
+                                            color: isDark ? Colors.white : const Color(0xFF1F1F1F),
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ],
                           ),
                         ],
                       ),

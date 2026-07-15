@@ -63,14 +63,17 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
       builder: (context) {
         return AlertDialog(
           backgroundColor: isDark ? AppColors.cardDark : AppColors.card,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
           title: Text(
             ref.t('fullName'),
             style: AppTextStyles.h3(isDark: isDark),
           ),
-          content: CustomInput(
-            controller: _nameController,
-            hintText: ref.t('fullName'),
+          content: SizedBox(
+            width: double.maxFinite,
+            child: CustomInput(
+              controller: _nameController,
+              hintText: ref.t('fullName'),
+            ),
           ),
           actions: [
             TextButton(
@@ -108,6 +111,7 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
         );
       },
     );
+
   }
 
   void _showAvatarSelectorDialog(BuildContext context) {
