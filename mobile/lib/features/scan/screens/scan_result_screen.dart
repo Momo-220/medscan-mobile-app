@@ -15,6 +15,7 @@ import '../../../shared/utils/localization.dart';
 import '../../../shared/widgets/card.dart';
 import '../../../shared/widgets/skeleton.dart';
 import '../../../shared/widgets/navigation_bar.dart';
+import '../../../shared/widgets/medical_sources_widget.dart';
 import '../providers/suggestions_provider.dart';
 import '../../../core/di/providers.dart';
 
@@ -718,17 +719,13 @@ class _ScanResultPageState extends ConsumerState<ScanResultPage> {
                 },
               ),
 
-              // Disclaimer text at bottom
-              const SizedBox(height: 32),
-              Center(
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 16.0),
-                  child: Text(
-                    scan.disclaimer ?? ref.t('disclaimerMedical'),
-                    style: AppTextStyles.micro(isDark: isDark),
-                    textAlign: TextAlign.center,
-                  ),
-                ),
+              // Premium Medical Sources & Warning disclaimers (Guideline 1.4.1)
+              const SizedBox(height: 24),
+              MedicalSourcesWidget(
+                medicationName: scan.medicationName,
+                genericName: scan.genericName,
+                explicitSources: scan.sources,
+                isAiResponse: true,
               ),
               // Generous bottom spacer to scroll above CustomNavigationBar
               const SizedBox(height: 120),

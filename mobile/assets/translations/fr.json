@@ -339,5 +339,8 @@
   "trialRemindersDesc": "Créez un compte pour recevoir des rappels quotidiens de prise de médicaments.",
   "autoRenewMidnight": "Renouvellement automatique à minuit",
   "trialGemsBenefit": "Votre compte bénéficie de 30 gemmes offertes chaque jour pour vos diagnostics.",
-  "chatNoGems": "Vous n'avez plus de gemmes pour discuter. Elles se rechargeront automatiquement à minuit."
+  "chatNoGems": "Vous n'avez plus de gemmes pour discuter. Elles se rechargeront automatiquement à minuit.",
+  "medicalSources": "📚 Sources médicales",
+  "aiDisclaimer": "Cette réponse est générée par une intelligence artificielle à partir de connaissances générales. Consultez toujours les sources officielles ci-dessous.",
+  "permanentMedicalDisclaimer": "Les informations fournies par MedScan sont destinées à un usage informatif uniquement et ne remplacent jamais l'avis d'un médecin ou d'un pharmacien."
 }

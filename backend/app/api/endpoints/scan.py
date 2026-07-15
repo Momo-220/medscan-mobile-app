@@ -398,6 +398,7 @@ async def scan_medication(
                 confidence=analysis.get("confidence", "low"),
                 disclaimer=analysis.get("disclaimer"),
                 warnings=analysis.get("warnings", []),
+                sources=analysis.get("sources", []),
                 analysis_data=analysis,
                 analyzed_at=datetime.utcnow().isoformat(),
             )
@@ -531,6 +532,7 @@ async def get_scan(
         confidence=scan_data.get("confidence", "low"),
         disclaimer=analysis.get("disclaimer", "⚕️ This is for informational purposes only."),
         warnings=scan_data.get("warnings", []),
+        sources=analysis.get("sources") or scan_data.get("sources", []),
         analysis_data=analysis,
         scanned_at=scan_data.get("scanned_at") or datetime.utcnow(),
         analyzed_at=scan_data.get("analyzed_at") or datetime.utcnow().isoformat(),

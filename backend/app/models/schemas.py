@@ -38,6 +38,7 @@ class ScanResponse(BaseModel):
     confidence: str = "high"
     disclaimer: Optional[str] = None
     warnings: Optional[List[str]] = None
+    sources: Optional[List[str]] = None
     analysis_data: Optional[dict] = None
     scanned_at: datetime = Field(default_factory=datetime.utcnow)
     analyzed_at: Optional[str] = None  # ISO string pour le frontend

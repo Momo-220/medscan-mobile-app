@@ -339,5 +339,8 @@
   "trialRemindersDesc": "Günlük ilaç hatırlatıcıları almak için bir hesap oluşturun.",
   "autoRenewMidnight": "Gece yarısı otomatik yenileme",
   "trialGemsBenefit": "Hesabınız, teşhisleriniz için her gün sunulan 30 ücretsiz mücevherden yararlanır.",
-  "chatNoGems": "Sohbet edecek mücevheriniz kalmadı. Gece yarısı otomatik olarak yüklenecektir."
+  "chatNoGems": "Sohbet edecek mücevheriniz kalmadı. Gece yarısı otomatik olarak yüklenecektir.",
+  "medicalSources": "📚 Tıbbi kaynaklar",
+  "aiDisclaimer": "Bu yanıt genel bilgilerden yapay zeka tarafından üretilmiştir. Her zaman aşağıdaki resmi kaynaklara danışın.",
+  "permanentMedicalDisclaimer": "MedScan tarafından sağlanan bilgiler yalnızca bilgilendirme amaçlıdır ve hiçbir zaman bir doktor veya eczacının tavsiyesinin yerini almaz."
 }

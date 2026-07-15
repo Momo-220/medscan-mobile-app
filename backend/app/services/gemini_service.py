@@ -56,7 +56,8 @@ Respond ONLY in JSON with these fields (be concise but complete):
   "packaging_language": "en",
   "category": "painkiller",
   "confidence": "high",
-  "disclaimer": "This analysis is for informational purposes only. Always consult your doctor or pharmacist."
+  "disclaimer": "This analysis is for informational purposes only. Always consult your doctor or pharmacist.",
+  "sources": ["List of official medical databases (e.g., DailyMed, OpenFDA, EMA) where this information can be verified"]
 }
 
 REQUIRED FIELDS (MUST ALWAYS BE PRESENT):
@@ -95,7 +96,8 @@ IMPORTANT:
   "packaging_language": "ar",
   "category": "مسكن",
   "confidence": "high",
-  "disclaimer": "هذا التحليل لأغراض إعلامية فقط. استشر دائماً طبيبك أو الصيدلي."
+  "disclaimer": "هذا التحليل لأغراض إعلامية فقط. استشر دائماً طبيبك أو الصيدلي.",
+  "sources": ["قائمة المصادر الطبية الرسمية (مثل DailyMed أو OpenFDA أو منظمة الصحة العالمية) للتحقق من المعلومات"]
 }
 
 الحقول المطلوبة:
@@ -132,7 +134,8 @@ SADECE JSON formatında şu alanlarla yanıt verin (kısa ama eksiksiz olun):
   "packaging_language": "tr",
   "category": "ağrı kesici",
   "confidence": "high",
-  "disclaimer": "Bu analiz yalnızca bilgilendirme amaçlıdır. Her zaman doktorunuza veya eczacınıza danışın."
+  "disclaimer": "Bu analiz yalnızca bilgilendirme amaçlıdır. Her zaman doktorunuza veya eczacınıza danışın.",
+  "sources": ["Bilgilerin doğrulanabileceği resmi tıbbi kaynakların listesi (örn: DailyMed, OpenFDA, EMA)"]
 }
 
 GEREKLİ ALANLAR:
@@ -169,7 +172,8 @@ Réponds UNIQUEMENT en JSON avec ces champs (sois concis mais complet) :
   "packaging_language": "fr",
   "category": "antidouleur",
   "confidence": "high",
-  "disclaimer": "Cette analyse est à titre informatif uniquement. Consultez toujours votre médecin ou pharmacien."
+  "disclaimer": "Cette analyse est à titre informatif uniquement. Consultez toujours votre médecin ou pharmacien.",
+  "sources": ["Liste des sources médicales officielles (ex : ANSM Base publique, DailyMed, EMA) pour vérifier les données"]
 }
 
 CHAMPS OBLIGATOIRES:
@@ -920,7 +924,7 @@ Analyze this medication image. Return ONLY a valid JSON object - no explanations
                 result["disclaimer"] = "Cette analyse est à titre informatif uniquement. Consultez toujours votre médecin ou pharmacien avant de prendre un médicament."
             
             # Ensure lists are lists
-            for list_field in ["contraindications", "side_effects", "interactions", "warnings"]:
+            for list_field in ["contraindications", "side_effects", "interactions", "warnings", "sources"]:
                 if list_field not in result:
                     result[list_field] = []
                 elif not isinstance(result[list_field], list):
