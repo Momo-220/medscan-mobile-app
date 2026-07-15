@@ -483,30 +483,35 @@ Analyze this medication image. Return ONLY a valid JSON object - no explanations
             }
             
             try:
-                response = await asyncio.to_thread(
-                    self.vision_model.generate_content,
-                    [prompt, image],
-                    generation_config=generation_config,
-                    safety_settings=MEDICAL_SAFETY_SETTINGS,
-                    request_options={"timeout": 25.0}
+                response = await asyncio.wait_for(
+                    asyncio.to_thread(
+                        self.vision_model.generate_content,
+                        [prompt, image],
+                        generation_config=generation_config,
+                        safety_settings=MEDICAL_SAFETY_SETTINGS,
+                    ),
+                    timeout=25.0
                 )
-            except Exception as e:
+            except (asyncio.TimeoutError, Exception) as e:
                 error_str = str(e)
-                if settings.GEMINI_API_KEY_2 and ("quota" in error_str.lower() or "429" in error_str or "surchargé" in error_str.lower() or "timeout" in error_str.lower()):
+                is_timeout = isinstance(e, asyncio.TimeoutError) or "timeout" in error_str.lower() or "deadline" in error_str.lower()
+                if settings.GEMINI_API_KEY_2 and ("quota" in error_str.lower() or "429" in error_str or "surchargé" in error_str.lower() or is_timeout):
                     rotated = await self._rotate_api_key()
                     if rotated:
                         logger.info("Retrying vision analysis with rotated API key and strict timeout")
-                        response = await asyncio.to_thread(
-                            self.vision_model.generate_content,
-                            [prompt, image],
-                            generation_config=generation_config,
-                            safety_settings=MEDICAL_SAFETY_SETTINGS,
-                            request_options={"timeout": 25.0}
+                        response = await asyncio.wait_for(
+                            asyncio.to_thread(
+                                self.vision_model.generate_content,
+                                [prompt, image],
+                                generation_config=generation_config,
+                                safety_settings=MEDICAL_SAFETY_SETTINGS,
+                            ),
+                            timeout=25.0
                         )
                     else:
-                        raise
+                        raise e
                 else:
-                    raise
+                    raise e
                 error_str = str(e)
                 error_type = type(e).__name__
                 
@@ -676,19 +681,26 @@ Analyze this medication image. Return ONLY a valid JSON object - no explanations
             chat_session = self.chat_model.start_chat(history=formatted_history)
             
             try:
-                response = await asyncio.to_thread(chat_session.send_message, message, request_options={"timeout": 25.0})
-            except Exception as e:
+                response = await asyncio.wait_for(
+                    asyncio.to_thread(chat_session.send_message, message),
+                    timeout=25.0
+                )
+            except (asyncio.TimeoutError, Exception) as e:
                 error_str = str(e)
-                if settings.GEMINI_API_KEY_2 and ("quota" in error_str.lower() or "429" in error_str or "surchargé" in error_str.lower() or "timeout" in error_str.lower()):
+                is_timeout = isinstance(e, asyncio.TimeoutError) or "timeout" in error_str.lower() or "deadline" in error_str.lower()
+                if settings.GEMINI_API_KEY_2 and ("quota" in error_str.lower() or "429" in error_str or "surchargé" in error_str.lower() or is_timeout):
                     rotated = await self._rotate_api_key()
                     if rotated:
                         logger.info("Retrying chat send_message with rotated API key and strict timeout")
                         chat_session = self.chat_model.start_chat(history=formatted_history)
-                        response = await asyncio.to_thread(chat_session.send_message, message, request_options={"timeout": 25.0})
+                        response = await asyncio.wait_for(
+                            asyncio.to_thread(chat_session.send_message, message),
+                            timeout=25.0
+                        )
                     else:
-                        raise
+                        raise e
                 else:
-                    raise
+                    raise e
             
             # Récupérer les tokens utilisés
             tokens_used = 0
@@ -760,19 +772,26 @@ Analyze this medication image. Return ONLY a valid JSON object - no explanations
             chat_session = self.chat_model.start_chat(history=formatted_history)
             
             try:
-                response = await asyncio.to_thread(chat_session.send_message, message, stream=True, request_options={"timeout": 25.0})
-            except Exception as e:
+                response = await asyncio.wait_for(
+                    asyncio.to_thread(chat_session.send_message, message, stream=True),
+                    timeout=25.0
+                )
+            except (asyncio.TimeoutError, Exception) as e:
                 error_str = str(e)
-                if settings.GEMINI_API_KEY_2 and ("quota" in error_str.lower() or "429" in error_str or "surchargé" in error_str.lower() or "timeout" in error_str.lower()):
+                is_timeout = isinstance(e, asyncio.TimeoutError) or "timeout" in error_str.lower() or "deadline" in error_str.lower()
+                if settings.GEMINI_API_KEY_2 and ("quota" in error_str.lower() or "429" in error_str or "surchargé" in error_str.lower() or is_timeout):
                     rotated = await self._rotate_api_key()
                     if rotated:
                         logger.info("Retrying chat stream send_message with rotated API key and strict timeout")
                         chat_session = self.chat_model.start_chat(history=formatted_history)
-                        response = await asyncio.to_thread(chat_session.send_message, message, stream=True, request_options={"timeout": 25.0})
+                        response = await asyncio.wait_for(
+                            asyncio.to_thread(chat_session.send_message, message, stream=True),
+                            timeout=25.0
+                        )
                     else:
-                        raise
+                        raise e
                 else:
-                    raise
+                    raise e
             
             for chunk in response:
                 if chunk.text:

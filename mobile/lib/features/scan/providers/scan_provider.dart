@@ -295,10 +295,34 @@ class ScanNotifier extends StateNotifier<ScanState> {
         errorMsg = 'INSUFFICIENT_CREDITS';
       } else if (e is NetworkException) {
         errorMsg = e.message;
+        if (errorMsg.contains('Failed to') || errorMsg.contains('request_options') || errorMsg.contains('Exception') || errorMsg.contains('Error')) {
+          errorMsg = languageCode == 'tr' 
+              ? 'Bir ağ hatası oluştu. Lütfen bağlantınızı kontrol edip tekrar deneyin.'
+              : languageCode == 'ar'
+                  ? 'حدث خطأ في الشبكة. يرجى التحقق من الاتصال والمحاولة مرة أخرى.'
+                  : languageCode == 'en'
+                      ? 'A network error occurred. Please check your connection and try again.'
+                      : 'Une erreur réseau est survenue. Veuillez vérifier votre connexion.';
+        }
       } else if (e is ServerException) {
         errorMsg = e.message;
+        if (errorMsg.contains('Failed to') || errorMsg.contains('request_options') || errorMsg.contains('Exception') || errorMsg.contains('Error') || errorMsg.contains('Unknown field')) {
+          errorMsg = languageCode == 'tr' 
+              ? 'Görsel analiz edilirken bir hata oluştu. Lütfen tekrar deneyin.'
+              : languageCode == 'ar'
+                  ? 'حدث خطأ أثناء تحليل الصورة. يرجى المحاولة مرة أخرى.'
+                  : languageCode == 'en'
+                      ? 'An error occurred during image analysis. Please try again.'
+                      : 'Une erreur est survenue lors de l\'analyse de l\'image. Veuillez réessayer.';
+        }
       } else {
-        errorMsg = 'Une erreur est survenue lors de l\'analyse de l\'image.';
+        errorMsg = languageCode == 'tr' 
+            ? 'Görsel analiz edilirken bir hata oluştu. Lütfen tekrar deneyin.'
+            : languageCode == 'ar'
+                ? 'حدث خطأ أثناء تحليل الصورة. يرجى المحاولة مرة أخرى.'
+                : languageCode == 'en'
+                    ? 'An error occurred during image analysis. Please try again.'
+                    : 'Une erreur est survenue lors de l\'analyse de l\'image. Veuillez réessayer.';
       }
 
       state = state.copyWith(
