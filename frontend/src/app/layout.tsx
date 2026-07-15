@@ -1,9 +1,8 @@
 import type { Metadata, Viewport } from 'next';
 import { Inter, Poppins } from 'next/font/google';
 import './globals.css';
-import { Providers } from '@/components/providers';
 
-// Font configuration - double typographie
+// Font configuration
 const inter = Inter({
   subsets: ['latin'],
   variable: '--font-lufga',
@@ -17,7 +16,7 @@ const poppins = Poppins({
   display: 'swap',
 });
 
-// Metadata for SEO and PWA
+// Metadata for SEO and PWA (automatically generates head tags)
 export const metadata: Metadata = {
   title: 'MediScan - Your Pharmaceutical Companion',
   description: 'A calm, intelligent, and trustworthy companion for medication management. Scan, learn, and stay safe with pharmaceutical guidance.',
@@ -64,27 +63,39 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="fr" className={`${inter.variable} ${poppins.variable}`} suppressHydrationWarning>
+    <html lang="fr" className={`${inter.variable} ${poppins.variable}`}>
       <head>
-        <link rel="icon" type="image/png" href="/logo.png" />
-        <link rel="apple-touch-icon" href="/logo.png" />
-        <link rel="preconnect" href="https://fonts.googleapis.com" />
-        <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
-        <link rel="preconnect" href="https://apis.google.com" />
-        {process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN && (
-          <link rel="preconnect" href={`https://${process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN}`} />
-        )}
-        <link rel="dns-prefetch" href="https://storage.googleapis.com" />
-        <meta name="mobile-web-app-capable" content="yes" />
-        <meta name="Permissions-Policy" content="camera=(self), microphone=()" />
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `
+              if (typeof window !== 'undefined' && 'serviceWorker' in navigator) {
+                navigator.serviceWorker.getRegistrations().then(function(registrations) {
+                  var hasUnregistered = false;
+                  for (var i = 0; i < registrations.length; i++) {
+                    registrations[i].unregister();
+                    hasUnregistered = true;
+                  }
+                  if (hasUnregistered) {
+                    if ('caches' in window) {
+                      caches.keys().then(function(names) {
+                        for (var j = 0; j < names.length; j++) {
+                          caches.delete(names[j]);
+                        }
+                      });
+                    }
+                    setTimeout(function() {
+                      window.location.reload();
+                    }, 200);
+                  }
+                });
+              }
+            `,
+          }}
+        />
       </head>
-      <body className="antialiased bg-background dark:bg-gray-900 text-text-primary dark:text-gray-100 transition-colors">
-        <Providers>
-          {children}
-        </Providers>
+      <body className="antialiased bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-100 transition-colors">
+        {children}
       </body>
     </html>
   );
 }
-
-

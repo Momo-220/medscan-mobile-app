@@ -59,7 +59,7 @@ class NotificationService {
 
     try {
       await _notificationsPlugin.initialize(
-        initializationSettings,
+        settings: initializationSettings,
         onDidReceiveNotificationResponse: (NotificationResponse details) {
           debugPrint('Notification clicked: ${details.payload}');
         },
@@ -162,14 +162,13 @@ class NotificationService {
 
       // Schedule recurring daily notification
       await _notificationsPlugin.zonedSchedule(
-        id,
-        title,
-        body,
-        scheduledDate,
-        platformDetails,
+        id: id,
+        title: title,
+        body: body,
+        scheduledDate: scheduledDate,
+        notificationDetails: platformDetails,
         androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
-        uiLocalNotificationDateInterpretation:
-            UILocalNotificationDateInterpretation.absoluteTime,
+        // Note: uiLocalNotificationDateInterpretation was removed in v18+
         matchDateTimeComponents: DateTimeComponents.time, // Daily match at the same time
         payload: id.toString(),
       );
@@ -214,10 +213,10 @@ class NotificationService {
       );
 
       await _notificationsPlugin.show(
-        id,
-        title,
-        body,
-        platformDetails,
+        id: id,
+        title: title,
+        body: body,
+        notificationDetails: platformDetails,
         payload: id.toString(),
       );
     } catch (e) {
@@ -227,7 +226,7 @@ class NotificationService {
 
   static Future<void> cancelReminder(int id) async {
     try {
-      await _notificationsPlugin.cancel(id);
+      await _notificationsPlugin.cancel(id: id);
     } catch (e) {
       debugPrint('Error cancelling local notification: $e');
     }

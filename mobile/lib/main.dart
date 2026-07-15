@@ -2,6 +2,7 @@ import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:google_sign_in/google_sign_in.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'core/di/providers.dart';
@@ -19,7 +20,7 @@ void main() async {
   // Load SharedPreferences instance
   final sharedPreferences = await SharedPreferences.getInstance();
 
-  // Initialize Firebase with explicit options (bypasses plist auto-detection issues on simulators)
+  // Initialize Firebase with explicit options
   try {
     await Firebase.initializeApp(
       options: const FirebaseOptions(
@@ -28,7 +29,8 @@ void main() async {
         messagingSenderId: '14523087808',
         projectId: 'medscan-915d3',
         storageBucket: 'medscan-915d3.firebasestorage.app',
-        iosBundleId: 'com.medscan.medscan',
+        // Fixed: must match PRODUCT_BUNDLE_IDENTIFIER in Runner.xcodeproj
+        iosBundleId: 'com.seinimomo.medscanapp',
       ),
     );
     debugPrint('Firebase initialized successfully!');
@@ -36,6 +38,14 @@ void main() async {
     await PushNotificationService.initialize();
   } catch (e) {
     debugPrint('Firebase initialization failed: $e');
+  }
+
+  // Initialize Google Sign-In (required once in v7.x before any authenticate() call)
+  try {
+    await GoogleSignIn.instance.initialize();
+    debugPrint('GoogleSignIn initialized successfully!');
+  } catch (e) {
+    debugPrint('GoogleSignIn initialization failed: $e');
   }
 
   // Lock device orientation to portrait

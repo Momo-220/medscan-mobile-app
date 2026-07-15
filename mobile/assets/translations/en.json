@@ -26,6 +26,7 @@
   "authSubtitle": "Your intelligent pharmaceutical companion",
   "authOr": "or",
   "authGoogle": "Continue with Google",
+  "authApple": "Continue with Apple",
   "authErrorInvalid": "Invalid email or password",
   "authErrorEmailUsed": "This email is already in use",
   "authErrorEmailExistsSignIn": "This email already exists. Sign in with your password.",

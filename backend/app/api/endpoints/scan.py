@@ -198,14 +198,7 @@ async def scan_medication(
             # Execute both in parallel
             analysis, image_url = await asyncio.gather(analysis_coro, upload_image_task())
             
-            # Ensure output is fully translated to requested app language
-            if language:
-                try:
-                    logger.info("Translating analysis to requested language", target_language=language)
-                    analysis = await gemini_service.translate_analysis(analysis, language)
-                except Exception as tr_err:
-                    logger.warning("Failed to translate analysis during scan", error=str(tr_err))
-            
+
             logger.info("Gemini analysis and image upload successful", 
                        medication=analysis.get("medication_name"),
                        category=analysis.get("category"),
@@ -462,24 +455,6 @@ async def get_scan(
 
     db_translations = scan_data.get("translations", {}) or {}
 
-    if language:
-        orig_lang = analysis.get("packaging_language") or scan_data.get("packaging_language") or "fr"
-        if language.lower() != orig_lang.lower():
-            target_lang_key = language.lower()
-            cached_trans = db_translations.get(target_lang_key)
-            if isinstance(cached_trans, dict) and ("indications" in cached_trans or "side_effects" in cached_trans) and "excipients" in cached_trans:
-                # Cache hit!
-                logger.info("Translation cache hit", scan_id=scan_id, language=language)
-                analysis = cached_trans
-            else:
-                # Cache miss!
-                try:
-                    from app.services.gemini_service import gemini_service
-                    analysis = await gemini_service.translate_analysis(analysis, language)
-                    db_translations[target_lang_key] = analysis
-                    scan_history_service.update_scan_translations(scan_id, db_translations)
-                except Exception as e:
-                    logger.error("Error during scan translation", error=str(e))
 
     def to_string(value, default=""):
         if value is None:
