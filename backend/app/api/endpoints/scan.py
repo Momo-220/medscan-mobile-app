@@ -205,19 +205,53 @@ async def scan_medication(
                        confidence=analysis.get("confidence"),
                        has_image_url=bool(image_url))
         except AIServiceError as e:
-            # Gérer spécifiquement les erreurs Gemini (quota, etc.)
-            error_str = str(e)
-            if "quota" in error_str.lower() or "429" in error_str or "surchargé" in error_str.lower():
-                logger.error("Gemini quota exceeded during scan", error=error_str)
+            error_str = str(e).lower()
+            lang_key = (language or "fr").lower()[:2]
+            
+            # Dictionnaire de messages conviviaux traduits
+            error_messages = {
+                "fr": {
+                    "quota": "Le service est temporairement surchargé. Réessayez dans quelques minutes.",
+                    "timeout": "L'analyse réseau a expiré. Veuillez reprendre une photo et réessayer.",
+                    "generic": "Impossible de lire le médicament sur cette photo. Assurez-vous que l'image est nette, bien éclairée, et réessayez."
+                },
+                "tr": {
+                    "quota": "Hizmet geçici olarak aşırı yüklendi. Lütfen birkaç dakika sonra tekrar deneyin.",
+                    "timeout": "Ağ analizi zaman aşımına uğradı. Lütfen yeni bir fotoğraf çekip tekrar deneyin.",
+                    "generic": "Bu fotoğraftaki ilaç okunamadı. Lütfen fotoğrafın net ve iyi aydınlatılmış olduğundan emin olup tekrar deneyin."
+                },
+                "en": {
+                    "quota": "The service is temporarily overloaded. Please try again in a few minutes.",
+                    "timeout": "Network analysis timed out. Please take a new photo and try again.",
+                    "generic": "Could not identify the medication from this photo. Please make sure the image is clear and well-lit, then try again."
+                },
+                "ar": {
+                    "quota": "الخدمة محملة بشكل زائد مؤقتاً. يرجى المحاولة مرة أخرى بعد بضع دقائق.",
+                    "timeout": "انتهت مهلة تحليل الشبكة. يرجى التقاط صورة جديدة والمحاولة مرة أخرى.",
+                    "generic": "تعذر التعرف على الدواء من هذه الصورة. يرجى التأكد من أن الصورة واضحة ومضاءة جيداً، ثم حاول مرة أخرى."
+                }
+            }
+            
+            # Fallback vers le français si la langue n'est pas supportée
+            msgs = error_messages.get(lang_key, error_messages["fr"])
+            
+            if "quota" in error_str or "429" in error_str or "surchargé" in error_str:
+                logger.error("Gemini quota exceeded during scan", error=str(e))
                 raise HTTPException(
                     status_code=status.HTTP_429_TOO_MANY_REQUESTS,
-                    detail="Service temporairement surchargé. Réessayez dans quelques minutes."
+                    detail=msgs["quota"]
+                )
+            elif "timeout" in error_str or "timed out" in error_str or "connection" in error_str:
+                logger.error("Gemini timeout during scan", error=str(e))
+                raise HTTPException(
+                    status_code=status.HTTP_504_GATEWAY_TIMEOUT,
+                    detail=msgs["timeout"]
                 )
             else:
-                logger.error("Gemini analysis failed", error=error_str)
+                logger.error("Gemini analysis failed", error=str(e))
                 raise HTTPException(
                     status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-                    detail=f"Impossible d'analyser l'image: {error_str}"
+                    detail=msgs["generic"]
                 )
         
         # 4. Build response - Notice pharmaceutique complète

@@ -123,21 +123,62 @@ async def chat_with_assistant(
         )
         
     except AIServiceError as e:
-        error_str = str(e)
-        if "quota" in error_str.lower() or "429" in error_str or "surchargé" in error_str.lower():
+        error_str = str(e).lower()
+        lang_key = (request.language or "fr").lower()[:2]
+        
+        # Dictionnaire de messages conviviaux traduits pour le chat
+        error_messages = {
+            "fr": {
+                "quota": "Le service de discussion est temporairement surchargé. Réessayez dans quelques minutes.",
+                "timeout": "La connexion avec l'IA a expiré. Veuillez renvoyer votre message.",
+                "generic": "Le service de discussion est indisponible pour le moment. Veuillez réessayer."
+            },
+            "tr": {
+                "quota": "Sohbet hizmeti geçici olarak aşırı yüklendi. Lütfen birkaç dakika sonra tekrar deneyin.",
+                "timeout": "Yapay zeka bağlantısı zaman aşımına uğradı. Lütfen mesajınızı tekrar gönderin.",
+                "generic": "Sohbet hizmeti şu anda kullanılamıyor. Lütfen daha sonra tekrar deneyin."
+            },
+            "en": {
+                "quota": "The chat service is temporarily overloaded. Please try again in a few minutes.",
+                "timeout": "The connection with the AI timed out. Please resend your message.",
+                "generic": "The chat service is currently unavailable. Please try again."
+            },
+            "ar": {
+                "quota": "خدمة الدردشة محملة بشكل زائد مؤقتاً. يرجى المحاولة مرة أخرى بعد بضع دقائق.",
+                "timeout": "انتهت مهلة الاتصال بالذكاء الاصطناعي. يرجى إعادة إرسال رسالتك.",
+                "generic": "خدمة الدردشة غير متوفرة حالياً. يرجى المحاولة مرة أخرى لاحقاً."
+            }
+        }
+        
+        msgs = error_messages.get(lang_key, error_messages["fr"])
+        
+        if "quota" in error_str or "429" in error_str or "surchargé" in error_str:
             raise HTTPException(
                 status_code=status.HTTP_429_TOO_MANY_REQUESTS,
-                detail="Service de chat temporairement surchargé. Réessayez dans quelques minutes."
+                detail=msgs["quota"]
             )
-        raise HTTPException(
-            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail=error_str
-        )
+        elif "timeout" in error_str or "timed out" in error_str or "connection" in error_str:
+            raise HTTPException(
+                status_code=status.HTTP_504_GATEWAY_TIMEOUT,
+                detail=msgs["timeout"]
+            )
+        else:
+            raise HTTPException(
+                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                detail=msgs["generic"]
+            )
     except Exception as e:
         logger.exception("Chat failed", user_id=user_id, error=str(e))
+        lang_key = (request.language or "fr").lower()[:2]
+        generic_errors = {
+            "fr": "Impossible de générer une réponse.",
+            "tr": "Yanıt oluşturulamadı.",
+            "en": "Failed to generate a response.",
+            "ar": "تعذر إنشاء رد."
+        }
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Impossible de générer une réponse.",
+            detail=generic_errors.get(lang_key, generic_errors["fr"]),
         )
 
 
@@ -277,16 +318,55 @@ async def chat_with_assistant_stream(
             
         except AIServiceError as e:
             logger.error("Streaming chat failed - AI Service Error", error=str(e))
-            yield f"data: {json.dumps({'error': str(e)})}\n\n"
+            error_str = str(e).lower()
+            lang_key = (chat_request.language or "fr").lower()[:2]
+            
+            error_messages = {
+                "fr": {
+                    "quota": "Le service de discussion est temporairement surchargé. Réessayez dans quelques minutes.",
+                    "timeout": "La connexion avec l'IA a expiré. Veuillez renvoyer votre message.",
+                    "generic": "Le service de discussion est indisponible pour le moment. Veuillez réessayer."
+                },
+                "tr": {
+                    "quota": "Sohbet hizmeti geçici olarak aşırı yüklendi. Lütfen birkaç dakika sonra tekrar deneyin.",
+                    "timeout": "Yapay zeka bağlantısı zaman aşımına uğradı. Lütfen mesajınızı tekrar gönderin.",
+                    "generic": "Sohbet hizmeti şu anda kullanılamıyor. Lütfen daha sonra tekrar deneyin."
+                },
+                "en": {
+                    "quota": "The chat service is temporarily overloaded. Please try again in a few minutes.",
+                    "timeout": "The connection with the AI timed out. Please resend your message.",
+                    "generic": "The chat service is currently unavailable. Please try again."
+                },
+                "ar": {
+                    "quota": "خدمة الدردشة محملة بشكل زائد مؤقتاً. يرجى المحاولة مرة أخرى بعد بضع دقائق.",
+                    "timeout": "انتهت مهلة الاتصال بالذكاء الاصطناعي. يرجى إعادة إرسال رسالتك.",
+                    "generic": "خدمة الدردشة غير متوفرة حالياً. يرجى المحاولة مرة أخرى لاحقاً."
+                }
+            }
+            
+            msgs = error_messages.get(lang_key, error_messages["fr"])
+            detail = msgs["generic"]
+            if "quota" in error_str or "429" in error_str or "surchargé" in error_str:
+                detail = msgs["quota"]
+            elif "timeout" in error_str or "timed out" in error_str or "connection" in error_str:
+                detail = msgs["timeout"]
+                
+            yield f"data: {json.dumps({'error': detail})}\n\n"
         except HTTPException as e:
-            # Si c'est une erreur 402, l'envoyer dans le stream
             if e.status_code == 402:
                 yield f"data: {json.dumps({'error': 'INSUFFICIENT_CREDITS', 'status': 402})}\n\n"
             else:
                 yield f"data: {json.dumps({'error': str(e.detail)})}\n\n"
         except Exception as e:
             logger.error("Streaming chat failed", error=str(e), exc_info=True)
-            yield f"data: {json.dumps({'error': f'Failed to generate response: {str(e)}'})}\n\n"
+            lang_key = (chat_request.language or "fr").lower()[:2]
+            generic_errors = {
+                "fr": "Impossible de générer une réponse.",
+                "tr": "Yanıt oluşturulamadı.",
+                "en": "Failed to generate a response.",
+                "ar": "تعذر إنشاء رد."
+            }
+            yield f"data: {json.dumps({'error': generic_errors.get(lang_key, generic_errors['fr'])})}\n\n"
     
     return StreamingResponse(
         generate(),
