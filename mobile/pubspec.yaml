@@ -77,6 +77,7 @@ dependencies:
   google_fonts: ^8.1.0
   path_provider: ^2.1.6
   flutter_timezone: ^5.1.0
+  url_launcher: ^6.3.2
 
 dev_dependencies:
   flutter_test:

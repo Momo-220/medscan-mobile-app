@@ -10,6 +10,7 @@ import '../../../core/constants/text_styles.dart';
 import '../../../shared/utils/localization.dart';
 import '../../../shared/widgets/button.dart';
 import '../../../shared/widgets/card.dart';
+import '../../../shared/widgets/medical_sources_widget.dart';
 import '../providers/chat_provider.dart';
 import '../../home/providers/credits_provider.dart';
 import '../../../shared/utils/pill_notification.dart';
@@ -421,45 +422,61 @@ class _ChatPageState extends ConsumerState<ChatPage> {
 
                             // Message Bubble
                             Flexible(
-                              child: Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                                decoration: BoxDecoration(
-                                  color: isUser
-                                      ? AppColors.primary
-                                      : (isDark ? AppColors.cardDark : Colors.white),
-                                  borderRadius: BorderRadius.only(
-                                    topLeft: const Radius.circular(20),
-                                    topRight: const Radius.circular(20),
-                                    bottomLeft: Radius.circular(isUser ? 20 : 0),
-                                    bottomRight: Radius.circular(isUser ? 0 : 20),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                                    decoration: BoxDecoration(
+                                      color: isUser
+                                          ? AppColors.primary
+                                          : (isDark ? AppColors.cardDark : Colors.white),
+                                      borderRadius: BorderRadius.only(
+                                        topLeft: const Radius.circular(20),
+                                        topRight: const Radius.circular(20),
+                                        bottomLeft: Radius.circular(isUser ? 20 : 0),
+                                        bottomRight: Radius.circular(isUser ? 0 : 20),
+                                      ),
+                                      boxShadow: [
+                                        BoxShadow(
+                                          color: Colors.black.withOpacity(0.03),
+                                          blurRadius: 10,
+                                          offset: const Offset(0, 4),
+                                        ),
+                                      ],
+                                    ),
+                                    child: isUser
+                                        ? Text(
+                                            msg.content,
+                                            style: AppTextStyles.small(isDark: false)
+                                                .copyWith(color: Colors.white),
+                                          )
+                                        : (index == messages.length - 1
+                                            ? TypingMarkdown(
+                                                data: msg.content,
+                                                isDark: isDark,
+                                                onCharacterTyped: _scrollToBottom,
+                                              )
+                                            : MarkdownBody(
+                                                data: msg.content,
+                                                styleSheet: MarkdownStyleSheet.fromTheme(Theme.of(context)).copyWith(
+                                                  p: AppTextStyles.small(isDark: isDark).copyWith(height: 1.5),
+                                                  listBullet: AppTextStyles.small(isDark: isDark),
+                                                ),
+                                              )),
                                   ),
-                                  boxShadow: [
-                                    BoxShadow(
-                                      color: Colors.black.withOpacity(0.03),
-                                      blurRadius: 10,
-                                      offset: const Offset(0, 4),
+                                  if (!isUser) ...[
+                                    const SizedBox(height: 6),
+                                    Padding(
+                                      padding: const EdgeInsets.only(right: 16.0),
+                                      child: MedicalSourcesWidget(
+                                        medicationName: '',
+                                        isAiResponse: true,
+                                      ),
                                     ),
                                   ],
-                                ),
-                                child: isUser
-                                    ? Text(
-                                        msg.content,
-                                        style: AppTextStyles.small(isDark: false)
-                                            .copyWith(color: Colors.white),
-                                      )
-                                    : (index == messages.length - 1
-                                        ? TypingMarkdown(
-                                            data: msg.content,
-                                            isDark: isDark,
-                                            onCharacterTyped: _scrollToBottom,
-                                          )
-                                        : MarkdownBody(
-                                            data: msg.content,
-                                            styleSheet: MarkdownStyleSheet.fromTheme(Theme.of(context)).copyWith(
-                                              p: AppTextStyles.small(isDark: isDark).copyWith(height: 1.5),
-                                              listBullet: AppTextStyles.small(isDark: isDark),
-                                            ),
-                                          )),
+                                ],
                               ),
                             ),
 

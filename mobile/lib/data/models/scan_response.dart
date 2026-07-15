@@ -26,6 +26,7 @@ class ScanResponse {
   final String confidence;
   final String? disclaimer;
   final List<String> warnings;
+  final List<String> sources;
   final Map<String, dynamic>? analysisData;
   final DateTime scannedAt;
   final String? analyzedAt;
@@ -58,6 +59,7 @@ class ScanResponse {
     required this.confidence,
     this.disclaimer,
     required this.warnings,
+    required this.sources,
     this.analysisData,
     required this.scannedAt,
     this.analyzedAt,
@@ -109,6 +111,7 @@ class ScanResponse {
       confidence: json['confidence'] as String? ?? 'high',
       disclaimer: json['disclaimer'] as String? ?? '⚕️ Ceci est uniquement à titre informatif.',
       warnings: _parseList(json['warnings']),
+      sources: _parseList(json['sources']),
       analysisData: json['analysis_data'] as Map<String, dynamic>?,
       scannedAt: json['scanned_at'] != null 
           ? DateTime.parse(json['scanned_at'] as String) 
@@ -146,6 +149,7 @@ class ScanResponse {
       'confidence': confidence,
       'disclaimer': disclaimer,
       'warnings': warnings,
+      'sources': sources,
       'analysis_data': analysisData,
       'scanned_at': scannedAt.toIso8601String(),
       'analyzed_at': analyzedAt,
