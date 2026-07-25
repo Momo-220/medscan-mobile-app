@@ -18,14 +18,18 @@ class PushNotificationService {
       if (settings.authorizationStatus == AuthorizationStatus.authorized) {
         debugPrint('Push Notification Permission Granted!');
         
-        try {
-          // 2. Fetch FCM Token (highly useful for console/API testing)
-          final token = await _messaging.getToken();
-          debugPrint('FCM DEVICE TOKEN: $token');
-        } catch (tokenError) {
-          debugPrint('⚠️ Impossible de générer le token FCM sur iOS : $tokenError');
-          debugPrint('👉 C\'est tout à fait normal si vous utilisez un compte développeur Apple gratuit (sans capability Push Notifications ni clé APNs .p8 dans Firebase).');
-        }
+          try {
+            // 2. Fetch FCM Token (highly useful for console/API testing)
+            final token = await _messaging.getToken();
+            debugPrint('FCM DEVICE TOKEN: $token');
+            
+            // Subscribe to global topics for broadcast update notifications
+            await _messaging.subscribeToTopic('all_users');
+            await _messaging.subscribeToTopic('updates');
+          } catch (tokenError) {
+            debugPrint('⚠️ Impossible de générer le token FCM sur iOS : $tokenError');
+            debugPrint('👉 C\'est tout à fait normal si vous utilisez un compte développeur Apple gratuit (sans capability Push Notifications ni clé APNs .p8 dans Firebase).');
+          }
       } else {
         debugPrint('Push Notification Permission Denied or Not Determined');
       }

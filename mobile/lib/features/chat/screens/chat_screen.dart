@@ -26,19 +26,45 @@ class _ChatPageState extends ConsumerState<ChatPage> {
   final TextEditingController _messageController = TextEditingController();
   final ScrollController _scrollController = ScrollController();
   bool _sending = false;
+  bool _autoScrollEnabled = true;
 
   @override
   void initState() {
     super.initState();
+    _scrollController.addListener(_onScroll);
     // Auto scroll to bottom when keyboard opens or list loads
     WidgetsBinding.instance.addPostFrameCallback((_) => _scrollToBottom(animated: false));
   }
 
   @override
   void dispose() {
+    _scrollController.removeListener(_onScroll);
     _messageController.dispose();
     _scrollController.dispose();
     super.dispose();
+  }
+
+  void _onScroll() {
+    if (!_scrollController.hasClients) return;
+    
+    final maxScroll = _scrollController.position.maxScrollExtent;
+    final currentScroll = _scrollController.position.pixels;
+    
+    // If user is within 40px of bottom, auto-scroll remains active
+    if (maxScroll - currentScroll <= 40) {
+      if (!_autoScrollEnabled) {
+        setState(() {
+          _autoScrollEnabled = true;
+        });
+      }
+    } else {
+      // If user scrolls up, disable auto-scroll to let them read in peace
+      if (_autoScrollEnabled) {
+        setState(() {
+          _autoScrollEnabled = false;
+        });
+      }
+    }
   }
 
   void _scrollToBottom({bool animated = true}) {
@@ -63,6 +89,7 @@ class _ChatPageState extends ConsumerState<ChatPage> {
     _messageController.clear();
     setState(() {
       _sending = true;
+      _autoScrollEnabled = true; // Auto scroll active when sending
     });
 
     final langCode = ref.read(languageProvider);
@@ -159,9 +186,11 @@ class _ChatPageState extends ConsumerState<ChatPage> {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final chatState = ref.watch(chatProvider);
 
-    // Auto scroll when streaming updates (state changes)
-    ref.listen(chatProvider, (previous, next) {
-      WidgetsBinding.instance.addPostFrameCallback((_) => _scrollToBottom());
+    // Auto scroll dynamically when new chunks arrive
+    ref.listen<String>(chatStreamingProvider, (previous, next) {
+      if (next.isNotEmpty && _autoScrollEnabled) {
+        WidgetsBinding.instance.addPostFrameCallback((_) => _scrollToBottom(animated: true));
+      }
     });
 
     return Scaffold(
@@ -403,18 +432,22 @@ class _ChatPageState extends ConsumerState<ChatPage> {
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             if (!isUser) ...[
-                              // Assistant Avatar
+                              // Assistant Avatar (Dr. Sarah Martin)
                               Container(
                                 width: 36,
                                 height: 36,
-                                decoration: const BoxDecoration(
-                                  color: AppColors.primary,
+                                decoration: BoxDecoration(
                                   shape: BoxShape.circle,
+                                  border: Border.all(
+                                    color: isDark ? const Color(0x1AFFFFFF) : const Color(0xFFE2E8F0),
+                                    width: 1.5,
+                                  ),
                                 ),
-                                child: const Icon(
-                                  Icons.medical_services_outlined,
-                                  color: Colors.white,
-                                  size: 18,
+                                child: ClipOval(
+                                  child: Image.asset(
+                                    'assets/images/doctor-png.jpg',
+                                    fit: BoxFit.cover,
+                                  ),
                                 ),
                               ),
                               const SizedBox(width: 8),
@@ -427,6 +460,7 @@ class _ChatPageState extends ConsumerState<ChatPage> {
                                 mainAxisSize: MainAxisSize.min,
                                 children: [
                                   Container(
+                                    width: isUser ? null : double.infinity,
                                     padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
                                     decoration: BoxDecoration(
                                       color: isUser
@@ -452,12 +486,8 @@ class _ChatPageState extends ConsumerState<ChatPage> {
                                             style: AppTextStyles.small(isDark: false)
                                                 .copyWith(color: Colors.white),
                                           )
-                                        : (index == messages.length - 1
-                                            ? TypingMarkdown(
-                                                data: msg.content,
-                                                isDark: isDark,
-                                                onCharacterTyped: _scrollToBottom,
-                                              )
+                                        : (index == messages.length - 1 && msg.content.isEmpty
+                                            ? const StreamingMarkdownWidget()
                                             : MarkdownBody(
                                                 data: msg.content,
                                                 styleSheet: MarkdownStyleSheet.fromTheme(Theme.of(context)).copyWith(
@@ -494,10 +524,19 @@ class _ChatPageState extends ConsumerState<ChatPage> {
                                     width: 1.5,
                                   ),
                                 ),
-                                child: const Icon(
-                                  Icons.person,
-                                  color: AppColors.primary,
-                                  size: 18,
+                                child: ClipOval(
+                                  child: () {
+                                    final currentUser = FirebaseAuth.instance.currentUser;
+                                    final avatarPath = currentUser?.photoURL;
+                                    if (avatarPath != null && avatarPath.isNotEmpty) {
+                                      return Image.asset(avatarPath, fit: BoxFit.cover);
+                                    }
+                                    return const Icon(
+                                      Icons.person,
+                                      color: AppColors.primary,
+                                      size: 18,
+                                    );
+                                  }(),
                                 ),
                               ),
                             ],
@@ -669,76 +708,88 @@ class _ChatPageState extends ConsumerState<ChatPage> {
   }
 }
 
-class TypingMarkdown extends StatefulWidget {
-  final String data;
-  final bool isDark;
-  final VoidCallback? onCharacterTyped;
-
-  const TypingMarkdown({
-    super.key,
-    required this.data,
-    required this.isDark,
-    this.onCharacterTyped,
-  });
+class StreamingMarkdownWidget extends ConsumerWidget {
+  const StreamingMarkdownWidget({super.key});
 
   @override
-  State<TypingMarkdown> createState() => _TypingMarkdownState();
+  Widget build(BuildContext context, WidgetRef ref) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final streamText = ref.watch(chatStreamingProvider);
+
+    if (streamText.isEmpty) {
+      // Elegant typing indicator
+      return Align(
+        alignment: Alignment.centerLeft,
+        child: SizedBox(
+          width: 40,
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: List.generate(3, (index) {
+              return _BlinkingDot(delay: index * 200);
+            }),
+          ),
+        ),
+      );
+    }
+
+    return MarkdownBody(
+      data: streamText,
+      styleSheet: MarkdownStyleSheet.fromTheme(Theme.of(context)).copyWith(
+        p: AppTextStyles.small(isDark: isDark).copyWith(height: 1.5),
+        listBullet: AppTextStyles.small(isDark: isDark),
+      ),
+    );
+  }
 }
 
-class _TypingMarkdownState extends State<TypingMarkdown> {
-  String _displayedText = '';
-  Timer? _timer;
-  int _currentIndex = 0;
+class _BlinkingDot extends StatefulWidget {
+  final int delay;
+  const _BlinkingDot({required this.delay});
+
+  @override
+  State<_BlinkingDot> createState() => _BlinkingDotState();
+}
+
+class _BlinkingDotState extends State<_BlinkingDot> with SingleTickerProviderStateMixin {
+  late AnimationController _controller;
+  late Animation<double> _animation;
 
   @override
   void initState() {
     super.initState();
-    _startTyping();
-  }
+    _controller = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 1000),
+    );
+    _animation = Tween<double>(begin: 0.2, end: 1.0).animate(
+      CurvedAnimation(parent: _controller, curve: Curves.easeInOut),
+    );
 
-  @override
-  void didUpdateWidget(covariant TypingMarkdown oldWidget) {
-    super.didUpdateWidget(oldWidget);
-    if (oldWidget.data != widget.data) {
-      _startTyping();
-    }
-  }
-
-  @override
-  void dispose() {
-    _timer?.cancel();
-    super.dispose();
-  }
-
-  void _startTyping() {
-    if (_timer != null && _timer!.isActive) return;
-
-    _timer = Timer.periodic(const Duration(milliseconds: 15), (timer) {
-      if (_currentIndex < widget.data.length) {
-        setState(() {
-          _currentIndex++;
-          _displayedText = widget.data.substring(0, _currentIndex);
-        });
-        if (widget.onCharacterTyped != null) {
-          widget.onCharacterTyped!();
-        }
-      } else {
-        _timer?.cancel();
+    Future.delayed(Duration(milliseconds: widget.delay), () {
+      if (mounted) {
+        _controller.repeat(reverse: true);
       }
     });
   }
 
   @override
-  Widget build(BuildContext context) {
-    final textToDisplay = _displayedText.isEmpty && widget.data.isNotEmpty
-        ? widget.data
-        : (_displayedText.isEmpty ? 'Typing...' : _displayedText);
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
 
-    return MarkdownBody(
-      data: textToDisplay,
-      styleSheet: MarkdownStyleSheet.fromTheme(Theme.of(context)).copyWith(
-        p: AppTextStyles.small(isDark: widget.isDark).copyWith(height: 1.5),
-        listBullet: AppTextStyles.small(isDark: widget.isDark),
+  @override
+  Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    return FadeTransition(
+      opacity: _animation,
+      child: Container(
+        width: 7,
+        height: 7,
+        decoration: BoxDecoration(
+          color: isDark ? Colors.white60 : Colors.black45,
+          shape: BoxShape.circle,
+        ),
       ),
     );
   }

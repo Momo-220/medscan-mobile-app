@@ -6,6 +6,9 @@ import 'package:go_router/go_router.dart';
 import '../../../core/constants/colors.dart';
 import '../../../core/constants/text_styles.dart';
 import '../../../core/di/providers.dart';
+import '../../../shared/services/notification_service.dart';
+import '../../../shared/services/version_service.dart';
+import '../../../shared/widgets/version_update_dialog.dart';
 import '../../../shared/utils/localization.dart';
 import '../../../shared/widgets/button.dart';
 import '../../../shared/widgets/card.dart';
@@ -19,6 +22,37 @@ import 'widgets/health_tips_card.dart';
 
 class HomePage extends ConsumerWidget {
   const HomePage({super.key});
+
+  void _notifyNewVersionIfFirstTime(WidgetRef ref, String latestVersion) async {
+    final prefs = ref.read(sharedPrefsServiceProvider);
+    final lastNotified = prefs.getString('last_notified_update_version');
+    if (lastNotified != latestVersion) {
+      final lang = ref.read(languageProvider);
+      String title;
+      String body;
+
+      if (lang == 'en') {
+        title = '🎉 New MedScan update available!';
+        body = 'Version $latestVersion is now available. Tap to update and enjoy the latest features!';
+      } else if (lang == 'tr') {
+        title = '🎉 Yeni MedScan güncellemesi mevcut!';
+        body = '$latestVersion sürümü yayında. En son özellikleri kullanmak için şimdi güncelleyin!';
+      } else if (lang == 'ar') {
+        title = '🎉 تحديث جديد متاح لـ MedScan!';
+        body = 'الإصدار $latestVersion متاح الآن. اضغط للتحديث والاستفادة من أحدث الميزات!';
+      } else {
+        title = '🎉 Nouvelle mise à jour MedScan disponible !';
+        body = 'La version $latestVersion est disponible. Cliquez pour mettre à jour et profiter des dernières améliorations !';
+      }
+
+      await NotificationService.showInstantNotification(
+        id: 999999,
+        title: title,
+        body: body,
+      );
+      await prefs.setString('last_notified_update_version', latestVersion);
+    }
+  }
 
   String _getGreeting(String tMorning, String tEvening) {
     final hour = DateTime.now().hour;
@@ -132,6 +166,41 @@ class HomePage extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
+
+    // Listen to remote version checking status
+    ref.listen<AsyncValue<AppVersionStatus>>(versionCheckProvider, (previous, next) {
+      next.whenOrNull(
+        data: (status) {
+          if (status is MaintenanceStatus) {
+            showDialog(
+              context: context,
+              barrierDismissible: false,
+              builder: (context) => MaintenanceDialog(message: status.message),
+            );
+          } else if (status is UpdateRequiredStatus) {
+            _notifyNewVersionIfFirstTime(ref, status.config.latestVersion);
+            showDialog(
+              context: context,
+              barrierDismissible: false,
+              builder: (context) => VersionUpdateDialog(
+                config: status.config,
+                isForceUpdate: true,
+              ),
+            );
+          } else if (status is UpdateAvailableStatus) {
+            _notifyNewVersionIfFirstTime(ref, status.config.latestVersion);
+            showDialog(
+              context: context,
+              barrierDismissible: true,
+              builder: (context) => VersionUpdateDialog(
+                config: status.config,
+                isForceUpdate: false,
+              ),
+            );
+          }
+        },
+      );
+    });
     
     // Auth & local name extraction
     final user = FirebaseAuth.instance.currentUser;

@@ -536,24 +536,55 @@ class _ScanPageState extends ConsumerState<ScanPage> with SingleTickerProviderSt
                           ],
                         ),
                         const SizedBox(height: 12),
-                        ClipRRect(
-                          borderRadius: BorderRadius.circular(8),
-                          child: TweenAnimationBuilder<double>(
-                            duration: const Duration(milliseconds: 600),
-                            curve: Curves.easeOutCubic,
-                            tween: Tween<double>(
-                              begin: 0,
-                              end: scanState.progressPercent / 100.0,
-                            ),
-                            builder: (context, value, child) {
-                              return LinearProgressIndicator(
-                                value: value,
-                                backgroundColor: isDark ? Colors.white10 : const Color(0xFFE2E8F0),
-                                valueColor: const AlwaysStoppedAnimation<Color>(Color(0xFF3B82F6)),
-                                minHeight: 8,
-                              );
-                            },
+                        TweenAnimationBuilder<double>(
+                          duration: const Duration(milliseconds: 1000),
+                          curve: Curves.easeInOutCubic,
+                          tween: Tween<double>(
+                            begin: 0,
+                            end: scanState.progressPercent / 100.0,
                           ),
+                          builder: (context, value, child) {
+                            return Container(
+                              height: 10,
+                              width: double.infinity,
+                              decoration: BoxDecoration(
+                                color: isDark ? const Color(0xFF1E293B) : const Color(0xFFF1F5F9),
+                                borderRadius: BorderRadius.circular(5),
+                              ),
+                              child: LayoutBuilder(
+                                builder: (context, constraints) {
+                                  final currentWidth = constraints.maxWidth * value;
+                                  return Align(
+                                    alignment: Alignment.centerLeft,
+                                    child: AnimatedContainer(
+                                      duration: const Duration(milliseconds: 150),
+                                      curve: Curves.easeOutQuad,
+                                      width: currentWidth,
+                                      height: 10,
+                                      decoration: BoxDecoration(
+                                        gradient: const LinearGradient(
+                                          colors: [
+                                            Color(0xFF3B82F6),
+                                            Color(0xFF60A5FA),
+                                            Color(0xFF00F5D4),
+                                          ],
+                                        ),
+                                        borderRadius: BorderRadius.circular(5),
+                                        boxShadow: [
+                                          BoxShadow(
+                                            color: const Color(0xFF3B82F6).withOpacity(0.35),
+                                            blurRadius: 6,
+                                            spreadRadius: 1,
+                                            offset: const Offset(0, 1),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                  );
+                                },
+                              ),
+                            );
+                          },
                         ),
                       ],
                     ),

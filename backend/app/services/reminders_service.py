@@ -17,8 +17,33 @@ def calculate_next_dose(time_str: str, frequency: str, days: Optional[List[int]]
     now = datetime.now()
     hour, minute = map(int, time_str.split(":"))
     next_dose = now.replace(hour=hour, minute=minute, second=0, microsecond=0)
-    if next_dose <= now:
-        next_dose += timedelta(days=1)
+    
+    # 1. Base dose calculation by frequency
+    if frequency == "twice":
+        doses_today = [next_dose, next_dose + timedelta(hours=12)]
+        candidates = [d for d in doses_today if d > now]
+        if candidates:
+            next_dose = candidates[0]
+        else:
+            next_dose = next_dose + timedelta(days=1)
+    elif frequency == "three-times":
+        doses_today = [next_dose, next_dose + timedelta(hours=8), next_dose + timedelta(hours=16)]
+        candidates = [d for d in doses_today if d > now]
+        if candidates:
+            next_dose = candidates[0]
+        else:
+            next_dose = next_dose + timedelta(days=1)
+    else:  # daily
+        if next_dose <= now:
+            next_dose += timedelta(days=1)
+            
+    # 2. Weekday constraint adjustment
+    if days:
+        loops = 0
+        while next_dose.weekday() not in days and loops < 365:
+            next_dose = next_dose.replace(hour=hour, minute=minute) + timedelta(days=1)
+            loops += 1
+            
     return next_dose
 
 
@@ -96,14 +121,24 @@ def mark_taken(reminder_id: str, user_id: str, taken_at: Optional[datetime] = No
         return None
     taken_at = taken_at or datetime.utcnow()
     # next_dose
+    base_next = doc["next_dose"]
     if doc["frequency"] == "daily":
-        next_dose = doc["next_dose"] + timedelta(days=1)
+        next_dose = base_next + timedelta(days=1)
     elif doc["frequency"] == "twice":
-        next_dose = doc["next_dose"] + timedelta(hours=12)
+        next_dose = base_next + timedelta(hours=12)
     elif doc["frequency"] == "three-times":
-        next_dose = doc["next_dose"] + timedelta(hours=8)
+        next_dose = base_next + timedelta(hours=8)
     else:
-        next_dose = calculate_next_dose(doc["time"], doc["frequency"], doc.get("days"))
+        next_dose = base_next + timedelta(days=1)
+        
+    days = doc.get("days")
+    if days:
+        hour, minute = map(int, doc["time"].split(":"))
+        loops = 0
+        while next_dose.weekday() not in days and loops < 365:
+            next_dose = next_dose.replace(hour=hour, minute=minute) + timedelta(days=1)
+            loops += 1
+
     coll.update_one(
         {"id": reminder_id, "user_id": user_id},
         {"$set": {"next_dose": next_dose, "updated_at": datetime.utcnow()}},

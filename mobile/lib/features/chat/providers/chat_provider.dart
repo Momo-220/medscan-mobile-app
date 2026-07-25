@@ -98,9 +98,12 @@ class ChatNotifier extends StateNotifier<AsyncValue<List<ChatMessage>>> {
 
     state = AsyncValue.data([...currentMessages, userMsg, assistantMsgPlaceholder]);
 
-    // Track active assistant index to update dynamically during streaming
+    // Track active assistant index to update dynamically
     final int assistantIndex = state.value!.length - 1;
     String fullResponse = '';
+
+    // Initialize the streaming state
+    _ref.read(chatStreamingProvider.notifier).state = '';
 
     try {
       final token = await user.getIdToken() ?? await _ref.read(secureStorageServiceProvider).getAuthToken();
@@ -145,16 +148,8 @@ class ChatNotifier extends StateNotifier<AsyncValue<List<ChatMessage>>> {
             if (data['chunk'] != null) {
               fullResponse += data['chunk'] as String;
               
-              // Update assistant message content in state in real-time
-              if (mounted) {
-                final list = List<ChatMessage>.from(state.value!);
-                list[assistantIndex] = ChatMessage(
-                  role: 'assistant',
-                  content: fullResponse,
-                  timestamp: list[assistantIndex].timestamp,
-                );
-                state = AsyncValue.data(list);
-              }
+              // Only update the stream provider to trigger local rebuilds, no general state rebuild
+              _ref.read(chatStreamingProvider.notifier).state = fullResponse;
             }
           } catch (e) {
             if (e is InsufficientCreditsException) rethrow;
@@ -168,21 +163,36 @@ class ChatNotifier extends StateNotifier<AsyncValue<List<ChatMessage>>> {
       // Refresh credits balance provider
       _ref.read(creditsProvider.notifier).fetchCredits(quietly: true);
 
-      // Save cache locally
-      if (mounted) {
-        _saveCache(user.uid, state.value!);
-      }
-    } catch (e) {
-      // Revert assistant message placeholder on error and show warning
+      // Once generation is finished, commit final response to general persistent state
       if (mounted) {
         final list = List<ChatMessage>.from(state.value!);
-        list.removeAt(assistantIndex); // Remove placeholder
+        list[assistantIndex] = ChatMessage(
+          role: 'assistant',
+          content: fullResponse,
+          timestamp: list[assistantIndex].timestamp,
+        );
         state = AsyncValue.data(list);
+        _saveCache(user.uid, list);
       }
+      
+      // Clear streaming state
+      _ref.read(chatStreamingProvider.notifier).state = '';
+    } catch (e) {
+      // Revert assistant message placeholder on error and clear streaming state
+      if (mounted) {
+        final list = List<ChatMessage>.from(state.value!);
+        if (list.length > assistantIndex) {
+          list.removeAt(assistantIndex);
+          state = AsyncValue.data(list);
+        }
+      }
+      _ref.read(chatStreamingProvider.notifier).state = '';
       rethrow;
     }
   }
 }
+
+final chatStreamingProvider = StateProvider<String>((ref) => '');
 
 final chatProvider = StateNotifierProvider<ChatNotifier, AsyncValue<List<ChatMessage>>>((ref) {
   return ChatNotifier(ref);

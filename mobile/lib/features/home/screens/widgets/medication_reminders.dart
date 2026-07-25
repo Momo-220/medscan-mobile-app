@@ -12,6 +12,289 @@ import '../../../../shared/widgets/skeleton.dart';
 import '../../../reminders/providers/reminders_provider.dart';
 import '../../../../data/models/reminder.dart';
 import '../../../../shared/utils/pill_notification.dart';
+import '../../../../shared/widgets/reminder_countdown_widget.dart';
+void showAddEditReminderDialog(
+  BuildContext context,
+  WidgetRef ref, {
+  Reminder? reminder,
+  String? initialMedicationName,
+  String? initialDosage,
+}) {
+  final isDark = Theme.of(context).brightness == Brightness.dark;
+  final isEdit = reminder != null;
+
+  final nameController = TextEditingController(text: reminder?.medicationName ?? initialMedicationName ?? '');
+  final dosageController = TextEditingController(text: reminder?.dosage ?? initialDosage ?? '');
+  
+  // Default time parsing
+  String selectedTime = reminder?.time ?? '08:00';
+  final initialParts = selectedTime.split(':');
+  TimeOfDay timeOfDay = TimeOfDay(
+    hour: int.parse(initialParts[0]),
+    minute: int.parse(initialParts[1]),
+  );
+
+  String selectedFrequency = reminder?.frequency ?? 'daily';
+  if (selectedFrequency == 'custom') {
+    selectedFrequency = 'daily';
+  }
+  List<int> selectedDays = List<int>.from(reminder?.days ?? []);
+  bool customDaysEnabled = reminder?.days != null && reminder!.days!.isNotEmpty;
+
+  showDialog(
+    context: context,
+    builder: (context) {
+      return StatefulBuilder(
+        builder: (context, setDialogState) {
+          return Dialog(
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+            backgroundColor: isDark ? AppColors.cardDark : AppColors.card,
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.all(24.0),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    isEdit ? ref.t('editReminder') : ref.t('addReminder'),
+                    style: AppTextStyles.h3(isDark: isDark),
+                  ),
+                  const SizedBox(height: 20),
+
+                  // Medication Name Input
+                  Text(ref.t('medicationName'), style: AppTextStyles.smallBold(isDark: isDark)),
+                  const SizedBox(height: 6),
+                  CustomInput(
+                    controller: nameController,
+                    hintText: 'Ex: Paracétamol',
+                  ),
+                  const SizedBox(height: 16),
+
+                  // Dosage Input
+                  Text(ref.t('dosage'), style: AppTextStyles.smallBold(isDark: isDark)),
+                  const SizedBox(height: 6),
+                  CustomInput(
+                    controller: dosageController,
+                    hintText: 'Ex: 1 comprimé',
+                  ),
+                  const SizedBox(height: 16),
+
+                  // Time Selector Row
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(ref.t('time'), style: AppTextStyles.smallBold(isDark: isDark)),
+                          const SizedBox(height: 6),
+                          Text(
+                            selectedTime,
+                            style: AppTextStyles.bodyBold(isDark: isDark).copyWith(fontSize: 20, color: AppColors.primary),
+                          ),
+                        ],
+                      ),
+                      OutlinedButton.icon(
+                        onPressed: () async {
+                          final TimeOfDay? picked = await showTimePicker(
+                            context: context,
+                            initialTime: timeOfDay,
+                            builder: (context, child) {
+                              return Theme(
+                                data: isDark ? ThemeData.dark() : ThemeData.light(),
+                                child: child!,
+                              );
+                            },
+                          );
+
+                          if (picked != null) {
+                            setDialogState(() {
+                              timeOfDay = picked;
+                              final hour = picked.hour.toString().padLeft(2, '0');
+                              final min = picked.minute.toString().padLeft(2, '0');
+                              selectedTime = '$hour:$min';
+                            });
+                          }
+                        },
+                        icon: const Icon(Icons.access_time, size: 18),
+                        label: Text(ref.t('edit')),
+                        style: OutlinedButton.styleFrom(
+                          foregroundColor: AppColors.primary,
+                          side: const BorderSide(color: AppColors.primary),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 20),
+
+                  // Frequency Selector
+                  Text(ref.t('frequency'), style: AppTextStyles.smallBold(isDark: isDark)),
+                  const SizedBox(height: 6),
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.symmetric(horizontal: 12),
+                    decoration: BoxDecoration(
+                      color: isDark ? const Color(0xFF1E293B) : const Color(0xFFF8FAFC),
+                      borderRadius: BorderRadius.circular(14),
+                      border: Border.all(
+                        color: isDark ? const Color(0x1AFFFFFF) : const Color(0xFFE2E8F0),
+                      ),
+                    ),
+                    child: DropdownButtonHideUnderline(
+                      child: DropdownButton<String>(
+                        value: selectedFrequency,
+                        dropdownColor: isDark ? AppColors.cardDark : AppColors.card,
+                        style: AppTextStyles.small(isDark: isDark),
+                        onChanged: (val) {
+                          if (val != null) {
+                            setDialogState(() {
+                              selectedFrequency = val;
+                            });
+                          }
+                        },
+                        items: [
+                          DropdownMenuItem(value: 'daily', child: Text(ref.t('daily'))),
+                          DropdownMenuItem(value: 'twice', child: Text(ref.t('twice'))),
+                          DropdownMenuItem(value: 'three-times', child: Text(ref.t('threeTimes'))),
+                        ],
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text(ref.t('customDaysActive'), style: AppTextStyles.smallBold(isDark: isDark)),
+                      Switch(
+                        value: customDaysEnabled,
+                        activeColor: AppColors.primary,
+                        onChanged: (val) {
+                          setDialogState(() {
+                            customDaysEnabled = val;
+                            if (val && selectedDays.isEmpty) {
+                              selectedDays = [0, 1, 2, 3, 4, 5, 6];
+                            }
+                          });
+                        },
+                      ),
+                    ],
+                  ),
+                  if (customDaysEnabled) ...[
+                    const SizedBox(height: 16),
+                    Text(ref.t('selectDays'), style: AppTextStyles.smallBold(isDark: isDark)),
+                    const SizedBox(height: 8),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: List.generate(7, (index) {
+                        final dayNames = [
+                          ref.t('mondayShort'),
+                          ref.t('tuesdayShort'),
+                          ref.t('wednesdayShort'),
+                          ref.t('thursdayShort'),
+                          ref.t('fridayShort'),
+                          ref.t('saturdayShort'),
+                          ref.t('sundayShort'),
+                        ];
+                        final isSelected = selectedDays.contains(index);
+                        return GestureDetector(
+                          onTap: () {
+                            setDialogState(() {
+                              if (isSelected) {
+                                selectedDays.remove(index);
+                              } else {
+                                selectedDays.add(index);
+                              }
+                            });
+                          },
+                          child: AnimatedContainer(
+                            duration: const Duration(milliseconds: 150),
+                            width: 36,
+                            height: 36,
+                            decoration: BoxDecoration(
+                              color: isSelected
+                                  ? AppColors.primary
+                                  : (isDark ? const Color(0xFF1E293B) : const Color(0xFFF1F5F9)),
+                              shape: BoxShape.circle,
+                              border: Border.all(
+                                color: isSelected
+                                    ? AppColors.primary
+                                    : (isDark ? const Color(0x33FFFFFF) : const Color(0xFFCBD5E1)),
+                                width: 1.5,
+                              ),
+                            ),
+                            child: Center(
+                              child: Text(
+                                dayNames[index],
+                                style: AppTextStyles.micro(isDark: isDark).copyWith(
+                                  color: isSelected
+                                      ? Colors.white
+                                      : (isDark ? Colors.white70 : AppColors.textPrimary),
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 10,
+                                ),
+                              ),
+                            ),
+                          ),
+                        );
+                      }),
+                    ),
+                  ],
+                  const SizedBox(height: 32),
+
+                  // Action buttons
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.end,
+                    children: [
+                      TextButton(
+                        onPressed: () => Navigator.pop(context),
+                        child: Text(ref.t('close'), style: AppTextStyles.small(color: AppColors.textMuted)),
+                      ),
+                      const SizedBox(width: 12),
+                      Button(
+                        onTap: () async {
+                          final name = nameController.text.trim();
+                          final dosage = dosageController.text.trim();
+
+                          if (name.isEmpty || dosage.isEmpty) return;
+
+                          try {
+                            if (isEdit) {
+                              await ref.read(remindersProvider.notifier).updateReminder(
+                                    id: reminder.id,
+                                    medicationName: name,
+                                    dosage: dosage,
+                                    time: selectedTime,
+                                    frequency: selectedFrequency,
+                                    active: reminder.active,
+                                    days: customDaysEnabled ? selectedDays : null,
+                                  );
+                            } else {
+                              await ref.read(remindersProvider.notifier).addReminder(
+                                    medicationName: name,
+                                    dosage: dosage,
+                                    time: selectedTime,
+                                    frequency: selectedFrequency,
+                                    days: customDaysEnabled ? selectedDays : null,
+                                  );
+                            }
+                            if (context.mounted) Navigator.pop(context);
+                          } catch (_) {}
+                        },
+                        child: Text(isEdit ? ref.t('edit') : ref.t('create')),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          );
+        },
+      );
+    },
+  );
+}
+
 class MedicationRemindersWidget extends ConsumerStatefulWidget {
   const MedicationRemindersWidget({super.key});
 
@@ -21,194 +304,7 @@ class MedicationRemindersWidget extends ConsumerStatefulWidget {
 
 class _MedicationRemindersWidgetState extends ConsumerState<MedicationRemindersWidget> {
   void _showAddEditReminderDialog(BuildContext context, {Reminder? reminder}) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    final isEdit = reminder != null;
-
-    final nameController = TextEditingController(text: reminder?.medicationName ?? '');
-    final dosageController = TextEditingController(text: reminder?.dosage ?? '');
-    
-    // Default time parsing
-    String selectedTime = reminder?.time ?? '08:00';
-    final initialParts = selectedTime.split(':');
-    TimeOfDay timeOfDay = TimeOfDay(
-      hour: int.parse(initialParts[0]),
-      minute: int.parse(initialParts[1]),
-    );
-
-    String selectedFrequency = reminder?.frequency ?? 'daily';
-
-    showDialog(
-      context: context,
-      builder: (context) {
-        return StatefulBuilder(
-          builder: (context, setDialogState) {
-            return Dialog(
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
-              backgroundColor: isDark ? AppColors.cardDark : AppColors.card,
-              child: SingleChildScrollView(
-                padding: const EdgeInsets.all(24.0),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      isEdit ? ref.t('editReminder') : ref.t('addReminder'),
-                      style: AppTextStyles.h3(isDark: isDark),
-                    ),
-                    const SizedBox(height: 20),
-
-                    // Medication Name Input
-                    Text(ref.t('medicationName'), style: AppTextStyles.smallBold(isDark: isDark)),
-                    const SizedBox(height: 6),
-                    CustomInput(
-                      controller: nameController,
-                      hintText: 'Ex: Paracétamol',
-                    ),
-                    const SizedBox(height: 16),
-
-                    // Dosage Input
-                    Text(ref.t('dosage'), style: AppTextStyles.smallBold(isDark: isDark)),
-                    const SizedBox(height: 6),
-                    CustomInput(
-                      controller: dosageController,
-                      hintText: 'Ex: 1 comprimé',
-                    ),
-                    const SizedBox(height: 16),
-
-                    // Time Selector Row
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(ref.t('time'), style: AppTextStyles.smallBold(isDark: isDark)),
-                            const SizedBox(height: 6),
-                            Text(
-                              selectedTime,
-                              style: AppTextStyles.bodyBold(isDark: isDark).copyWith(fontSize: 20, color: AppColors.primary),
-                            ),
-                          ],
-                        ),
-                        OutlinedButton.icon(
-                          onPressed: () async {
-                            final TimeOfDay? picked = await showTimePicker(
-                              context: context,
-                              initialTime: timeOfDay,
-                              builder: (context, child) {
-                                return Theme(
-                                  data: isDark ? ThemeData.dark() : ThemeData.light(),
-                                  child: child!,
-                                );
-                              },
-                            );
-
-                            if (picked != null) {
-                              setDialogState(() {
-                                timeOfDay = picked;
-                                final hour = picked.hour.toString().padLeft(2, '0');
-                                final min = picked.minute.toString().padLeft(2, '0');
-                                selectedTime = '$hour:$min';
-                              });
-                            }
-                          },
-                          icon: const Icon(Icons.access_time, size: 18),
-                          label: Text(ref.t('edit')),
-                          style: OutlinedButton.styleFrom(
-                            foregroundColor: AppColors.primary,
-                            side: const BorderSide(color: AppColors.primary),
-                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 20),
-
-                    // Frequency Selector
-                    Text(ref.t('frequency'), style: AppTextStyles.smallBold(isDark: isDark)),
-                    const SizedBox(height: 6),
-                    Container(
-                      width: double.infinity,
-                      padding: const EdgeInsets.symmetric(horizontal: 12),
-                      decoration: BoxDecoration(
-                        color: isDark ? const Color(0xFF1E293B) : const Color(0xFFF8FAFC),
-                        borderRadius: BorderRadius.circular(14),
-                        border: Border.all(
-                          color: isDark ? const Color(0x1AFFFFFF) : const Color(0xFFE2E8F0),
-                        ),
-                      ),
-                      child: DropdownButtonHideUnderline(
-                        child: DropdownButton<String>(
-                          value: selectedFrequency,
-                          dropdownColor: isDark ? AppColors.cardDark : AppColors.card,
-                          style: AppTextStyles.small(isDark: isDark),
-                          onChanged: (val) {
-                            if (val != null) {
-                              setDialogState(() {
-                                selectedFrequency = val;
-                              });
-                            }
-                          },
-                          items: [
-                            DropdownMenuItem(value: 'daily', child: Text(ref.t('daily'))),
-                            DropdownMenuItem(value: 'twice', child: Text(ref.t('twice'))),
-                            DropdownMenuItem(value: 'three-times', child: Text(ref.t('threeTimes'))),
-                            DropdownMenuItem(value: 'custom', child: Text(ref.t('custom'))),
-                          ],
-                        ),
-                      ),
-                    ),
-                    const SizedBox(height: 32),
-
-                    // Action buttons
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.end,
-                      children: [
-                        TextButton(
-                          onPressed: () => Navigator.pop(context),
-                          child: Text(ref.t('close'), style: AppTextStyles.small(color: AppColors.textMuted)),
-                        ),
-                        const SizedBox(width: 12),
-                        Button(
-                          onTap: () async {
-                            final name = nameController.text.trim();
-                            final dosage = dosageController.text.trim();
-
-                            if (name.isEmpty || dosage.isEmpty) return;
-
-                            try {
-                              if (isEdit) {
-                                await ref.read(remindersProvider.notifier).updateReminder(
-                                      id: reminder.id,
-                                      medicationName: name,
-                                      dosage: dosage,
-                                      time: selectedTime,
-                                      frequency: selectedFrequency,
-                                      active: reminder.active,
-                                    );
-                              } else {
-                                await ref.read(remindersProvider.notifier).addReminder(
-                                      medicationName: name,
-                                      dosage: dosage,
-                                      time: selectedTime,
-                                      frequency: selectedFrequency,
-                                    );
-                              }
-                              if (context.mounted) Navigator.pop(context);
-                            } catch (_) {}
-                          },
-                          child: Text(isEdit ? ref.t('edit') : ref.t('create')),
-                        ),
-                      ],
-                    ),
-                  ],
-                ),
-              ),
-            );
-          },
-        );
-      },
-    );
+    showAddEditReminderDialog(context, ref, reminder: reminder);
   }
 
   void _showDeleteConfirmation(BuildContext context, String id) {
@@ -431,6 +527,11 @@ class _MedicationRemindersWidgetState extends ConsumerState<MedicationRemindersW
                 Text(
                   r.dosage,
                   style: AppTextStyles.micro(isDark: isDark),
+                ),
+                ReminderCountdownWidget(
+                  nextDose: r.nextDose,
+                  active: r.active,
+                  taken: r.taken ?? false,
                 ),
               ],
             ),

@@ -20,8 +20,6 @@ class LanguageStateNotifier extends StateNotifier<String> {
     final prefs = _ref.read(sharedPrefsServiceProvider);
     await prefs.setLanguage(langCode);
     state = langCode;
-    // Load new translation map
-    await _ref.read(translationsProvider.notifier).loadTranslations(langCode);
   }
 }
 

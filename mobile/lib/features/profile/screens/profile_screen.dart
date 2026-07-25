@@ -68,12 +68,9 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
             ref.t('fullName'),
             style: AppTextStyles.h3(isDark: isDark),
           ),
-          content: SizedBox(
-            width: double.maxFinite,
-            child: CustomInput(
-              controller: _nameController,
-              hintText: ref.t('fullName'),
-            ),
+          content: CustomInput(
+            controller: _nameController,
+            hintText: ref.t('fullName'),
           ),
           actions: [
             TextButton(

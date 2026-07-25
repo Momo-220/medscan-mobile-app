@@ -20,7 +20,6 @@ class NotificationService {
         try {
           timeZoneName = tzResult.name;
         } catch (_) {
-          // If all else fails, try to parse the name out of TimezoneInfo(...)
           final String str = tzResult.toString();
           if (str.contains('(') && str.contains(',')) {
             timeZoneName = str.split('(')[1].split(',')[0].trim();
@@ -29,10 +28,10 @@ class NotificationService {
           }
         }
       }
-      tz.setLocalLocation(tz.getLocation(timeZoneName));
-      debugPrint('Local Timezone initialized to: $timeZoneName');
+      _setLocalTimezoneSafely(timeZoneName);
     } catch (e) {
-      debugPrint('Could not get local timezone, defaulting to UTC: $e');
+      debugPrint('Could not get local timezone, attempting offset fallback: $e');
+      _setLocalTimezoneSafely('UTC');
     }
 
     // 2. Setup channel details for Android
@@ -73,8 +72,11 @@ class NotificationService {
     try {
       final androidPlatform = _notificationsPlugin.resolvePlatformSpecificImplementation<AndroidFlutterLocalNotificationsPlugin>();
       if (androidPlatform != null) {
-        final bool? granted = await androidPlatform.requestNotificationsPermission();
-        return granted ?? false;
+        final bool? notificationsGranted = await androidPlatform.requestNotificationsPermission();
+        try {
+          await androidPlatform.requestExactAlarmsPermission();
+        } catch (_) {}
+        return notificationsGranted ?? false;
       }
 
       final iosPlatform = _notificationsPlugin.resolvePlatformSpecificImplementation<IOSFlutterLocalNotificationsPlugin>();
@@ -110,25 +112,35 @@ class NotificationService {
     required String title,
     required String body,
     required String timeStr, // format "HH:MM" e.g., "08:30"
+    required String frequency,
+    List<int>? days,
   }) async {
     try {
+      // 1. Cancel any existing scheduled alarms for this reminder
+      await cancelReminder(id);
+
       final parts = timeStr.split(':');
       final hour = int.parse(parts[0]);
       final minute = int.parse(parts[1]);
 
-      final now = tz.TZDateTime.now(tz.local);
-      var scheduledDate = tz.TZDateTime(
-        tz.local,
-        now.year,
-        now.month,
-        now.day,
-        hour,
-        minute,
-      );
+      // 2. Safe location mapping
+      tz.Location location;
+      try {
+        location = tz.local;
+      } catch (_) {
+        try {
+          location = tz.getLocation('UTC');
+        } catch (_) {
+          location = tz.timeZoneDatabase.locations.values.first;
+        }
+      }
 
-      // If scheduled date is in the past, move to next day
-      if (scheduledDate.isBefore(now)) {
-        scheduledDate = scheduledDate.add(const Duration(days: 1));
+      // 3. Define hour offsets according to daily frequency
+      final List<int> hourOffsets = [0];
+      if (frequency == 'twice') {
+        hourOffsets.add(12);
+      } else if (frequency == 'three-times') {
+        hourOffsets.addAll([8, 16]);
       }
 
       final AndroidNotificationDetails androidDetails = AndroidNotificationDetails(
@@ -160,18 +172,113 @@ class NotificationService {
         macOS: darwinDetails,
       );
 
-      // Schedule recurring daily notification
-      await _notificationsPlugin.zonedSchedule(
-        id: id,
-        title: title,
-        body: body,
-        scheduledDate: scheduledDate,
-        notificationDetails: platformDetails,
-        androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
-        // Note: uiLocalNotificationDateInterpretation was removed in v18+
-        matchDateTimeComponents: DateTimeComponents.time, // Daily match at the same time
-        payload: id.toString(),
-      );
+      final now = tz.TZDateTime.now(location);
+
+      // 4. Schedule multiple alarms dynamically
+      if (days == null || days.isEmpty) {
+        // Daily matching configuration
+        for (int i = 0; i < hourOffsets.length; i++) {
+          final offset = hourOffsets[i];
+          var scheduledDate = tz.TZDateTime(
+            location,
+            now.year,
+            now.month,
+            now.day,
+            (hour + offset) % 24,
+            minute,
+          );
+
+          final daysToAdd = (hour + offset) ~/ 24;
+          if (daysToAdd > 0) {
+            scheduledDate = scheduledDate.add(Duration(days: daysToAdd));
+          }
+
+          if (scheduledDate.isBefore(now)) {
+            scheduledDate = scheduledDate.add(const Duration(days: 1));
+          }
+
+          final int alarmId = id + (i * 100000);
+          try {
+            await _notificationsPlugin.zonedSchedule(
+              id: alarmId,
+              title: title,
+              body: body,
+              scheduledDate: scheduledDate,
+              notificationDetails: platformDetails,
+              androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
+              matchDateTimeComponents: DateTimeComponents.time,
+              payload: id.toString(),
+            );
+          } catch (e) {
+            debugPrint('exactAllowWhileIdle failed, falling back to inexact schedule: $e');
+            await _notificationsPlugin.zonedSchedule(
+              id: alarmId,
+              title: title,
+              body: body,
+              scheduledDate: scheduledDate,
+              notificationDetails: platformDetails,
+              androidScheduleMode: AndroidScheduleMode.inexact,
+              matchDateTimeComponents: DateTimeComponents.time,
+              payload: id.toString(),
+            );
+          }
+        }
+      } else {
+        // Weekdays matching configuration (e.g. Mon, Thu)
+        // ISO weekdays: 1 (Mon) - 7 (Sun)
+        // Our indices: 0 (Mon) - 6 (Sun)
+        for (final weekdayIndex in days) {
+          final targetIsoWeekday = weekdayIndex + 1;
+
+          for (int i = 0; i < hourOffsets.length; i++) {
+            final offset = hourOffsets[i];
+            
+            var scheduledDate = tz.TZDateTime(
+              location,
+              now.year,
+              now.month,
+              now.day,
+              (hour + offset) % 24,
+              minute,
+            );
+
+            final daysToAddOffset = (hour + offset) ~/ 24;
+            if (daysToAddOffset > 0) {
+              scheduledDate = scheduledDate.add(Duration(days: daysToAddOffset));
+            }
+
+            while (scheduledDate.weekday != targetIsoWeekday || scheduledDate.isBefore(now)) {
+              scheduledDate = scheduledDate.add(const Duration(days: 1));
+            }
+
+            final int alarmId = id + ((weekdayIndex + 1) * 10000) + (i * 100000);
+            try {
+              await _notificationsPlugin.zonedSchedule(
+                id: alarmId,
+                title: title,
+                body: body,
+                scheduledDate: scheduledDate,
+                notificationDetails: platformDetails,
+                androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
+                matchDateTimeComponents: DateTimeComponents.dayOfWeekAndTime,
+                payload: id.toString(),
+              );
+            } catch (e) {
+              debugPrint('exactAllowWhileIdle failed, falling back to inexact schedule: $e');
+              await _notificationsPlugin.zonedSchedule(
+                id: alarmId,
+                title: title,
+                body: body,
+                scheduledDate: scheduledDate,
+                notificationDetails: platformDetails,
+                androidScheduleMode: AndroidScheduleMode.inexact,
+                matchDateTimeComponents: DateTimeComponents.dayOfWeekAndTime,
+                payload: id.toString(),
+              );
+            }
+          }
+        }
+      }
     } catch (e) {
       debugPrint('Error scheduling local notification: $e');
     }
@@ -224,9 +331,119 @@ class NotificationService {
     }
   }
 
+  /// Displays an instant tip notification using the general_tips channel and notif_douce sound
+  static Future<void> showTipNotification({
+    required int id,
+    required String title,
+    required String body,
+  }) async {
+    try {
+      final AndroidNotificationDetails androidDetails = AndroidNotificationDetails(
+        'medscan_general_tips_channel',
+        'Conseils & Astuces Santé',
+        channelDescription: 'Notifications d\'astuces santé et conseils quotidiens',
+        importance: Importance.defaultImportance,
+        priority: Priority.defaultPriority,
+        playSound: true,
+        sound: const RawResourceAndroidNotificationSound('notif_douce'),
+        category: AndroidNotificationCategory.recommendation,
+      );
+
+      const DarwinNotificationDetails darwinDetails = DarwinNotificationDetails(
+        presentAlert: true,
+        presentBadge: true,
+        presentSound: true,
+        sound: 'notif_douce.wav',
+        badgeNumber: 1,
+        interruptionLevel: InterruptionLevel.active,
+      );
+
+      final NotificationDetails platformDetails = NotificationDetails(
+        android: androidDetails,
+        iOS: darwinDetails,
+        macOS: darwinDetails,
+      );
+
+      await _notificationsPlugin.show(
+        id: id,
+        title: title,
+        body: body,
+        notificationDetails: platformDetails,
+        payload: 'tip_$id',
+      );
+    } catch (e) {
+      debugPrint('Error showing tip notification: $e');
+    }
+  }
+
+  /// Schedules a recurring tip notification on the general_tips channel
+  static Future<void> scheduleTipNotification({
+    required int id,
+    required String title,
+    required String body,
+    required DateTime scheduledDate,
+  }) async {
+    try {
+      final AndroidNotificationDetails androidDetails = AndroidNotificationDetails(
+        'medscan_general_tips_channel',
+        'Conseils & Astuces Santé',
+        channelDescription: 'Notifications d\'astuces santé et conseils quotidiens',
+        importance: Importance.defaultImportance,
+        priority: Priority.defaultPriority,
+        playSound: true,
+        sound: const RawResourceAndroidNotificationSound('notif_douce'),
+      );
+
+      const DarwinNotificationDetails darwinDetails = DarwinNotificationDetails(
+        presentAlert: true,
+        presentBadge: true,
+        presentSound: true,
+        sound: 'notif_douce.wav',
+        badgeNumber: 1,
+        interruptionLevel: InterruptionLevel.active,
+      );
+
+      final NotificationDetails platformDetails = NotificationDetails(
+        android: androidDetails,
+        iOS: darwinDetails,
+        macOS: darwinDetails,
+      );
+
+      tz.Location location;
+      try {
+        location = tz.local;
+      } catch (_) {
+        location = tz.getLocation('UTC');
+      }
+
+      final tzScheduled = tz.TZDateTime.from(scheduledDate, location);
+
+      await _notificationsPlugin.zonedSchedule(
+        id: id,
+        title: title,
+        body: body,
+        scheduledDate: tzScheduled,
+        notificationDetails: platformDetails,
+        androidScheduleMode: AndroidScheduleMode.inexact,
+        matchDateTimeComponents: DateTimeComponents.time,
+        payload: 'tip_$id',
+      );
+    } catch (e) {
+      debugPrint('Error scheduling tip notification: $e');
+    }
+  }
+
   static Future<void> cancelReminder(int id) async {
     try {
       await _notificationsPlugin.cancel(id: id);
+      await _notificationsPlugin.cancel(id: id + 100000);
+      await _notificationsPlugin.cancel(id: id + 200000);
+      for (int i = 0; i < 7; i++) {
+        final int baseDayOffset = id + ((i + 1) * 10000);
+        await _notificationsPlugin.cancel(id: baseDayOffset);
+        await _notificationsPlugin.cancel(id: baseDayOffset + 100000);
+        await _notificationsPlugin.cancel(id: baseDayOffset + 200000);
+      }
     } catch (e) {
       debugPrint('Error cancelling local notification: $e');
     }
@@ -237,6 +454,31 @@ class NotificationService {
       await _notificationsPlugin.cancelAll();
     } catch (e) {
       debugPrint('Error cancelling all notifications: $e');
+    }
+  }
+
+  static void _setLocalTimezoneSafely(String name) {
+    try {
+      tz.setLocalLocation(tz.getLocation(name));
+      debugPrint('Local Timezone initialized directly to: $name');
+    } catch (_) {
+      final localOffsetMs = DateTime.now().timeZoneOffset.inMilliseconds;
+      for (final loc in tz.timeZoneDatabase.locations.values) {
+        final dynamic offsetVal = loc.currentTimeZone.offset;
+        if (offsetVal == localOffsetMs || offsetVal == DateTime.now().timeZoneOffset) {
+          tz.setLocalLocation(loc);
+          debugPrint('Local Timezone initialized by offset match to: ${loc.name}');
+          return;
+        }
+      }
+      // Ultimate fallback: UTC or first database location
+      try {
+        tz.setLocalLocation(tz.getLocation('UTC'));
+      } catch (_) {
+        if (tz.timeZoneDatabase.locations.isNotEmpty) {
+          tz.setLocalLocation(tz.timeZoneDatabase.locations.values.first);
+        }
+      }
     }
   }
 }

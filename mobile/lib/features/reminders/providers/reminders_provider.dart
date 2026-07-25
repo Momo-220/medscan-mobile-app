@@ -9,6 +9,7 @@ import '../../auth/providers/auth_provider.dart';
 import '../../home/providers/health_stats_provider.dart';
 import '../../../shared/services/notification_service.dart';
 import '../../../shared/utils/localization.dart';
+import '../services/smart_notification_scheduler.dart';
 
 class RemindersNotifier extends StateNotifier<AsyncValue<List<Reminder>>> {
   final Ref _ref;
@@ -61,7 +62,7 @@ class RemindersNotifier extends StateNotifier<AsyncValue<List<Reminder>>> {
 
         // Synchronize local notifications scheduled with backend active reminders
         for (var r in list) {
-          final int notificationId = r.id.hashCode;
+          final int notificationId = _getStableNotificationId(r.id);
           if (r.active) {
             final details = _getNotificationDetails(r.medicationName, r.dosage, _ref.read(languageProvider));
             NotificationService.scheduleReminder(
@@ -69,6 +70,8 @@ class RemindersNotifier extends StateNotifier<AsyncValue<List<Reminder>>> {
               title: details['title']!,
               body: details['body']!,
               timeStr: r.time,
+              frequency: r.frequency,
+              days: r.days,
             );
           } else {
             NotificationService.cancelReminder(notificationId);
@@ -95,6 +98,7 @@ class RemindersNotifier extends StateNotifier<AsyncValue<List<Reminder>>> {
     required String dosage,
     required String time,
     required String frequency,
+    List<int>? days,
   }) async {
     final user = FirebaseAuth.instance.currentUser;
     if (user == null) return;
@@ -109,6 +113,7 @@ class RemindersNotifier extends StateNotifier<AsyncValue<List<Reminder>>> {
         'dosage': dosage,
         'time': time,
         'frequency': frequency,
+        'days': days,
         'active': true,
       });
 
@@ -123,10 +128,12 @@ class RemindersNotifier extends StateNotifier<AsyncValue<List<Reminder>>> {
         // Schedule local notification alarm with caring message
         final details = _getNotificationDetails(newReminder.medicationName, newReminder.dosage, _ref.read(languageProvider));
         NotificationService.scheduleReminder(
-          id: newReminder.id.hashCode,
+          id: _getStableNotificationId(newReminder.id),
           title: details['title']!,
           body: details['body']!,
           timeStr: newReminder.time,
+          frequency: newReminder.frequency,
+          days: newReminder.days,
         );
 
         // Refresh dashboard metrics
@@ -144,6 +151,7 @@ class RemindersNotifier extends StateNotifier<AsyncValue<List<Reminder>>> {
     required String time,
     required String frequency,
     required bool active,
+    List<int>? days,
   }) async {
     final user = FirebaseAuth.instance.currentUser;
     if (user == null) return;
@@ -160,6 +168,7 @@ class RemindersNotifier extends StateNotifier<AsyncValue<List<Reminder>>> {
         'dosage': dosage,
         'time': time,
         'frequency': frequency,
+        'days': days,
         'active': active,
       });
 
@@ -172,7 +181,7 @@ class RemindersNotifier extends StateNotifier<AsyncValue<List<Reminder>>> {
         _saveCache(user.uid, updatedList);
 
         // Update local notification alarm
-        final int notificationId = id.hashCode;
+        final int notificationId = _getStableNotificationId(id);
         if (active) {
           final details = _getNotificationDetails(updatedReminder.medicationName, updatedReminder.dosage, _ref.read(languageProvider));
           NotificationService.scheduleReminder(
@@ -180,6 +189,8 @@ class RemindersNotifier extends StateNotifier<AsyncValue<List<Reminder>>> {
             title: details['title']!,
             body: details['body']!,
             timeStr: updatedReminder.time,
+            frequency: updatedReminder.frequency,
+            days: updatedReminder.days,
           );
         } else {
           NotificationService.cancelReminder(notificationId);
@@ -225,7 +236,7 @@ class RemindersNotifier extends StateNotifier<AsyncValue<List<Reminder>>> {
         _saveCache(user.uid, updatedList);
 
         // Cancel local notification alarm
-        NotificationService.cancelReminder(id.hashCode);
+        NotificationService.cancelReminder(_getStableNotificationId(id));
 
         // Refresh dashboard metrics
         _ref.read(healthStatsProvider.notifier).fetchStats(quietly: true);
@@ -306,6 +317,15 @@ class RemindersNotifier extends StateNotifier<AsyncValue<List<Reminder>>> {
       "تذكير دافئ لسلامتك: حان وقت تناول {medication} ({dosage}). دمتم بصحة وعافية! 💪",
     ],
   };
+}
+
+int _getStableNotificationId(String reminderId) {
+  int hash = 0x811c9dc5;
+  for (int i = 0; i < reminderId.length; i++) {
+    hash ^= reminderId.codeUnitAt(i);
+    hash = (hash * 0x01000193) & 0xFFFFFFFF;
+  }
+  return (hash & 0x7FFFFFFF) % 500000;
 }
 
 final remindersProvider = StateNotifierProvider<RemindersNotifier, AsyncValue<List<Reminder>>>((ref) {

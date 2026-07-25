@@ -43,6 +43,7 @@ class CustomInput extends StatelessWidget {
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
     return Column(
+      mainAxisSize: MainAxisSize.min,
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         if (label != null) ...[
@@ -66,10 +67,10 @@ class CustomInput extends StatelessWidget {
           onTap: onTap,
           focusNode: focusNode,
           autofocus: autofocus,
-          style: AppTextStyles.body(
+          style: AppTextStyles.small(
             color: isDark ? AppColors.textPrimaryDark : AppColors.textPrimary,
             fontWeight: FontWeight.w400,
-          ),
+          ).copyWith(height: 1.2),
           cursorColor: AppColors.primary,
           decoration: InputDecoration(
             hintText: hintText,

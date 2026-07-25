@@ -18,6 +18,7 @@ import '../../../shared/widgets/navigation_bar.dart';
 import '../../../shared/widgets/medical_sources_widget.dart';
 import '../providers/suggestions_provider.dart';
 import '../../../core/di/providers.dart';
+import '../../home/screens/widgets/medication_reminders.dart';
 
 class ScanResultPage extends ConsumerStatefulWidget {
   final Map<String, dynamic> scanData;
@@ -483,6 +484,38 @@ class _ScanResultPageState extends ConsumerState<ScanResultPage> {
                       ),
                     ],
                   ],
+                ),
+              ),
+              const SizedBox(height: 16),
+              // Premium "Schedule a reminder" button pre-filled with scan results
+              SizedBox(
+                width: double.infinity,
+                child: ElevatedButton.icon(
+                  onPressed: () {
+                    showAddEditReminderDialog(
+                      context,
+                      ref,
+                      initialMedicationName: scan.medicationName,
+                      initialDosage: scan.dosage,
+                    );
+                  },
+                  icon: const Icon(Icons.add_alarm_rounded, color: Colors.white, size: 20),
+                  label: Text(
+                    ref.t('scheduleReminder'),
+                    style: const TextStyle(
+                      fontWeight: FontWeight.bold,
+                      color: Colors.white,
+                      fontSize: 14,
+                    ),
+                  ),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppColors.primary,
+                    padding: const EdgeInsets.symmetric(vertical: 14),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(14),
+                    ),
+                    elevation: 0,
+                  ),
                 ),
               ),
               const SizedBox(height: 24),
