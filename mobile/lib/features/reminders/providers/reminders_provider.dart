@@ -265,9 +265,27 @@ class RemindersNotifier extends StateNotifier<AsyncValue<List<Reminder>>> {
   }
 
   Map<String, String> _getNotificationDetails(String medicationName, String dosage, String lang) {
+    final user = FirebaseAuth.instance.currentUser;
+    final prefs = _ref.read(sharedPrefsServiceProvider);
+    final rawName = user?.displayName ?? prefs.getLocalName();
+    final name = (rawName != null && rawName.trim().isNotEmpty) ? rawName.trim() : null;
+
     final list = _caringMessages[lang] ?? _caringMessages['fr']!;
     final index = (medicationName.hashCode + dosage.hashCode) % list.length;
-    final messageTemplate = list[index];
+    var messageTemplate = list[index];
+
+    // Personalize with name if available
+    if (name != null) {
+      if (lang == 'fr') {
+        messageTemplate = messageTemplate.replaceAll("Coucou !", "Coucou $name !");
+      } else if (lang == 'en') {
+        messageTemplate = messageTemplate.replaceAll("Hello!", "Hello $name!");
+      } else if (lang == 'ar') {
+        messageTemplate = messageTemplate.replaceAll("مرحباً!", "مرحباً $name!");
+      } else if (lang == 'tr') {
+        messageTemplate = messageTemplate.replaceAll("Merhaba!", "Merhaba $name!");
+      }
+    }
     
     String title;
     if (lang == 'fr') {
@@ -303,7 +321,7 @@ class RemindersNotifier extends StateNotifier<AsyncValue<List<Reminder>>> {
       "A sweet reminder for your well-being: it's time to take {medication} ({dosage}). Stay strong! 💪",
     ],
     'tr': [
-      "Kendinize özen gösterme vakti geldi. Küçük hatırlatmanız: {medication} ({dosage}) ❤️",
+      "Merhaba! Kendinize özen gösterme vakti geldi. Küçük hatırlatmanız: {medication} ({dosage}) ❤️",
       "Kendiniz için kısa bir ara verin. Şimdi {medication} ({dosage}) zamanı. Sağlığınıza dikkat edin! ✨",
       "Küçük bir sevgi dozu: En iyi halinizde kalmak için {medication} ({dosage}) almayı unutmayın! 🌟",
       "Sağlığınız çok değerli. {medication} ({dosage}) saati geldi. Harika bir gün dileriz! 🌸",
