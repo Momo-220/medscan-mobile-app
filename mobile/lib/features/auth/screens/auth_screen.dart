@@ -573,89 +573,64 @@ class _AuthPageState extends ConsumerState<AuthPage> {
 
                           // ── Social Sign-In Row (Apple & Google Side-by-Side) ──
                           Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
                             children: [
                               // Apple Button
-                              Expanded(
-                                child: GestureDetector(
-                                  onTap: _loading ? null : _handleAppleSignIn,
-                                  child: Container(
-                                    height: 48,
-                                    decoration: BoxDecoration(
-                                      color: isDark ? Colors.white : Colors.black,
-                                      borderRadius: BorderRadius.circular(14),
-                                      boxShadow: isDark
-                                          ? null
-                                          : [
-                                              BoxShadow(
-                                                color: Colors.black.withOpacity(0.08),
-                                                blurRadius: 4,
-                                                offset: const Offset(0, 1),
-                                              ),
-                                            ],
-                                    ),
-                                    child: Row(
-                                      mainAxisAlignment: MainAxisAlignment.center,
-                                      children: [
-                                        Icon(
-                                          Icons.apple,
-                                          color: isDark ? Colors.black : Colors.white,
-                                          size: 20,
-                                        ),
-                                        const SizedBox(width: 8),
-                                        Text(
-                                          ref.t('authApple'),
-                                          style: TextStyle(
-                                            fontSize: 14,
-                                            fontWeight: FontWeight.w600,
-                                            color: isDark ? Colors.black : Colors.white,
-                                          ),
-                                        ),
-                                      ],
+                              GestureDetector(
+                                onTap: _loading ? null : _handleAppleSignIn,
+                                child: Container(
+                                  width: 56,
+                                  height: 56,
+                                  decoration: BoxDecoration(
+                                    color: isDark ? Colors.white : Colors.black,
+                                    borderRadius: BorderRadius.circular(16),
+                                    boxShadow: isDark
+                                        ? null
+                                        : [
+                                            BoxShadow(
+                                              color: Colors.black.withOpacity(0.08),
+                                              blurRadius: 6,
+                                              offset: const Offset(0, 2),
+                                            ),
+                                          ],
+                                  ),
+                                  child: Center(
+                                    child: Icon(
+                                      Icons.apple,
+                                      color: isDark ? Colors.black : Colors.white,
+                                      size: 26,
                                     ),
                                   ),
                                 ),
                               ),
-                              const SizedBox(width: 12),
+                              const SizedBox(width: 20),
                               // Google Button
-                              Expanded(
-                                child: GestureDetector(
-                                  onTap: _loading ? null : _handleGoogleSignIn,
-                                  child: Container(
-                                    height: 48,
-                                    decoration: BoxDecoration(
-                                      color: isDark ? const Color(0xFF1D1B20) : Colors.white,
-                                      border: Border.all(
-                                        color: isDark
-                                            ? const Color(0xFF49454F)
-                                            : const Color(0xFFDADCE0),
-                                        width: 1,
-                                      ),
-                                      borderRadius: BorderRadius.circular(14),
-                                      boxShadow: isDark
-                                          ? null
-                                          : [
-                                              BoxShadow(
-                                                color: Colors.black.withOpacity(0.06),
-                                                blurRadius: 4,
-                                                offset: const Offset(0, 1),
-                                              ),
-                                            ],
+                              GestureDetector(
+                                onTap: _loading ? null : _handleGoogleSignIn,
+                                child: Container(
+                                  width: 56,
+                                  height: 56,
+                                  decoration: BoxDecoration(
+                                    color: isDark ? const Color(0xFF1D1B20) : Colors.white,
+                                    border: Border.all(
+                                      color: isDark
+                                          ? const Color(0xFF49454F)
+                                          : const Color(0xFFDADCE0),
+                                      width: 1,
                                     ),
-                                    child: Row(
-                                      mainAxisAlignment: MainAxisAlignment.center,
-                                      children: [
-                                        const GoogleLogo(size: 18),
-                                        const SizedBox(width: 8),
-                                        Text(
-                                          ref.t('authGoogle'),
-                                          style: TextStyle(
-                                            fontSize: 14,
-                                            fontWeight: FontWeight.w600,
-                                            color: isDark ? Colors.white : const Color(0xFF1F1F1F),
-                                          ),
-                                        ),
-                                      ],
-                                    ),
+                                    borderRadius: BorderRadius.circular(16),
+                                    boxShadow: isDark
+                                        ? null
+                                        : [
+                                            BoxShadow(
+                                              color: Colors.black.withOpacity(0.06),
+                                              blurRadius: 6,
+                                              offset: const Offset(0, 2),
+                                            ),
+                                          ],
+                                  ),
+                                  child: const Center(
+                                    child: GoogleLogo(size: 24),
                                   ),
                                 ),
                               ),

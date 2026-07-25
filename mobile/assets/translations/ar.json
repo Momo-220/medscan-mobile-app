@@ -340,5 +340,17 @@
   "chatNoGems": "لم يتبق لديك جواهر للدردشة. ستُشحن تلقائياً عند منتصف الليل.",
   "medicalSources": "📚 المصادر الطبية",
   "aiDisclaimer": "تم إنشاء هذا الرد بواسطة الذكاء الاصطناعي من المعرفة العامة. استشر دائماً المصادر الرسمية أدناه.",
-  "permanentMedicalDisclaimer": "المعلومات المقدمة من MedScan هي لأغراض إعلامية فقط ولا تغني أبداً عن استشارة الطبيب أو الصيدلي."
+  "permanentMedicalDisclaimer": "المعلومات المقدمة من MedScan هي لأغراض إعلامية فقط ولا تغني أبداً عن استشارة الطبيب أو الصيدلي.",
+  "scheduleReminder": "جدولة تذكير",
+  "selectDays": "أيام تناول الدواء",
+  "mondayShort": "ن",
+  "tuesdayShort": "ث",
+  "wednesdayShort": "ر",
+  "thursdayShort": "خ",
+  "fridayShort": "ج",
+  "saturdayShort": "س",
+  "sundayShort": "ح",
+  "customDaysActive": "أيام محددة",
+  "inHoursMinutesSeconds": "خلال {h}س {m}د {s}ث",
+  "dueNow": "حان الآن!"
 }

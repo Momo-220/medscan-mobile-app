@@ -118,6 +118,15 @@ class SharedPrefsService {
     await _prefs.setInt('credits_cache_$userId', credits);
   }
 
+  // Generic Getters/Setters
+  String? getString(String key) {
+    return _prefs.getString(key);
+  }
+
+  Future<void> setString(String key, String value) async {
+    await _prefs.setString(key, value);
+  }
+
   // Clear Preferences on Logout
   Future<void> clearUserSession(String userId) async {
     await _prefs.remove('$_keyPharmacyCachePrefix$userId');
