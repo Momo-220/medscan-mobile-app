@@ -16,14 +16,31 @@ class VersionUpdateDialog extends StatelessWidget {
     required this.isForceUpdate,
   });
 
-  Future<void> _launchStore() async {
-    final urlString = Platform.isIOS ? config.appStoreUrl : config.playStoreUrl;
-    if (urlString.isNotEmpty) {
-      final uri = Uri.parse(urlString);
+  Future<void> _launchStore(BuildContext context) async {
+    String urlString = Platform.isIOS ? config.appStoreUrl : config.playStoreUrl;
+    
+    // Fallback if URL in Firestore config is empty
+    if (urlString.trim().isEmpty) {
+      if (Platform.isIOS) {
+        urlString = 'https://apps.apple.com/app/id6742562145';
+      } else {
+        urlString = 'https://play.google.com/store/apps/details?id=com.seinimomo.medscanapp';
+      }
+    }
+
+    try {
+      final uri = Uri.parse(urlString.trim());
+      if (await canLaunchUrl(uri)) {
+        await launchUrl(uri, mode: LaunchMode.externalApplication);
+      } else {
+        // Fallback without canLaunchUrl check
+        await launchUrl(uri, mode: LaunchMode.externalNonBrowserApplication);
+      }
+    } catch (e) {
+      debugPrint('Could not launch store URL: $e');
       try {
-        if (await canLaunchUrl(uri)) {
-          await launchUrl(uri, mode: LaunchMode.externalApplication);
-        }
+        final uri = Uri.parse(urlString.trim());
+        await launchUrl(uri, mode: LaunchMode.platformDefault);
       } catch (_) {}
     }
   }
@@ -33,102 +50,145 @@ class VersionUpdateDialog extends StatelessWidget {
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
     final dialogContent = Container(
-      padding: const EdgeInsets.all(24),
+      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 28),
       decoration: BoxDecoration(
-        color: isDark ? AppColors.cardDark : AppColors.card,
-        borderRadius: BorderRadius.circular(28),
+        color: isDark ? const Color(0xFF1E293B) : Colors.white,
+        borderRadius: BorderRadius.circular(32),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: isDark ? 0.5 : 0.15),
+            blurRadius: 30,
+            offset: const Offset(0, 12),
+          ),
+        ],
       ),
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          // Elegant header icon with gradient glow
-          Container(
-            width: 64,
-            height: 64,
-            decoration: BoxDecoration(
-              gradient: const LinearGradient(
-                colors: [Color(0xFF3B82F6), Color(0xFF6366F1)],
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-              ),
-              shape: BoxShape.circle,
-              boxShadow: [
-                BoxShadow(
-                  color: AppColors.primary.withOpacity(0.2),
-                  blurRadius: 16,
-                  offset: const Offset(0, 8),
+          // 🚀 Header Badge with Gradient & Sparkles Glow
+          Stack(
+            alignment: Alignment.center,
+            children: [
+              Container(
+                width: 80,
+                height: 80,
+                decoration: BoxDecoration(
+                  gradient: const LinearGradient(
+                    colors: [Color(0xFF2563EB), Color(0xFF4F46E5), Color(0xFF7C3AED)],
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                  ),
+                  shape: BoxShape.circle,
+                  boxShadow: [
+                    BoxShadow(
+                      color: const Color(0xFF4F46E5).withValues(alpha: 0.4),
+                      blurRadius: 20,
+                      offset: const Offset(0, 8),
+                    ),
+                  ],
                 ),
-              ],
-            ),
-            child: const Center(
-              child: Icon(
-                Icons.system_update_rounded,
-                color: Colors.white,
-                size: 32,
+                child: const Center(
+                  child: Text(
+                    '🚀',
+                    style: TextStyle(fontSize: 38),
+                  ),
+                ),
               ),
-            ),
+              Positioned(
+                right: 0,
+                top: 0,
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF10B981),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: Colors.white, width: 1.5),
+                  ),
+                  child: Text(
+                    'v${config.latestVersion}',
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 10,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ),
+              ),
+            ],
           ),
           const SizedBox(height: 20),
-          
+
           // Title
           Text(
-            isForceUpdate ? 'Mise à jour requise' : 'Nouvelle version disponible',
-            style: AppTextStyles.h2(isDark: isDark).copyWith(fontWeight: FontWeight.bold),
+            isForceUpdate ? 'Mise à jour obligatoire' : 'Nouvelle version disponible ! 🎉',
+            style: AppTextStyles.h2(isDark: isDark).copyWith(
+              fontWeight: FontWeight.bold,
+              fontSize: 20,
+              color: isDark ? Colors.white : const Color(0xFF0F172A),
+            ),
             textAlign: TextAlign.center,
           ),
-          const SizedBox(height: 12),
-          
+          const SizedBox(height: 10),
+
           // Body text
           Text(
             isForceUpdate
-                ? 'Une mise à jour importante de MedScan est nécessaire pour continuer à utiliser l\'application.'
-                : 'Une nouvelle version de MedScan est disponible avec des améliorations et des corrections.',
+                ? 'Une mise à jour essentielle de MedScan est disponible. Veuillez mettre à jour l\'application pour continuer.'
+                : 'La version ${config.latestVersion} de MedScan est en ligne sur l\'App Store avec de nouvelles fonctionnalités et améliorations !',
             style: AppTextStyles.small(isDark: isDark).copyWith(
               height: 1.5,
-              color: isDark ? Colors.white70 : AppColors.textSecondary,
+              fontSize: 14,
+              color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
             ),
             textAlign: TextAlign.center,
           ),
-          
-          // Release Notes if available
+
+          // Release Notes Container
           if (config.releaseNotes.isNotEmpty) ...[
-            const SizedBox(height: 16),
+            const SizedBox(height: 18),
             Container(
               width: double.infinity,
-              padding: const EdgeInsets.all(14),
+              padding: const EdgeInsets.all(16),
               decoration: BoxDecoration(
-                color: isDark ? const Color(0x0DFFFFFF) : const Color(0x06000000),
-                borderRadius: BorderRadius.circular(16),
+                color: isDark ? const Color(0xFF0F172A) : const Color(0xFFF8FAFC),
+                borderRadius: BorderRadius.circular(20),
                 border: Border.all(
-                  color: isDark ? const Color(0x1AFFFFFF) : const Color(0x0D000000),
-                  width: 1,
+                  color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0),
                 ),
               ),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(
-                    'Nouveautés :',
-                    style: AppTextStyles.micro(isDark: isDark).copyWith(
-                      fontWeight: FontWeight.bold,
-                      color: isDark ? Colors.white : AppColors.textPrimary,
-                    ),
+                  Row(
+                    children: [
+                      const Icon(Icons.auto_awesome_rounded, size: 16, color: Color(0xFF3B82F6)),
+                      const SizedBox(width: 6),
+                      Text(
+                        'Nouveautés :',
+                        style: AppTextStyles.micro(isDark: isDark).copyWith(
+                          fontWeight: FontWeight.bold,
+                          fontSize: 13,
+                          color: isDark ? Colors.white : const Color(0xFF0F172A),
+                        ),
+                      ),
+                    ],
                   ),
                   const SizedBox(height: 6),
                   Text(
                     config.releaseNotes,
                     style: AppTextStyles.micro(isDark: isDark).copyWith(
                       height: 1.4,
-                      color: isDark ? Colors.white60 : AppColors.textSecondary,
+                      fontSize: 12,
+                      color: isDark ? const Color(0xFFCBD5E1) : const Color(0xFF475569),
                     ),
                   ),
                 ],
               ),
             ),
           ],
-          
-          const SizedBox(height: 24),
-          
+
+          const SizedBox(height: 26),
+
           // Action Buttons
           Row(
             children: [
@@ -138,13 +198,16 @@ class VersionUpdateDialog extends StatelessWidget {
                     style: OutlinedButton.styleFrom(
                       padding: const EdgeInsets.symmetric(vertical: 14),
                       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-                      side: BorderSide(color: isDark ? Colors.white24 : const Color(0xFFE2E8F0)),
+                      side: BorderSide(
+                        color: isDark ? const Color(0xFF334155) : const Color(0xFFCBD5E1),
+                      ),
                     ),
                     onPressed: () => Navigator.pop(context),
                     child: Text(
                       'Plus tard',
                       style: AppTextStyles.smallBold(isDark: isDark).copyWith(
-                        color: isDark ? Colors.white70 : AppColors.textSecondary,
+                        color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
+                        fontSize: 14,
                       ),
                     ),
                   ),
@@ -152,36 +215,24 @@ class VersionUpdateDialog extends StatelessWidget {
                 const SizedBox(width: 12),
               ],
               Expanded(
-                child: GestureDetector(
-                  onTap: _launchStore,
-                  child: Container(
+                child: ElevatedButton.icon(
+                  style: ElevatedButton.styleFrom(
                     padding: const EdgeInsets.symmetric(vertical: 14),
-                    decoration: BoxDecoration(
-                      gradient: const LinearGradient(
-                        colors: [Color(0xFF3B82F6), Color(0xFF6366F1)],
-                        begin: Alignment.topLeft,
-                        end: Alignment.bottomRight,
-                      ),
-                      borderRadius: BorderRadius.circular(16),
-                      boxShadow: [
-                        BoxShadow(
-                          color: AppColors.primary.withOpacity(0.15),
-                          blurRadius: 12,
-                          offset: const Offset(0, 4),
-                        ),
-                      ],
-                    ),
-                    child: const Center(
-                      child: Text(
-                        'Mettre à jour',
-                        style: TextStyle(
-                          color: Colors.white,
-                          fontSize: 14,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
+                    backgroundColor: const Color(0xFF2563EB),
+                    elevation: 4,
+                    shadowColor: const Color(0xFF2563EB).withValues(alpha: 0.4),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                  ),
+                  icon: const Icon(Icons.download_rounded, color: Colors.white, size: 18),
+                  label: const Text(
+                    'Mettre à jour',
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontSize: 14,
+                      fontWeight: FontWeight.bold,
                     ),
                   ),
+                  onPressed: () => _launchStore(context),
                 ),
               ),
             ],
@@ -193,7 +244,7 @@ class VersionUpdateDialog extends StatelessWidget {
     return PopScope(
       canPop: !isForceUpdate,
       child: Dialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(28)),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(32)),
         backgroundColor: Colors.transparent,
         elevation: 0,
         child: dialogContent,
@@ -215,18 +266,17 @@ class MaintenanceDialog extends StatelessWidget {
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
     final dialogContent = Container(
-      padding: const EdgeInsets.all(24),
+      padding: const EdgeInsets.all(28),
       decoration: BoxDecoration(
-        color: isDark ? AppColors.cardDark : AppColors.card,
-        borderRadius: BorderRadius.circular(28),
+        color: isDark ? const Color(0xFF1E293B) : Colors.white,
+        borderRadius: BorderRadius.circular(32),
       ),
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          // Elegant header icon with orange glow for maintenance
           Container(
-            width: 64,
-            height: 64,
+            width: 72,
+            height: 72,
             decoration: BoxDecoration(
               gradient: const LinearGradient(
                 colors: [Color(0xFFF59E0B), Color(0xFFEF4444)],
@@ -236,8 +286,8 @@ class MaintenanceDialog extends StatelessWidget {
               shape: BoxShape.circle,
               boxShadow: [
                 BoxShadow(
-                  color: Colors.orange.withOpacity(0.2),
-                  blurRadius: 16,
+                  color: Colors.orange.withValues(alpha: 0.3),
+                  blurRadius: 18,
                   offset: const Offset(0, 8),
                 ),
               ],
@@ -246,25 +296,21 @@ class MaintenanceDialog extends StatelessWidget {
               child: Icon(
                 Icons.construction_rounded,
                 color: Colors.white,
-                size: 32,
+                size: 36,
               ),
             ),
           ),
           const SizedBox(height: 20),
-          
-          // Title
           Text(
-            'Maintenance en cours',
+            'Maintenance en cours 🛠️',
             style: AppTextStyles.h2(isDark: isDark).copyWith(fontWeight: FontWeight.bold),
             textAlign: TextAlign.center,
           ),
           const SizedBox(height: 12),
-          
-          // Body text
           Text(
             message.isNotEmpty
                 ? message
-                : 'MedScan est actuellement en cours de maintenance technique pour améliorer votre expérience. Veuillez réessayer plus tard.',
+                : 'MedScan est actuellement en cours de maintenance technique. Revenez dans quelques instants !',
             style: AppTextStyles.small(isDark: isDark).copyWith(
               height: 1.5,
               color: isDark ? Colors.white70 : AppColors.textSecondary,
@@ -278,7 +324,7 @@ class MaintenanceDialog extends StatelessWidget {
     return PopScope(
       canPop: false,
       child: Dialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(28)),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(32)),
         backgroundColor: Colors.transparent,
         elevation: 0,
         child: dialogContent,

@@ -8,7 +8,6 @@ import '../../../shared/utils/localization.dart';
 import '../../../shared/widgets/card.dart';
 import '../../../shared/services/notification_service.dart';
 import '../../../shared/utils/pill_notification.dart';
-import '../../reminders/services/smart_notification_scheduler.dart';
 import '../../auth/providers/auth_provider.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import '../../../core/di/providers.dart';
