@@ -46,6 +46,7 @@ class RemindersNotifier extends StateNotifier<AsyncValue<List<Reminder>>> {
     final user = FirebaseAuth.instance.currentUser;
     if (user == null || user.isAnonymous) {
       state = const AsyncValue.data([]);
+      SmartNotificationScheduler.syncSchedule(activeReminders: []);
       return;
     }
 
@@ -77,6 +78,9 @@ class RemindersNotifier extends StateNotifier<AsyncValue<List<Reminder>>> {
             NotificationService.cancelReminder(notificationId);
           }
         }
+
+        // Sync health tips when no active medication reminders
+        SmartNotificationScheduler.syncSchedule(activeReminders: list);
       }
     } catch (e, stack) {
       if (state.value == null || state.value!.isEmpty) {
@@ -138,6 +142,7 @@ class RemindersNotifier extends StateNotifier<AsyncValue<List<Reminder>>> {
 
         // Refresh dashboard metrics
         _ref.read(healthStatsProvider.notifier).fetchStats(quietly: true);
+        SmartNotificationScheduler.syncSchedule(activeReminders: updatedList);
       }
     } catch (e) {
       rethrow;
@@ -198,6 +203,7 @@ class RemindersNotifier extends StateNotifier<AsyncValue<List<Reminder>>> {
 
         // Refresh dashboard metrics
         _ref.read(healthStatsProvider.notifier).fetchStats(quietly: true);
+        SmartNotificationScheduler.syncSchedule(activeReminders: updatedList);
       }
     } catch (e) {
       rethrow;
@@ -240,6 +246,7 @@ class RemindersNotifier extends StateNotifier<AsyncValue<List<Reminder>>> {
 
         // Refresh dashboard metrics
         _ref.read(healthStatsProvider.notifier).fetchStats(quietly: true);
+        SmartNotificationScheduler.syncSchedule(activeReminders: updatedList);
       }
     } catch (e) {
       rethrow;

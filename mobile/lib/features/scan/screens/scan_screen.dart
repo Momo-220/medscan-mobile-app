@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:lottie/lottie.dart';
 
 import '../../../core/constants/colors.dart';
 import '../../../core/constants/text_styles.dart';
@@ -593,6 +594,35 @@ class _ScanPageState extends ConsumerState<ScanPage> with SingleTickerProviderSt
                 ],
               ),
             ),
+          ),
+
+          // 🐱 Cat Lottie Animation Sitting on top of the Navigation Bar
+          Builder(
+            builder: (context) {
+              final safeAreaBottom = MediaQuery.of(context).padding.bottom;
+              final double bottomMargin = safeAreaBottom > 0 ? safeAreaBottom : 20.0;
+
+              return Positioned(
+                left: 24,
+                bottom: 58 + bottomMargin,
+                child: IgnorePointer(
+                  child: AnimatedOpacity(
+                    opacity: scanState.loading ? 1.0 : 0.0,
+                    duration: const Duration(milliseconds: 300),
+                    child: SizedBox(
+                      width: 145,
+                      height: 145,
+                      child: Lottie.asset(
+                        'assets/animations/cat_scan.json',
+                        repeat: true,
+                        animate: scanState.loading,
+                        fit: BoxFit.contain,
+                      ),
+                    ),
+                  ),
+                ),
+              );
+            },
           ),
 
           // Docked Bottom Navigation Bar
