@@ -6,42 +6,26 @@ import '../data/notification_catalog.dart';
 /// Engine managing priority rules and scheduling for daily tips vs medication reminders
 class SmartNotificationScheduler {
   static const String _prefKeyLastIndex = 'smart_notif_last_catalog_index';
-  static const List<int> _tipNotificationIds = [800001, 800002, 800003];
+  static const List<int> _tipNotificationIds = [800001, 800002, 800003, 800004];
 
   /// Synchronizes scheduled notifications based on active user reminders and language
   static Future<void> syncSchedule({
-    required BuildContext context,
+    BuildContext? context,
     required List activeReminders,
   }) async {
     try {
-      final bool hasActiveReminders = activeReminders.any((r) {
-        try {
-          return r.active == true;
-        } catch (_) {
-          return true;
-        }
-      });
-
-      // RULE 1: If user has active medication reminders, cancel tip notifications
-      if (hasActiveReminders) {
-        for (final id in _tipNotificationIds) {
-          await NotificationService.cancelReminder(id);
-        }
-        debugPrint('SmartNotificationScheduler: User has active medication reminders. Tips suspended.');
-        return;
-      }
-
-      // RULE 2: If NO active medication reminders, schedule 2-3 daily tips
+      // Always schedule 4 daily health tips (10:00, 15:00, 19:30, 20:15)
       final sp = await SharedPreferences.getInstance();
       int currentIndex = sp.getInt(_prefKeyLastIndex) ?? 0;
       final String langCode = sp.getString('language') ?? 'fr';
 
       final now = DateTime.now();
-      // Slots: 10:00 AM, 3:00 PM (15:00), 7:30 PM (19:30)
+      // Slots: 10:00 AM, 3:00 PM (15:00), 7:30 PM (19:30), 8:15 PM (20:15)
       final slots = [
         DateTime(now.year, now.month, now.day, 10, 0),
         DateTime(now.year, now.month, now.day, 15, 0),
         DateTime(now.year, now.month, now.day, 19, 30),
+        DateTime(now.year, now.month, now.day, 20, 15),
       ];
 
       for (int i = 0; i < slots.length; i++) {
