@@ -8,9 +8,9 @@ plugins {
 }
 
 android {
-    namespace = "com.medscan.medscan"
+    namespace = "com.seinimomo.medscanapp"
     compileSdk = flutter.compileSdkVersion
-    ndkVersion = flutter.ndkVersion
+    ndkVersion = "28.2.13676358"
 
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
@@ -19,8 +19,7 @@ android {
     }
 
     defaultConfig {
-        // TODO: Specify your own unique Application ID (https://developer.android.com/studio/build/application-id.html).
-        applicationId = "com.medscan.medscan"
+        applicationId = "com.seinimomo.medscanapp"
         // You can update the following values to match your application needs.
         // For more information, see: https://flutter.dev/to/review-gradle-config.
         minSdk = flutter.minSdkVersion
@@ -51,6 +50,12 @@ android {
             } else {
                 signingConfig = signingConfigs.getByName("debug")
             }
+        }
+    }
+
+    packaging {
+        jniLibs {
+            keepDebugSymbols.add("**/*.so")
         }
     }
 }
