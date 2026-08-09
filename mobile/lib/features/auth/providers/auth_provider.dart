@@ -178,34 +178,43 @@ class AuthNotifier extends Notifier<AsyncValue<User?>> {
     }
     state = const AsyncValue.loading();
     try {
-      // google_sign_in v7.x: use singleton + authenticate()
-      final GoogleSignInAccount? account =
-          await GoogleSignIn.instance.authenticate();
+      GoogleSignInAccount? account;
+      try {
+        account = await GoogleSignIn.instance.authenticate();
+      } catch (authErr) {
+        debugPrint('GoogleSignIn.instance.authenticate error: $authErr');
+      }
+
       if (account == null) {
         // User cancelled
         state = const AsyncValue.data(null);
         return;
       }
 
-      // idToken is a sync getter on the account (v7.x change)
       final String? idToken = account.authentication.idToken;
+      String? accessToken;
 
-      // accessToken requires explicit authorization (v7.x change)
-      final authorization =
-          await account.authorizationClient.authorizeScopes([
-        'email',
-        'profile',
-      ]);
+      try {
+        final authorization = await account.authorizationClient.authorizeScopes([
+          'email',
+          'profile',
+          'openid',
+        ]);
+        accessToken = authorization.accessToken;
+      } catch (scopeErr) {
+        debugPrint('Scope authorization non-critical error: $scopeErr');
+      }
 
       final OAuthCredential credential = GoogleAuthProvider.credential(
         idToken: idToken,
-        accessToken: authorization.accessToken,
+        accessToken: accessToken,
       );
 
       final userCredential = await _auth!.signInWithCredential(credential);
       await _saveToken();
       state = AsyncValue.data(userCredential.user);
     } catch (e, stack) {
+      debugPrint('signInWithGoogle failed: $e\n$stack');
       state = AsyncValue.error(e, stack);
       rethrow;
     }

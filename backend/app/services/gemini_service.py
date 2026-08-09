@@ -3,9 +3,11 @@ Google Gemini AI Service
 Vision analysis and conversational AI with medical safety
 """
 
+import json
+import re
 import google.generativeai as genai
 from google.generativeai.types import HarmCategory, HarmBlockThreshold
-from typing import Dict, Any, List, Optional, AsyncGenerator
+from typing import Dict, Any, List, Optional, AsyncGenerator, Union
 from PIL import Image
 import io
 import asyncio
@@ -412,31 +414,38 @@ class GeminiService:
                        key_preview=self._active_key[:10] + "..." if len(api_key) > 10 else "N/A")
             genai.configure(api_key=self._active_key, transport="rest")
             
-            logger.info(f" Initializing Gemini models: Vision={settings.GEMINI_MODEL_VISION}, Chat={settings.GEMINI_MODEL_CHAT}")
+            if self._active_key == settings.GEMINI_API_KEY_2:
+                vision_model_name = getattr(settings, "GEMINI_MODEL_VISION_2", "gemini-flash-latest")
+                chat_model_name = getattr(settings, "GEMINI_MODEL_CHAT_2", "gemini-flash-latest")
+            else:
+                vision_model_name = settings.GEMINI_MODEL_VISION
+                chat_model_name = settings.GEMINI_MODEL_CHAT
+
+            logger.info(f" Initializing Gemini models: Vision={vision_model_name}, Chat={chat_model_name}")
             
             # Initialize Vision Model - Optimized for speed
             # Note: response_mime_type must be passed in generate_content, not in model init
             self.vision_model = genai.GenerativeModel(
-                model_name=settings.GEMINI_MODEL_VISION,
-                generation_config={
-                    "temperature": 0.3,  # Lower for faster, more consistent responses
-                    "top_p": 0.9,
-                    "top_k": 20,
-                    "max_output_tokens": 4096,
-                },
+                model_name=vision_model_name,
+                generation_config=genai.GenerationConfig(
+                    temperature=0.3,  # Lower for faster, more consistent responses
+                    top_p=0.9,
+                    top_k=20,
+                    max_output_tokens=4096,
+                ),
             )
             
             # Initialize Chat Model
             # Note: system_instruction parameter is not supported in this API version
             # We'll include system instructions in the message itself when needed
             self.chat_model = genai.GenerativeModel(
-                model_name=settings.GEMINI_MODEL_CHAT,
-                generation_config={
-                    "temperature": settings.GEMINI_TEMPERATURE,
-                    "top_p": 0.95,
-                    "top_k": 40,
-                    "max_output_tokens": settings.GEMINI_MAX_TOKENS,
-                },
+                model_name=chat_model_name,
+                generation_config=genai.GenerationConfig(
+                    temperature=settings.GEMINI_TEMPERATURE,
+                    top_p=0.95,
+                    top_k=40,
+                    max_output_tokens=settings.GEMINI_MAX_TOKENS,
+                ),
             )
             
             self._initialized = True
@@ -479,12 +488,12 @@ Analyze this medication image. Return ONLY a valid JSON object - no explanations
             logger.info("Sending request to Gemini API", model=settings.GEMINI_MODEL_VISION)
             
             # Generate response - Note: response_mime_type not supported in this API version
-            generation_config = {
-                "temperature": 0.3,
-                "top_p": 0.9,
-                "top_k": 20,
-                "max_output_tokens": 4096,
-            }
+            generation_config = genai.GenerationConfig(
+                temperature=0.3,
+                top_p=0.9,
+                top_k=20,
+                max_output_tokens=4096,
+            )
             
             try:
                 response = await asyncio.wait_for(
@@ -499,23 +508,23 @@ Analyze this medication image. Return ONLY a valid JSON object - no explanations
             except (asyncio.TimeoutError, Exception) as e:
                 error_str = str(e)
                 is_timeout = isinstance(e, asyncio.TimeoutError) or "timeout" in error_str.lower() or "deadline" in error_str.lower()
-                if settings.GEMINI_API_KEY_2 and ("quota" in error_str.lower() or "429" in error_str or "surchargé" in error_str.lower() or is_timeout):
+                if settings.GEMINI_API_KEY_2 and ("quota" in error_str.lower() or "429" in error_str or "404" in error_str or "not found" in error_str.lower() or "surchargé" in error_str.lower() or is_timeout):
                     rotated = await self._rotate_api_key()
                     if rotated:
                         logger.info("Retrying vision analysis with rotated API key and strict timeout")
-                        response = await asyncio.wait_for(
-                            asyncio.to_thread(
-                                self.vision_model.generate_content,
-                                [prompt, image],
-                                generation_config=generation_config,
-                                safety_settings=MEDICAL_SAFETY_SETTINGS,
-                            ),
-                            timeout=25.0
-                        )
-                    else:
-                        raise e
-                else:
-                    raise e
+                        try:
+                            response = await asyncio.wait_for(
+                                asyncio.to_thread(
+                                    self.vision_model.generate_content,
+                                    [prompt, image],
+                                    generation_config=generation_config,
+                                    safety_settings=MEDICAL_SAFETY_SETTINGS,
+                                ),
+                                timeout=25.0
+                            )
+                        except Exception as retry_e:
+                            e = retry_e
+                
                 error_str = str(e)
                 error_type = type(e).__name__
                 
@@ -526,7 +535,6 @@ Analyze this medication image. Return ONLY a valid JSON object - no explanations
                     logger.error("Gemini quota exceeded during image analysis", 
                                 error=error_str, 
                                 error_type=error_type,
-                                retry_delay=retry_delay,
                                 exc_info=True)
                     raise AIServiceError(error_msg)
                 
@@ -605,9 +613,10 @@ Analyze this medication image. Return ONLY a valid JSON object - no explanations
             # Log critical fields for debugging
             # Récupérer les tokens utilisés pour le calcul de coût
             tokens_used = 0
-            if hasattr(response, 'usage_metadata') and response.usage_metadata:
-                input_tokens = getattr(response.usage_metadata, 'prompt_token_count', 0) or 0
-                output_tokens = getattr(response.usage_metadata, 'candidates_token_count', 0) or 0
+            usage_meta = getattr(response, 'usage_metadata', None)
+            if usage_meta:
+                input_tokens = getattr(usage_meta, 'prompt_token_count', 0) or 0
+                output_tokens = getattr(usage_meta, 'candidates_token_count', 0) or 0
                 tokens_used = input_tokens + output_tokens
                 logger.info("Tokens used for vision analysis", 
                            input_tokens=input_tokens,
@@ -654,14 +663,24 @@ Analyze this medication image. Return ONLY a valid JSON object - no explanations
         message: str,
         chat_history: Optional[List[Dict[str, str]]] = None,
         language: str = "fr",
-    ) -> str:
+    ) -> Any:
         """
         Chat with AI assistant
         Returns AI response
         """
         try:
+            # Auto-initialiser si non initialisé
+            if not self._initialized or not self.chat_model:
+                logger.info("Gemini chat model not initialized. Initializing service...")
+                await self.initialize()
+
+            if not self.chat_model:
+                error_msg = "Le modèle Gemini Chat n'est pas initialisé. Vérifiez que GEMINI_API_KEY est configurée dans backend/.env"
+                logger.error(error_msg)
+                raise AIServiceError(error_msg)
+                
             # Format chat history with system prompt included in first message
-            formatted_history = self._format_chat_history(chat_history)
+            formatted_history: List[Any] = self._format_chat_history(chat_history)
             
             # Get system prompt in correct language
             system_prompt = get_chat_system_prompt(language)
@@ -682,7 +701,7 @@ Analyze this medication image. Return ONLY a valid JSON object - no explanations
                 ]
             
             # Start or continue chat session
-            chat_session = self.chat_model.start_chat(history=formatted_history)
+            chat_session = self.chat_model.start_chat(history=formatted_history)  # type: ignore
             
             try:
                 response = await asyncio.wait_for(
@@ -694,9 +713,9 @@ Analyze this medication image. Return ONLY a valid JSON object - no explanations
                 is_timeout = isinstance(e, asyncio.TimeoutError) or "timeout" in error_str.lower() or "deadline" in error_str.lower()
                 if settings.GEMINI_API_KEY_2 and ("quota" in error_str.lower() or "429" in error_str or "surchargé" in error_str.lower() or is_timeout):
                     rotated = await self._rotate_api_key()
-                    if rotated:
+                    if rotated and self.chat_model:
                         logger.info("Retrying chat send_message with rotated API key and strict timeout")
-                        chat_session = self.chat_model.start_chat(history=formatted_history)
+                        chat_session = self.chat_model.start_chat(history=formatted_history)  # type: ignore
                         response = await asyncio.wait_for(
                             asyncio.to_thread(chat_session.send_message, message),
                             timeout=25.0
@@ -708,9 +727,10 @@ Analyze this medication image. Return ONLY a valid JSON object - no explanations
             
             # Récupérer les tokens utilisés
             tokens_used = 0
-            if hasattr(response, 'usage_metadata') and response.usage_metadata:
-                input_tokens = getattr(response.usage_metadata, 'prompt_token_count', 0) or 0
-                output_tokens = getattr(response.usage_metadata, 'candidates_token_count', 0) or 0
+            usage_meta = getattr(response, 'usage_metadata', None)
+            if usage_meta:
+                input_tokens = getattr(usage_meta, 'prompt_token_count', 0) or 0
+                output_tokens = getattr(usage_meta, 'candidates_token_count', 0) or 0
                 tokens_used = input_tokens + output_tokens
                 logger.info("Tokens used for chat", 
                            input_tokens=input_tokens,
@@ -752,8 +772,18 @@ Analyze this medication image. Return ONLY a valid JSON object - no explanations
         """
         tokens_used = 0
         try:
+            # Auto-initialiser si non initialisé
+            if not self._initialized or not self.chat_model:
+                logger.info("Gemini chat model not initialized. Initializing service...")
+                await self.initialize()
+
+            if not self.chat_model:
+                error_msg = "Le modèle Gemini Chat n'est pas initialisé. Vérifiez que GEMINI_API_KEY est configurée dans backend/.env"
+                logger.error(error_msg)
+                raise AIServiceError(error_msg)
+
             # Format chat history with system prompt included in first message
-            formatted_history = self._format_chat_history(chat_history)
+            formatted_history: List[Any] = self._format_chat_history(chat_history)
             
             # Get system prompt in correct language
             system_prompt = get_chat_system_prompt(language)
@@ -773,7 +803,7 @@ Analyze this medication image. Return ONLY a valid JSON object - no explanations
                     }
                 ]
             
-            chat_session = self.chat_model.start_chat(history=formatted_history)
+            chat_session = self.chat_model.start_chat(history=formatted_history)  # type: ignore
             
             try:
                 response = await asyncio.wait_for(
@@ -785,9 +815,9 @@ Analyze this medication image. Return ONLY a valid JSON object - no explanations
                 is_timeout = isinstance(e, asyncio.TimeoutError) or "timeout" in error_str.lower() or "deadline" in error_str.lower()
                 if settings.GEMINI_API_KEY_2 and ("quota" in error_str.lower() or "429" in error_str or "surchargé" in error_str.lower() or is_timeout):
                     rotated = await self._rotate_api_key()
-                    if rotated:
+                    if rotated and self.chat_model:
                         logger.info("Retrying chat stream send_message with rotated API key and strict timeout")
-                        chat_session = self.chat_model.start_chat(history=formatted_history)
+                        chat_session = self.chat_model.start_chat(history=formatted_history)  # type: ignore
                         response = await asyncio.wait_for(
                             asyncio.to_thread(chat_session.send_message, message, stream=True),
                             timeout=25.0
@@ -802,9 +832,10 @@ Analyze this medication image. Return ONLY a valid JSON object - no explanations
                     yield (chunk.text, 0)
                 
                 # Récupérer les tokens du dernier chunk (qui contient usage_metadata)
-                if hasattr(chunk, 'usage_metadata') and chunk.usage_metadata:
-                    input_tokens = getattr(chunk.usage_metadata, 'prompt_token_count', 0) or 0
-                    output_tokens = getattr(chunk.usage_metadata, 'candidates_token_count', 0) or 0
+                chunk_meta = getattr(chunk, 'usage_metadata', None)
+                if chunk_meta:
+                    input_tokens = getattr(chunk_meta, 'prompt_token_count', 0) or 0
+                    output_tokens = getattr(chunk_meta, 'candidates_token_count', 0) or 0
                     tokens_used = input_tokens + output_tokens
             
             # Envoyer un dernier chunk avec les tokens totaux
@@ -849,8 +880,6 @@ Analyze this medication image. Return ONLY a valid JSON object - no explanations
     def _parse_vision_response(self, response_text: str) -> Dict[str, Any]:
         """Parse Gemini vision response into structured data"""
         try:
-            import json
-            import re
             
             # Try to extract JSON from response
             # Gemini might wrap JSON in markdown code blocks
@@ -1049,7 +1078,7 @@ Analyze this medication image. Return ONLY a valid JSON object - no explanations
     def _format_chat_history(
         self,
         history: Optional[List[Dict[str, str]]],
-    ) -> List[Dict[str, str]]:
+    ) -> List[Any]:
         """Format chat history for Gemini"""
         if not history:
             return []

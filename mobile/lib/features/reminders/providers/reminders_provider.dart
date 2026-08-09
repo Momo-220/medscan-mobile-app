@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_riverpod/legacy.dart'; // StateNotifier, StateNotifierProvider (Riverpod 3.x legacy)
 import 'package:firebase_auth/firebase_auth.dart';
@@ -17,12 +18,8 @@ class RemindersNotifier extends StateNotifier<AsyncValue<List<Reminder>>> {
   RemindersNotifier(this._ref) : super(const AsyncValue.loading()) {
     _ref.listen(firebaseAuthStateProvider, (previous, next) {
       final user = next.value;
-      if (user != null) {
-        _loadCacheAndFetch(user.uid);
-      } else {
-        state = const AsyncValue.data([]);
-        NotificationService.cancelAll();
-      }
+      final userId = user?.uid ?? 'local_user';
+      _loadCacheAndFetch(userId);
     }, fireImmediately: true);
   }
 
@@ -35,6 +32,23 @@ class RemindersNotifier extends StateNotifier<AsyncValue<List<Reminder>>> {
         final List<dynamic> list = json.decode(cacheJson);
         final cachedReminders = list.map((e) => Reminder.fromJson(e)).toList();
         state = AsyncValue.data(cachedReminders);
+
+        // Synchronize local notifications scheduled with cached active reminders
+        for (var r in cachedReminders) {
+          final int notificationId = _getStableNotificationId(r.id);
+          if (r.active) {
+            final details = _getNotificationDetails(r.medicationName, r.dosage, _ref.read(languageProvider));
+            NotificationService.scheduleReminder(
+              id: notificationId,
+              title: details['title']!,
+              body: details['body']!,
+              timeStr: r.time,
+              frequency: r.frequency,
+              days: r.days,
+            );
+          }
+        }
+        SmartNotificationScheduler.syncSchedule(activeReminders: cachedReminders);
       } catch (_) {}
     }
 
@@ -45,8 +59,9 @@ class RemindersNotifier extends StateNotifier<AsyncValue<List<Reminder>>> {
   Future<void> fetchReminders(String userId) async {
     final user = FirebaseAuth.instance.currentUser;
     if (user == null || user.isAnonymous) {
-      state = const AsyncValue.data([]);
-      SmartNotificationScheduler.syncSchedule(activeReminders: []);
+      if (state.value == null) {
+        state = const AsyncValue.data([]);
+      }
       return;
     }
 
@@ -83,7 +98,8 @@ class RemindersNotifier extends StateNotifier<AsyncValue<List<Reminder>>> {
         SmartNotificationScheduler.syncSchedule(activeReminders: list);
       }
     } catch (e, stack) {
-      if (state.value == null || state.value!.isEmpty) {
+      debugPrint('Error fetching reminders: $e');
+      if (state.value == null) {
         state = AsyncValue.error(e, stack);
       }
     }
@@ -105,47 +121,77 @@ class RemindersNotifier extends StateNotifier<AsyncValue<List<Reminder>>> {
     List<int>? days,
   }) async {
     final user = FirebaseAuth.instance.currentUser;
-    if (user == null) return;
+    final userId = user?.uid ?? 'local_user';
 
-    try {
-      // Proactively request notification permissions when adding a reminder
-      await NotificationService.requestPermissions();
+    // Proactively request notification permissions when adding a reminder
+    await NotificationService.requestPermissions();
 
-      final client = _ref.read(apiClientProvider);
-      final response = await client.post('/reminders', data: {
-        'medication_name': medicationName,
-        'dosage': dosage,
-        'time': time,
-        'frequency': frequency,
-        'days': days,
-        'active': true,
-      });
+    final String localId = 'reminder_${DateTime.now().millisecondsSinceEpoch}';
+    final localReminder = Reminder(
+      id: localId,
+      medicationName: medicationName,
+      dosage: dosage,
+      time: time,
+      frequency: frequency,
+      days: days,
+      active: true,
+      nextDose: DateTime.now(),
+      createdAt: DateTime.now(),
+      updatedAt: DateTime.now(),
+    );
 
-      final newReminder = Reminder.fromJson(response.data);
-      
-      if (mounted) {
-        final current = state.value ?? [];
-        final updatedList = [...current, newReminder];
-        state = AsyncValue.data(updatedList);
-        _saveCache(user.uid, updatedList);
+    // 1. Instantly update local state, save cache, & schedule local notification alarm!
+    final current = state.value ?? [];
+    final updatedList = [...current, localReminder];
+    state = AsyncValue.data(updatedList);
+    _saveCache(userId, updatedList);
 
-        // Schedule local notification alarm with caring message
-        final details = _getNotificationDetails(newReminder.medicationName, newReminder.dosage, _ref.read(languageProvider));
-        NotificationService.scheduleReminder(
-          id: _getStableNotificationId(newReminder.id),
-          title: details['title']!,
-          body: details['body']!,
-          timeStr: newReminder.time,
-          frequency: newReminder.frequency,
-          days: newReminder.days,
-        );
+    final details = _getNotificationDetails(medicationName, dosage, _ref.read(languageProvider));
+    await NotificationService.scheduleReminder(
+      id: _getStableNotificationId(localReminder.id),
+      title: details['title']!,
+      body: details['body']!,
+      timeStr: localReminder.time,
+      frequency: localReminder.frequency,
+      days: localReminder.days,
+    );
 
-        // Refresh dashboard metrics
-        _ref.read(healthStatsProvider.notifier).fetchStats(quietly: true);
-        SmartNotificationScheduler.syncSchedule(activeReminders: updatedList);
+    _ref.read(healthStatsProvider.notifier).fetchStats(quietly: true);
+    SmartNotificationScheduler.syncSchedule(activeReminders: updatedList);
+
+    // 2. Try syncing with backend API in background if authenticated
+    if (user != null && !user.isAnonymous) {
+      try {
+        final client = _ref.read(apiClientProvider);
+        final response = await client.post('/reminders', data: {
+          'medication_name': medicationName,
+          'dosage': dosage,
+          'time': time,
+          'frequency': frequency,
+          'days': days,
+          'active': true,
+        });
+
+        final serverReminder = Reminder.fromJson(response.data);
+        if (mounted) {
+          final listWithoutTemp = (state.value ?? []).where((r) => r.id != localId).toList();
+          final finalList = [...listWithoutTemp, serverReminder];
+          state = AsyncValue.data(finalList);
+          _saveCache(userId, finalList);
+
+          NotificationService.cancelReminder(_getStableNotificationId(localId));
+          NotificationService.scheduleReminder(
+            id: _getStableNotificationId(serverReminder.id),
+            title: details['title']!,
+            body: details['body']!,
+            timeStr: serverReminder.time,
+            frequency: serverReminder.frequency,
+            days: serverReminder.days,
+          );
+        }
+      } catch (e) {
+        debugPrint('Backend sync for reminder failed, retained local offline reminder: $e');
       }
-    } catch (e) {
-      rethrow;
     }
   }
 
@@ -159,63 +205,91 @@ class RemindersNotifier extends StateNotifier<AsyncValue<List<Reminder>>> {
     List<int>? days,
   }) async {
     final user = FirebaseAuth.instance.currentUser;
-    if (user == null) return;
+    final userId = user?.uid ?? 'local_user';
 
-    try {
-      if (active) {
-        // Proactively request notification permissions when activating a reminder
-        await NotificationService.requestPermissions();
-      }
+    if (active) {
+      await NotificationService.requestPermissions();
+    }
 
-      final client = _ref.read(apiClientProvider);
-      final response = await client.put('/reminders/$id', data: {
-        'medication_name': medicationName,
-        'dosage': dosage,
-        'time': time,
-        'frequency': frequency,
-        'days': days,
-        'active': active,
-      });
+    final current = state.value ?? [];
+    final existingReminder = current.firstWhere(
+      (r) => r.id == id,
+      orElse: () => Reminder(
+        id: id,
+        medicationName: medicationName,
+        dosage: dosage,
+        time: time,
+        frequency: frequency,
+        days: days,
+        active: active,
+        nextDose: DateTime.now(),
+        createdAt: DateTime.now(),
+        updatedAt: DateTime.now(),
+      ),
+    );
 
-      final updatedReminder = Reminder.fromJson(response.data);
+    final updatedLocalReminder = existingReminder.copyWith(
+      medicationName: medicationName,
+      dosage: dosage,
+      time: time,
+      frequency: frequency,
+      active: active,
+      days: days,
+      updatedAt: DateTime.now(),
+    );
 
-      if (mounted) {
-        final current = state.value ?? [];
-        final updatedList = current.map((r) => r.id == id ? updatedReminder : r).toList();
-        state = AsyncValue.data(updatedList);
-        _saveCache(user.uid, updatedList);
+    final updatedList = current.map((r) => r.id == id ? updatedLocalReminder : r).toList();
+    if (!current.any((r) => r.id == id)) {
+      updatedList.add(updatedLocalReminder);
+    }
+    state = AsyncValue.data(updatedList);
+    _saveCache(userId, updatedList);
 
-        // Update local notification alarm
-        final int notificationId = _getStableNotificationId(id);
-        if (active) {
-          final details = _getNotificationDetails(updatedReminder.medicationName, updatedReminder.dosage, _ref.read(languageProvider));
-          NotificationService.scheduleReminder(
-            id: notificationId,
-            title: details['title']!,
-            body: details['body']!,
-            timeStr: updatedReminder.time,
-            frequency: updatedReminder.frequency,
-            days: updatedReminder.days,
-          );
-        } else {
-          NotificationService.cancelReminder(notificationId);
+    final int notificationId = _getStableNotificationId(id);
+    if (active) {
+      final details = _getNotificationDetails(medicationName, dosage, _ref.read(languageProvider));
+      NotificationService.scheduleReminder(
+        id: notificationId,
+        title: details['title']!,
+        body: details['body']!,
+        timeStr: time,
+        frequency: frequency,
+        days: days,
+      );
+    } else {
+      NotificationService.cancelReminder(notificationId);
+    }
+
+    _ref.read(healthStatsProvider.notifier).fetchStats(quietly: true);
+    SmartNotificationScheduler.syncSchedule(activeReminders: updatedList);
+
+    if (user != null && !user.isAnonymous && !id.startsWith('reminder_')) {
+      try {
+        final client = _ref.read(apiClientProvider);
+        final response = await client.put('/reminders/$id', data: {
+          'medication_name': medicationName,
+          'dosage': dosage,
+          'time': time,
+          'frequency': frequency,
+          'days': days,
+          'active': active,
+        });
+
+        final serverReminder = Reminder.fromJson(response.data);
+        if (mounted) {
+          final finalList = (state.value ?? []).map((r) => r.id == id ? serverReminder : r).toList();
+          state = AsyncValue.data(finalList);
+          _saveCache(userId, finalList);
         }
-
-        // Refresh dashboard metrics
-        _ref.read(healthStatsProvider.notifier).fetchStats(quietly: true);
-        SmartNotificationScheduler.syncSchedule(activeReminders: updatedList);
+      } catch (e) {
+        debugPrint('Backend sync for update reminder failed: $e');
       }
-    } catch (e) {
-      rethrow;
     }
   }
 
   Future<void> toggleReminderActive(String id, bool active) async {
-    final user = FirebaseAuth.instance.currentUser;
-    if (user == null) return;
-
     final current = state.value ?? [];
-    final reminder = current.firstWhere((r) => r.id == id);
+    final reminder = current.firstWhere((r) => r.id == id, orElse: () => current.first);
 
     await updateReminder(
       id: id,
@@ -224,50 +298,57 @@ class RemindersNotifier extends StateNotifier<AsyncValue<List<Reminder>>> {
       time: reminder.time,
       frequency: reminder.frequency,
       active: active,
+      days: reminder.days,
     );
   }
 
   Future<void> deleteReminder(String id) async {
     final user = FirebaseAuth.instance.currentUser;
-    if (user == null) return;
+    final userId = user?.uid ?? 'local_user';
 
-    try {
-      final client = _ref.read(apiClientProvider);
-      await client.delete('/reminders/$id');
+    final current = state.value ?? [];
+    final updatedList = current.where((r) => r.id != id).toList();
+    state = AsyncValue.data(updatedList);
+    _saveCache(userId, updatedList);
 
-      if (mounted) {
-        final current = state.value ?? [];
-        final updatedList = current.where((r) => r.id != id).toList();
-        state = AsyncValue.data(updatedList);
-        _saveCache(user.uid, updatedList);
+    NotificationService.cancelReminder(_getStableNotificationId(id));
 
-        // Cancel local notification alarm
-        NotificationService.cancelReminder(_getStableNotificationId(id));
+    _ref.read(healthStatsProvider.notifier).fetchStats(quietly: true);
+    SmartNotificationScheduler.syncSchedule(activeReminders: updatedList);
 
-        // Refresh dashboard metrics
-        _ref.read(healthStatsProvider.notifier).fetchStats(quietly: true);
-        SmartNotificationScheduler.syncSchedule(activeReminders: updatedList);
+    if (user != null && !user.isAnonymous && !id.startsWith('reminder_')) {
+      try {
+        final client = _ref.read(apiClientProvider);
+        await client.delete('/reminders/$id');
+      } catch (e) {
+        debugPrint('Backend sync for delete reminder failed: $e');
       }
-    } catch (e) {
-      rethrow;
     }
   }
 
   Future<void> markTaken(String id) async {
     final user = FirebaseAuth.instance.currentUser;
-    if (user == null) return;
+    final userId = user?.uid ?? 'local_user';
 
-    try {
-      final client = _ref.read(apiClientProvider);
-      await client.post('/reminders/$id/take', data: {'taken_at': DateTime.now().toUtc().toIso8601String()});
+    final current = state.value ?? [];
+    final updatedList = current.map((r) {
+      if (r.id == id) {
+        return r.copyWith(taken: true);
+      }
+      return r;
+    }).toList();
+    state = AsyncValue.data(updatedList);
+    _saveCache(userId, updatedList);
 
-      // Refresh list to pull updated taken states and next dose calculations
-      await fetchReminders(user.uid);
-      
-      // Refresh dashboard metrics
-      _ref.read(healthStatsProvider.notifier).fetchStats(quietly: true);
-    } catch (e) {
-      rethrow;
+    _ref.read(healthStatsProvider.notifier).fetchStats(quietly: true);
+
+    if (user != null && !user.isAnonymous && !id.startsWith('reminder_')) {
+      try {
+        final client = _ref.read(apiClientProvider);
+        await client.post('/reminders/$id/take', data: {'taken_at': DateTime.now().toUtc().toIso8601String()});
+      } catch (e) {
+        debugPrint('Backend sync for markTaken failed: $e');
+      }
     }
   }
 

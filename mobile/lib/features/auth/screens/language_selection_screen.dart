@@ -120,14 +120,14 @@ class LanguageSelectionPage extends ConsumerWidget {
                         crossAxisCount: 2,
                         crossAxisSpacing: 16,
                         mainAxisSpacing: 16,
-                        childAspectRatio: 1.1,
+                        childAspectRatio: 0.95,
                       ),
                       itemCount: languages.length,
                       itemBuilder: (context, index) {
                         final lang = languages[index];
                         return AppCard(
                           hover: true,
-                          padding: const EdgeInsets.symmetric(vertical: 24, horizontal: 16),
+                          padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 12),
                           onTap: () async {
                             await ref.read(languageProvider.notifier).setLanguage(lang['code']!);
                             if (context.mounted) {

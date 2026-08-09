@@ -30,13 +30,13 @@ class _HealthTipsCardWidgetState extends ConsumerState<HealthTipsCardWidget> {
       'title': {
         'en': 'Hydration',
         'fr': 'Hydratation',
-        'tr': 'Hydratation', // Matches screenshot fallback
+        'tr': 'Sıvı Alımı',
         'ar': 'الترطيب',
       },
       'description': {
         'en': 'Drink a large glass of water with your medications to facilitate absorption',
         'fr': 'Buvez un grand verre d\'eau avec vos médicaments pour faciliter l\'absorption',
-        'tr': 'Buvez un grand verre d\'eau avec vos médicaments pour faciliter l\'absorption', // Matches screenshot fallback
+        'tr': 'İlaçlarınızın emilimini kolaylaştırmak için bol su ile alın',
         'ar': 'اشرب كوبًا كبيرًا من الماء مع أدويتك لتسهيل امتصاصها',
       }
     },
@@ -45,13 +45,13 @@ class _HealthTipsCardWidgetState extends ConsumerState<HealthTipsCardWidget> {
       'title': {
         'en': 'Optimal timing',
         'fr': 'Timing optimal',
-        'tr': 'Optimal zamanlama',
+        'tr': 'Optimal Zamanlama',
         'ar': 'التوقيت الأمثل',
       },
       'description': {
         'en': 'Take your medications at fixed times to maintain a constant level',
         'fr': 'Prenez vos médicaments à heures fixes pour maintenir un niveau constant',
-        'tr': 'Sabit bir seviyeyi korumak için ilaçlarınızı sabit saatlerde alın',
+        'tr': 'Sabit bir seviye korumak için ilaçlarınızı sabit saatlerde alın',
         'ar': 'تناول أدويتك في أوقات ثابتة للحفاظ على مستوى ثابت في الجسم',
       }
     },
@@ -117,7 +117,7 @@ class _HealthTipsCardWidgetState extends ConsumerState<HealthTipsCardWidget> {
 
   void _startTipRotation() {
     _tipTimer?.cancel();
-    _tipTimer = Timer.periodic(const Duration(seconds: 5), (timer) {
+    _tipTimer = Timer.periodic(const Duration(seconds: 8), (timer) {
       if (mounted) {
         setState(() {
           _currentTipIndex = (_currentTipIndex + 1) % _allTips.length;
@@ -128,53 +128,35 @@ class _HealthTipsCardWidgetState extends ConsumerState<HealthTipsCardWidget> {
 
   Future<void> _loadNextReminder() async {
     final user = FirebaseAuth.instance.currentUser;
-    if (user == null || user.isAnonymous) {
-      if (mounted) {
-        setState(() {
-          _nextReminder = null;
-          _loadingReminder = false;
-        });
-      }
-      return;
-    }
-
-    try {
-      // Accessing reminders via Riverpod notifier
-      final remindersAsync = ref.read(remindersProvider);
-      remindersAsync.when(
-        data: (reminders) {
-          final activeReminders = reminders.where((r) => r.active).toList();
-          if (activeReminders.isNotEmpty) {
-            // Sort by next dose date
-            activeReminders.sort((a, b) => a.nextDose.compareTo(b.nextDose));
-            if (mounted) {
-              setState(() {
-                _nextReminder = activeReminders.first;
-                _loadingReminder = false;
-              });
-            }
-          } else {
-            if (mounted) {
-              setState(() {
-                _nextReminder = null;
-                _loadingReminder = false;
-              });
-            }
+    if (user != null) {
+      try {
+        final remindersList = ref.read(remindersProvider).value ?? [];
+        final activeReminders = remindersList.where((r) => r.active).toList();
+        if (activeReminders.isNotEmpty) {
+          activeReminders.sort((a, b) => a.nextDose.compareTo(b.nextDose));
+          if (mounted) {
+            setState(() {
+              _nextReminder = activeReminders.first;
+              _loadingReminder = false;
+            });
           }
-        },
-        error: (_, __) {
+        } else {
           if (mounted) {
             setState(() {
               _nextReminder = null;
               _loadingReminder = false;
             });
           }
-        },
-        loading: () {
-          // Keep loading state
-        },
-      );
-    } catch (_) {
+        }
+      } catch (e) {
+        if (mounted) {
+          setState(() {
+            _nextReminder = null;
+            _loadingReminder = false;
+          });
+        }
+      }
+    } else {
       if (mounted) {
         setState(() {
           _nextReminder = null;
@@ -193,7 +175,7 @@ class _HealthTipsCardWidgetState extends ConsumerState<HealthTipsCardWidget> {
       _loadNextReminder();
     });
 
-    final String langCode = ref.read(languageProvider);
+    final String langCode = ref.watch(languageProvider);
 
     final tip = _allTips[_currentTipIndex];
     final String tipTitle = tip['title'][langCode] ?? tip['title']['fr'];

@@ -74,7 +74,7 @@ async def chat_with_assistant(
         credits_service.ensure_credits(user_id, credits_service.CHAT_COST, is_anonymous=is_anonymous)
 
         # S'assurer que Gemini est initialisé
-        if not gemini_service._initialized:
+        if not gemini_service._initialized or not gemini_service.chat_model:
             logger.info("Initializing Gemini service for chat")
             await gemini_service.initialize()
         
@@ -281,7 +281,7 @@ async def chat_with_assistant_stream(
         
         try:
             # S'assurer que Gemini est initialisé
-            if not gemini_service._initialized:
+            if not gemini_service._initialized or not gemini_service.chat_model:
                 logger.info("Initializing Gemini service for chat")
                 await gemini_service.initialize()
             

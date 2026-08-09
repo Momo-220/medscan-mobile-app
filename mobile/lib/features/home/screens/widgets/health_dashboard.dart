@@ -19,7 +19,7 @@ class HealthDashboardWidget extends ConsumerWidget {
 
     // Calculate cross axis count based on screen width
     final int crossAxisCount = width > 900 ? 4 : (width > 600 ? 2 : 1);
-    final double childAspectRatio = width > 900 ? 1.3 : (width > 600 ? 1.3 : 3.8);
+    final double childAspectRatio = width > 900 ? 1.3 : (width > 600 ? 1.3 : 3.1);
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -234,7 +234,7 @@ class HealthDashboardWidget extends ConsumerWidget {
 
     if (isHorizontal) {
       return AppCard(
-        padding: const EdgeInsets.symmetric(horizontal: 20.0, vertical: 16.0),
+        padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 12.0),
         children: Row(
           children: [
             // Icon Box

@@ -139,12 +139,16 @@ class _ReminderCountdownWidgetState extends ConsumerState<ReminderCountdownWidge
             size: 13,
           ),
           const SizedBox(width: 4),
-          Text(
-            displayString,
-            style: AppTextStyles.micro(isDark: isDark).copyWith(
-              color: AppColors.primary,
-              fontWeight: FontWeight.w700,
-              fontSize: 10,
+          Flexible(
+            child: Text(
+              displayString,
+              style: AppTextStyles.micro(isDark: isDark).copyWith(
+                color: AppColors.primary,
+                fontWeight: FontWeight.w700,
+                fontSize: 10,
+              ),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
             ),
           ),
         ],

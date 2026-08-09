@@ -105,7 +105,7 @@ class Button extends StatelessWidget {
     final bool isButtonEnabled = !disabled && !loading && onTap != null;
 
     Widget buttonContent = Row(
-      mainAxisSize: MainAxisSize.min,
+      mainAxisSize: width != null ? MainAxisSize.max : MainAxisSize.min,
       mainAxisAlignment: MainAxisAlignment.center,
       crossAxisAlignment: CrossAxisAlignment.center,
       children: [
@@ -134,7 +134,8 @@ class Button extends StatelessWidget {
       opacity: isButtonEnabled ? 1.0 : 0.5,
       child: GestureDetector(
         onTap: isButtonEnabled ? onTap : null,
-        child: Container(
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 150),
           width: width,
           padding: padding,
           decoration: BoxDecoration(
@@ -143,9 +144,7 @@ class Button extends StatelessWidget {
             border: borderSide != BorderSide.none ? Border.fromBorderSide(borderSide) : null,
             boxShadow: shadow,
           ),
-          child: Center(
-            child: buttonContent,
-          ),
+          child: buttonContent,
         ),
       ),
     );

@@ -47,10 +47,11 @@ void showAddEditReminderDialog(
       return StatefulBuilder(
         builder: (context, setDialogState) {
           return Dialog(
+            insetPadding: const EdgeInsets.symmetric(horizontal: 20.0, vertical: 24.0),
             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
             backgroundColor: isDark ? AppColors.cardDark : AppColors.card,
             child: SingleChildScrollView(
-              padding: const EdgeInsets.all(24.0),
+              padding: const EdgeInsets.all(20.0),
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -358,9 +359,13 @@ class _MedicationRemindersWidgetState extends ConsumerState<MedicationRemindersW
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Text(
-                ref.t('medicationRemindersTitle'),
-                style: AppTextStyles.h3(isDark: isDark),
+              Expanded(
+                child: Text(
+                  ref.t('medicationRemindersTitle'),
+                  style: AppTextStyles.h3(isDark: isDark),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
               ),
               if (!isAnonymous)
                 IconButton(
@@ -523,10 +528,14 @@ class _MedicationRemindersWidgetState extends ConsumerState<MedicationRemindersW
                     decoration: (r.taken ?? false) ? TextDecoration.lineThrough : null,
                     color: (r.taken ?? false) ? AppColors.textMuted : null,
                   ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
                 ),
                 Text(
                   r.dosage,
                   style: AppTextStyles.micro(isDark: isDark),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
                 ),
                 ReminderCountdownWidget(
                   nextDose: r.nextDose,
@@ -537,23 +546,38 @@ class _MedicationRemindersWidgetState extends ConsumerState<MedicationRemindersW
             ),
           ),
 
+          const SizedBox(width: 4),
           // Active switch, edit & delete buttons
-          Switch(
-            value: r.active,
-            activeColor: AppColors.primary,
-            onChanged: (val) {
-              ref.read(remindersProvider.notifier).toggleReminderActive(r.id, val);
-            },
-          ),
-          
-          IconButton(
-            icon: Icon(Icons.edit_outlined, color: isDark ? Colors.white60 : Colors.black45, size: 20),
-            onPressed: () => _showAddEditReminderDialog(context, reminder: r),
-          ),
-          
-          IconButton(
-            icon: Icon(Icons.delete_outline, color: Colors.red[400], size: 20),
-            onPressed: () => _showDeleteConfirmation(context, r.id),
+          Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              SizedBox(
+                width: 36,
+                child: Transform.scale(
+                  scale: 0.75,
+                  child: Switch(
+                    value: r.active,
+                    activeColor: AppColors.primary,
+                    onChanged: (val) {
+                      ref.read(remindersProvider.notifier).toggleReminderActive(r.id, val);
+                    },
+                  ),
+                ),
+              ),
+              const SizedBox(width: 2),
+              IconButton(
+                padding: EdgeInsets.zero,
+                constraints: const BoxConstraints(minWidth: 28, minHeight: 28),
+                icon: Icon(Icons.edit_outlined, color: isDark ? Colors.white60 : Colors.black45, size: 18),
+                onPressed: () => _showAddEditReminderDialog(context, reminder: r),
+              ),
+              IconButton(
+                padding: EdgeInsets.zero,
+                constraints: const BoxConstraints(minWidth: 28, minHeight: 28),
+                icon: Icon(Icons.delete_outline, color: Colors.red[400], size: 18),
+                onPressed: () => _showDeleteConfirmation(context, r.id),
+              ),
+            ],
           ),
         ],
       ),

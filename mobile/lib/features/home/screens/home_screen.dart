@@ -344,7 +344,7 @@ class HomePage extends ConsumerWidget {
                 const RecentScansWidget(),
                 
                 // Bottom spacing margin for floating navigation bar
-                const SizedBox(height: 120),
+                const SizedBox(height: 140),
               ],
             ),
           ),

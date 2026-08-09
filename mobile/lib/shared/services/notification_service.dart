@@ -36,7 +36,7 @@ class NotificationService {
 
     // 2. Setup channel details for Android
     const AndroidInitializationSettings initializationSettingsAndroid =
-        AndroidInitializationSettings('@mipmap/ic_launcher');
+        AndroidInitializationSettings('launcher_icon');
 
     // 3. Setup Darwin (iOS / macOS) details
     const DarwinInitializationSettings initializationSettingsDarwin =
@@ -63,6 +63,37 @@ class NotificationService {
           debugPrint('Notification clicked: ${details.payload}');
         },
       );
+
+      // Create high-importance Android Notification Channels with custom sounds
+      final androidPlatform = _notificationsPlugin.resolvePlatformSpecificImplementation<AndroidFlutterLocalNotificationsPlugin>();
+      if (androidPlatform != null) {
+        await androidPlatform.createNotificationChannel(
+          const AndroidNotificationChannel(
+            'medscan_reminders_channel_v3',
+            'Rappels de médicaments',
+            description: 'Notifications pour la prise de médicaments',
+            importance: Importance.max,
+            playSound: true,
+            sound: RawResourceAndroidNotificationSound('alarme_douce'),
+          ),
+        );
+        await androidPlatform.createNotificationChannel(
+          const AndroidNotificationChannel(
+            'medscan_general_tips_channel_v3',
+            'Conseils & Astuces Santé',
+            description: 'Notifications d\'astuces santé et conseils quotidiens',
+            importance: Importance.high,
+            playSound: true,
+            sound: RawResourceAndroidNotificationSound('notif_douce'),
+          ),
+        );
+
+        // Auto-request notifications and exact alarm permissions on Android launch
+        await androidPlatform.requestNotificationsPermission();
+        try {
+          await androidPlatform.requestExactAlarmsPermission();
+        } catch (_) {}
+      }
     } catch (e) {
       debugPrint('NotificationService init error: $e');
     }
@@ -144,13 +175,26 @@ class NotificationService {
       }
 
       final AndroidNotificationDetails androidDetails = AndroidNotificationDetails(
-        'medscan_reminders_channel_v2',
+        'medscan_reminders_channel_v3',
         'Rappels de médicaments',
         channelDescription: 'Notifications pour la prise de médicaments',
         importance: Importance.max,
         priority: Priority.high,
         playSound: true,
         sound: const RawResourceAndroidNotificationSound('alarme_douce'),
+        category: AndroidNotificationCategory.alarm,
+        audioAttributesUsage: AudioAttributesUsage.alarm,
+        fullScreenIntent: true,
+        vibrationPattern: Int64List.fromList([0, 1000, 500, 1000, 500, 1000, 500, 1000]),
+      );
+
+      final AndroidNotificationDetails androidDetailsDefaultSound = AndroidNotificationDetails(
+        'medscan_reminders_channel_v3',
+        'Rappels de médicaments',
+        channelDescription: 'Notifications pour la prise de médicaments',
+        importance: Importance.max,
+        priority: Priority.high,
+        playSound: true,
         category: AndroidNotificationCategory.alarm,
         audioAttributesUsage: AudioAttributesUsage.alarm,
         fullScreenIntent: true,
@@ -172,31 +216,39 @@ class NotificationService {
         macOS: darwinDetails,
       );
 
-      final now = tz.TZDateTime.now(location);
+      final NotificationDetails platformDetailsDefaultSound = NotificationDetails(
+        android: androidDetailsDefaultSound,
+        iOS: darwinDetails,
+        macOS: darwinDetails,
+      );
+
+      final nowLocal = DateTime.now();
 
       // 4. Schedule multiple alarms dynamically
       if (days == null || days.isEmpty) {
         // Daily matching configuration
         for (int i = 0; i < hourOffsets.length; i++) {
           final offset = hourOffsets[i];
-          var scheduledDate = tz.TZDateTime(
-            location,
-            now.year,
-            now.month,
-            now.day,
-            (hour + offset) % 24,
+          final targetHour = (hour + offset) % 24;
+          final daysToAdd = (hour + offset) ~/ 24;
+
+          var scheduledLocal = DateTime(
+            nowLocal.year,
+            nowLocal.month,
+            nowLocal.day,
+            targetHour,
             minute,
           );
 
-          final daysToAdd = (hour + offset) ~/ 24;
           if (daysToAdd > 0) {
-            scheduledDate = scheduledDate.add(Duration(days: daysToAdd));
+            scheduledLocal = scheduledLocal.add(Duration(days: daysToAdd));
           }
 
-          if (scheduledDate.isBefore(now)) {
-            scheduledDate = scheduledDate.add(const Duration(days: 1));
+          if (scheduledLocal.isBefore(nowLocal)) {
+            scheduledLocal = scheduledLocal.add(const Duration(days: 1));
           }
 
+          final scheduledDate = tz.TZDateTime.from(scheduledLocal, location);
           final int alarmId = id + (i * 100000);
           try {
             await _notificationsPlugin.zonedSchedule(
@@ -210,17 +262,32 @@ class NotificationService {
               payload: id.toString(),
             );
           } catch (e) {
-            debugPrint('exactAllowWhileIdle failed, falling back to inexact schedule: $e');
-            await _notificationsPlugin.zonedSchedule(
-              id: alarmId,
-              title: title,
-              body: body,
-              scheduledDate: scheduledDate,
-              notificationDetails: platformDetails,
-              androidScheduleMode: AndroidScheduleMode.inexact,
-              matchDateTimeComponents: DateTimeComponents.time,
-              payload: id.toString(),
-            );
+            debugPrint('exactAllowWhileIdle failed, falling back: $e');
+            final useDefaultSound = e.toString().contains('invalid_sound');
+            final detailsToUse = useDefaultSound ? platformDetailsDefaultSound : platformDetails;
+            try {
+              await _notificationsPlugin.zonedSchedule(
+                id: alarmId,
+                title: title,
+                body: body,
+                scheduledDate: scheduledDate,
+                notificationDetails: detailsToUse,
+                androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
+                matchDateTimeComponents: DateTimeComponents.time,
+                payload: id.toString(),
+              );
+            } catch (_) {
+              await _notificationsPlugin.zonedSchedule(
+                id: alarmId,
+                title: title,
+                body: body,
+                scheduledDate: scheduledDate,
+                notificationDetails: detailsToUse,
+                androidScheduleMode: AndroidScheduleMode.inexact,
+                matchDateTimeComponents: DateTimeComponents.time,
+                payload: id.toString(),
+              );
+            }
           }
         }
       } else {
@@ -232,25 +299,26 @@ class NotificationService {
 
           for (int i = 0; i < hourOffsets.length; i++) {
             final offset = hourOffsets[i];
-            
-            var scheduledDate = tz.TZDateTime(
-              location,
-              now.year,
-              now.month,
-              now.day,
-              (hour + offset) % 24,
+            final targetHour = (hour + offset) % 24;
+            final daysToAddOffset = (hour + offset) ~/ 24;
+
+            var scheduledLocal = DateTime(
+              nowLocal.year,
+              nowLocal.month,
+              nowLocal.day,
+              targetHour,
               minute,
             );
 
-            final daysToAddOffset = (hour + offset) ~/ 24;
             if (daysToAddOffset > 0) {
-              scheduledDate = scheduledDate.add(Duration(days: daysToAddOffset));
+              scheduledLocal = scheduledLocal.add(Duration(days: daysToAddOffset));
             }
 
-            while (scheduledDate.weekday != targetIsoWeekday || scheduledDate.isBefore(now)) {
-              scheduledDate = scheduledDate.add(const Duration(days: 1));
+            while (scheduledLocal.weekday != targetIsoWeekday || scheduledLocal.isBefore(nowLocal)) {
+              scheduledLocal = scheduledLocal.add(const Duration(days: 1));
             }
 
+            final scheduledDate = tz.TZDateTime.from(scheduledLocal, location);
             final int alarmId = id + ((weekdayIndex + 1) * 10000) + (i * 100000);
             try {
               await _notificationsPlugin.zonedSchedule(
@@ -264,17 +332,32 @@ class NotificationService {
                 payload: id.toString(),
               );
             } catch (e) {
-              debugPrint('exactAllowWhileIdle failed, falling back to inexact schedule: $e');
-              await _notificationsPlugin.zonedSchedule(
-                id: alarmId,
-                title: title,
-                body: body,
-                scheduledDate: scheduledDate,
-                notificationDetails: platformDetails,
-                androidScheduleMode: AndroidScheduleMode.inexact,
-                matchDateTimeComponents: DateTimeComponents.dayOfWeekAndTime,
-                payload: id.toString(),
-              );
+              debugPrint('exactAllowWhileIdle failed, falling back: $e');
+              final useDefaultSound = e.toString().contains('invalid_sound');
+              final detailsToUse = useDefaultSound ? platformDetailsDefaultSound : platformDetails;
+              try {
+                await _notificationsPlugin.zonedSchedule(
+                  id: alarmId,
+                  title: title,
+                  body: body,
+                  scheduledDate: scheduledDate,
+                  notificationDetails: detailsToUse,
+                  androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
+                  matchDateTimeComponents: DateTimeComponents.dayOfWeekAndTime,
+                  payload: id.toString(),
+                );
+              } catch (_) {
+                await _notificationsPlugin.zonedSchedule(
+                  id: alarmId,
+                  title: title,
+                  body: body,
+                  scheduledDate: scheduledDate,
+                  notificationDetails: detailsToUse,
+                  androidScheduleMode: AndroidScheduleMode.inexact,
+                  matchDateTimeComponents: DateTimeComponents.dayOfWeekAndTime,
+                  payload: id.toString(),
+                );
+              }
             }
           }
         }
@@ -291,13 +374,26 @@ class NotificationService {
   }) async {
     try {
       final AndroidNotificationDetails androidDetails = AndroidNotificationDetails(
-        'medscan_reminders_channel_v2',
+        'medscan_reminders_channel_v3',
         'Rappels de médicaments',
         channelDescription: 'Notifications pour la prise de médicaments',
         importance: Importance.max,
         priority: Priority.high,
         playSound: true,
         sound: const RawResourceAndroidNotificationSound('alarme_douce'),
+        category: AndroidNotificationCategory.alarm,
+        audioAttributesUsage: AudioAttributesUsage.alarm,
+        fullScreenIntent: true,
+        vibrationPattern: Int64List.fromList([0, 1000, 500, 1000, 500, 1000, 500, 1000]),
+      );
+
+      final AndroidNotificationDetails androidDetailsDefaultSound = AndroidNotificationDetails(
+        'medscan_reminders_channel_v3',
+        'Rappels de médicaments',
+        channelDescription: 'Notifications pour la prise de médicaments',
+        importance: Importance.max,
+        priority: Priority.high,
+        playSound: true,
         category: AndroidNotificationCategory.alarm,
         audioAttributesUsage: AudioAttributesUsage.alarm,
         fullScreenIntent: true,
@@ -319,13 +415,33 @@ class NotificationService {
         macOS: darwinDetails,
       );
 
-      await _notificationsPlugin.show(
-        id: id,
-        title: title,
-        body: body,
-        notificationDetails: platformDetails,
-        payload: id.toString(),
+      final NotificationDetails platformDetailsDefaultSound = NotificationDetails(
+        android: androidDetailsDefaultSound,
+        iOS: darwinDetails,
+        macOS: darwinDetails,
       );
+
+      try {
+        await _notificationsPlugin.show(
+          id: id,
+          title: title,
+          body: body,
+          notificationDetails: platformDetails,
+          payload: id.toString(),
+        );
+      } catch (e) {
+        if (e.toString().contains('invalid_sound')) {
+          await _notificationsPlugin.show(
+            id: id,
+            title: title,
+            body: body,
+            notificationDetails: platformDetailsDefaultSound,
+            payload: id.toString(),
+          );
+        } else {
+          rethrow;
+        }
+      }
     } catch (e) {
       debugPrint('Error showing instant notification: $e');
     }
@@ -339,13 +455,23 @@ class NotificationService {
   }) async {
     try {
       final AndroidNotificationDetails androidDetails = AndroidNotificationDetails(
-        'medscan_general_tips_channel',
+        'medscan_general_tips_channel_v3',
         'Conseils & Astuces Santé',
         channelDescription: 'Notifications d\'astuces santé et conseils quotidiens',
         importance: Importance.defaultImportance,
         priority: Priority.defaultPriority,
         playSound: true,
         sound: const RawResourceAndroidNotificationSound('notif_douce'),
+        category: AndroidNotificationCategory.recommendation,
+      );
+
+      final AndroidNotificationDetails androidDetailsDefaultSound = AndroidNotificationDetails(
+        'medscan_general_tips_channel_v3',
+        'Conseils & Astuces Santé',
+        channelDescription: 'Notifications d\'astuces santé et conseils quotidiens',
+        importance: Importance.defaultImportance,
+        priority: Priority.defaultPriority,
+        playSound: true,
         category: AndroidNotificationCategory.recommendation,
       );
 
@@ -364,13 +490,33 @@ class NotificationService {
         macOS: darwinDetails,
       );
 
-      await _notificationsPlugin.show(
-        id: id,
-        title: title,
-        body: body,
-        notificationDetails: platformDetails,
-        payload: 'tip_$id',
+      final NotificationDetails platformDetailsDefaultSound = NotificationDetails(
+        android: androidDetailsDefaultSound,
+        iOS: darwinDetails,
+        macOS: darwinDetails,
       );
+
+      try {
+        await _notificationsPlugin.show(
+          id: id,
+          title: title,
+          body: body,
+          notificationDetails: platformDetails,
+          payload: 'tip_$id',
+        );
+      } catch (e) {
+        if (e.toString().contains('invalid_sound')) {
+          await _notificationsPlugin.show(
+            id: id,
+            title: title,
+            body: body,
+            notificationDetails: platformDetailsDefaultSound,
+            payload: 'tip_$id',
+          );
+        } else {
+          rethrow;
+        }
+      }
     } catch (e) {
       debugPrint('Error showing tip notification: $e');
     }
@@ -385,13 +531,22 @@ class NotificationService {
   }) async {
     try {
       final AndroidNotificationDetails androidDetails = AndroidNotificationDetails(
-        'medscan_general_tips_channel',
+        'medscan_general_tips_channel_v3',
         'Conseils & Astuces Santé',
         channelDescription: 'Notifications d\'astuces santé et conseils quotidiens',
         importance: Importance.defaultImportance,
         priority: Priority.defaultPriority,
         playSound: true,
         sound: const RawResourceAndroidNotificationSound('notif_douce'),
+      );
+
+      final AndroidNotificationDetails androidDetailsDefaultSound = AndroidNotificationDetails(
+        'medscan_general_tips_channel_v3',
+        'Conseils & Astuces Santé',
+        channelDescription: 'Notifications d\'astuces santé et conseils quotidiens',
+        importance: Importance.defaultImportance,
+        priority: Priority.defaultPriority,
+        playSound: true,
       );
 
       const DarwinNotificationDetails darwinDetails = DarwinNotificationDetails(
@@ -409,6 +564,12 @@ class NotificationService {
         macOS: darwinDetails,
       );
 
+      final NotificationDetails platformDetailsDefaultSound = NotificationDetails(
+        android: androidDetailsDefaultSound,
+        iOS: darwinDetails,
+        macOS: darwinDetails,
+      );
+
       tz.Location location;
       try {
         location = tz.local;
@@ -418,16 +579,33 @@ class NotificationService {
 
       final tzScheduled = tz.TZDateTime.from(scheduledDate, location);
 
-      await _notificationsPlugin.zonedSchedule(
-        id: id,
-        title: title,
-        body: body,
-        scheduledDate: tzScheduled,
-        notificationDetails: platformDetails,
-        androidScheduleMode: AndroidScheduleMode.inexact,
-        matchDateTimeComponents: DateTimeComponents.time,
-        payload: 'tip_$id',
-      );
+      try {
+        await _notificationsPlugin.zonedSchedule(
+          id: id,
+          title: title,
+          body: body,
+          scheduledDate: tzScheduled,
+          notificationDetails: platformDetails,
+          androidScheduleMode: AndroidScheduleMode.inexact,
+          matchDateTimeComponents: DateTimeComponents.time,
+          payload: 'tip_$id',
+        );
+      } catch (e) {
+        if (e.toString().contains('invalid_sound')) {
+          await _notificationsPlugin.zonedSchedule(
+            id: id,
+            title: title,
+            body: body,
+            scheduledDate: tzScheduled,
+            notificationDetails: platformDetailsDefaultSound,
+            androidScheduleMode: AndroidScheduleMode.inexact,
+            matchDateTimeComponents: DateTimeComponents.time,
+            payload: 'tip_$id',
+          );
+        } else {
+          rethrow;
+        }
+      }
     } catch (e) {
       debugPrint('Error scheduling tip notification: $e');
     }
@@ -462,10 +640,9 @@ class NotificationService {
       tz.setLocalLocation(tz.getLocation(name));
       debugPrint('Local Timezone initialized directly to: $name');
     } catch (_) {
-      final localOffsetMs = DateTime.now().timeZoneOffset.inMilliseconds;
+      final localOffsetSeconds = DateTime.now().timeZoneOffset.inSeconds;
       for (final loc in tz.timeZoneDatabase.locations.values) {
-        final dynamic offsetVal = loc.currentTimeZone.offset;
-        if (offsetVal == localOffsetMs || offsetVal == DateTime.now().timeZoneOffset) {
+        if (loc.currentTimeZone.offset == localOffsetSeconds || loc.currentTimeZone.offset == localOffsetSeconds * 1000) {
           tz.setLocalLocation(loc);
           debugPrint('Local Timezone initialized by offset match to: ${loc.name}');
           return;

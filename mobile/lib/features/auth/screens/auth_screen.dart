@@ -63,8 +63,20 @@ class _AuthPageState extends ConsumerState<AuthPage> {
       if (code == 'weak-password') {
         return ref.t('authErrorWeakPassword');
       }
+      if (code == 'invalid-email') {
+        return 'Adresse email invalide. Veuillez vérifier le format.';
+      }
+      if (code == 'user-disabled') {
+        return 'Ce compte a été désactivé. Veuillez contacter le support.';
+      }
+      if (code == 'too-many-requests') {
+        return 'Trop de tentatives. Réessayez plus tard ou réinitialisez votre mot de passe.';
+      }
       if (code == 'network-request-failed') {
         return ref.t('authErrorNetwork');
+      }
+      if (code == 'account-exists-with-different-credential') {
+        return ref.t('authErrorEmailExistsSignIn');
       }
     }
     
@@ -544,7 +556,9 @@ class _AuthPageState extends ConsumerState<AuthPage> {
                             width: double.infinity,
                             onTap: _handleSubmit,
                             child: Row(
+                              mainAxisSize: MainAxisSize.min,
                               mainAxisAlignment: MainAxisAlignment.center,
+                              crossAxisAlignment: CrossAxisAlignment.center,
                               children: [
                                 Text(_isLogin ? ref.t('authLogin') : ref.t('authRegister')),
                                 const SizedBox(width: 8),

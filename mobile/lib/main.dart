@@ -1,4 +1,5 @@
 import 'package:firebase_core/firebase_core.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -16,23 +17,35 @@ void main() async {
 
   // Initialize Local Notifications service
   await NotificationService.initialize();
+  await PushNotificationService.initialize();
 
   // Load SharedPreferences instance
   final sharedPreferences = await SharedPreferences.getInstance();
 
-  // Initialize Firebase with explicit options
+  // Initialize Firebase with explicit options per platform
   try {
-    await Firebase.initializeApp(
-      options: const FirebaseOptions(
-        apiKey: 'AIzaSyBEbHqdkETi-6GbpRpjt0f5QGIC7H_Bf7o',
-        appId: '1:14523087808:ios:80c20077ffb81a11fd6625',
-        messagingSenderId: '14523087808',
-        projectId: 'medscan-915d3',
-        storageBucket: 'medscan-915d3.firebasestorage.app',
-        // Fixed: must match PRODUCT_BUNDLE_IDENTIFIER in Runner.xcodeproj
-        iosBundleId: 'com.seinimomo.medscanapp',
-      ),
-    );
+    if (defaultTargetPlatform == TargetPlatform.android) {
+      await Firebase.initializeApp(
+        options: const FirebaseOptions(
+          apiKey: 'AIzaSyDI1PB5EqYUhQ5xUB2yr2yovKi8sXc6rqY',
+          appId: '1:14523087808:android:eb35e6d0783e5232fd6625',
+          messagingSenderId: '14523087808',
+          projectId: 'medscan-915d3',
+          storageBucket: 'medscan-915d3.firebasestorage.app',
+        ),
+      );
+    } else {
+      await Firebase.initializeApp(
+        options: const FirebaseOptions(
+          apiKey: 'AIzaSyBEbHqdkETi-6GbpRpjt0f5QGIC7H_Bf7o',
+          appId: '1:14523087808:ios:80c20077ffb81a11fd6625',
+          messagingSenderId: '14523087808',
+          projectId: 'medscan-915d3',
+          storageBucket: 'medscan-915d3.firebasestorage.app',
+          iosBundleId: 'com.seinimomo.medscanapp',
+        ),
+      );
+    }
     debugPrint('Firebase initialized successfully!');
     // Initialize Remote Push Notifications service
     await PushNotificationService.initialize();
@@ -42,7 +55,9 @@ void main() async {
 
   // Initialize Google Sign-In (required once in v7.x before any authenticate() call)
   try {
-    await GoogleSignIn.instance.initialize();
+    await GoogleSignIn.instance.initialize(
+      serverClientId: '14523087808-77j9h0j47fm7ks4t6scu6nflfd43fhtt.apps.googleusercontent.com',
+    );
     debugPrint('GoogleSignIn initialized successfully!');
   } catch (e) {
     debugPrint('GoogleSignIn initialization failed: $e');

@@ -7,45 +7,9 @@
   "client": [
     {
       "client_info": {
-        "mobilesdk_app_id": "1:14523087808:android:010289547f864173fd6625",
+        "mobilesdk_app_id": "1:14523087808:android:eb35e6d0783e5232fd6625",
         "android_client_info": {
-          "package_name": "com.example.medscanmobile"
-        }
-      },
-      "oauth_client": [
-        {
-          "client_id": "14523087808-77j9h0j47fm7ks4t6scu6nflfd43fhtt.apps.googleusercontent.com",
-          "client_type": 3
-        }
-      ],
-      "api_key": [
-        {
-          "current_key": "AIzaSyDI1PB5EqYUhQ5xUB2yr2yovKi8sXc6rqY"
-        }
-      ],
-      "services": {
-        "appinvite_service": {
-          "other_platform_oauth_client": [
-            {
-              "client_id": "14523087808-77j9h0j47fm7ks4t6scu6nflfd43fhtt.apps.googleusercontent.com",
-              "client_type": 3
-            },
-            {
-              "client_id": "14523087808-fgg052q4akr9amk12v4pjo1v20541icr.apps.googleusercontent.com",
-              "client_type": 2,
-              "ios_info": {
-                "bundle_id": "com.example.medscanmobile"
-              }
-            }
-          ]
-        }
-      }
-    },
-    {
-      "client_info": {
-        "mobilesdk_app_id": "1:14523087808:android:2c207957254ccda5fd6625",
-        "android_client_info": {
-          "package_name": "medscan.android"
+          "package_name": "com.seinimomo.medscanapp"
         }
       },
       "oauth_client": [

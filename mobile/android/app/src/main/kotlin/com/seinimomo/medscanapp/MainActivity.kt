@@ -1,4 +1,4 @@
-package com.medscan.medscan
+package com.seinimomo.medscanapp
 
 import io.flutter.embedding.android.FlutterActivity
 
