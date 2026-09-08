@@ -50,7 +50,10 @@ class ChatRequest(BaseModel):
     """Request schema for chat messages"""
     message: str = Field(..., min_length=1, max_length=2000)
     include_history: bool = True
-    language: str = Field(default="fr", description="Response language (fr/en)")
+    language: str = Field(default="fr", description="Response language (fr/en/ar/tr)")
+    mode: Literal["chat", "consultation"] = Field(default="chat", description="Chat mode: 'chat' for general pharma Q&A, 'consultation' for pre-consultation with symptoms analysis")
+    medication_context: Optional[str] = Field(None, max_length=300, description="Medication name context from scan result")
+    image_url: Optional[str] = Field(None, description="Optional image URL or local path attached to message")
     
     @validator('message')
     def validate_message(cls, v):
@@ -63,6 +66,7 @@ class ChatMessage(BaseModel):
     """Schema for a single chat message"""
     role: Literal["user", "assistant"]
     content: str
+    image_url: Optional[str] = None
     timestamp: datetime = Field(default_factory=datetime.utcnow)
 
 

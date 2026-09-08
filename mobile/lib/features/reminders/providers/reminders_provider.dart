@@ -11,6 +11,7 @@ import '../../home/providers/health_stats_provider.dart';
 import '../../../shared/services/notification_service.dart';
 import '../../../shared/utils/localization.dart';
 import '../services/smart_notification_scheduler.dart';
+import '../../../shared/services/widget_service.dart';
 
 class RemindersNotifier extends StateNotifier<AsyncValue<List<Reminder>>> {
   final Ref _ref;
@@ -19,6 +20,18 @@ class RemindersNotifier extends StateNotifier<AsyncValue<List<Reminder>>> {
     _ref.listen(firebaseAuthStateProvider, (previous, next) {
       final user = next.value;
       final userId = user?.uid ?? 'local_user';
+      // Load cached reminders so we sync name + reminders together
+      List<Reminder>? cachedList;
+      try {
+        final prefs = _ref.read(sharedPrefsServiceProvider);
+        final cacheJson = prefs.getRemindersCache(userId);
+        if (cacheJson != null) {
+          final List<dynamic> decoded = json.decode(cacheJson);
+          cachedList = decoded.map((e) => Reminder.fromJson(e)).toList();
+        }
+      } catch (_) {}
+      // Sync widget with BOTH user name and reminders in one atomic call
+      WidgetService.syncWidget(reminders: cachedList, langCode: _ref.read(languageProvider));
       _loadCacheAndFetch(userId);
     }, fireImmediately: true);
   }
@@ -49,6 +62,7 @@ class RemindersNotifier extends StateNotifier<AsyncValue<List<Reminder>>> {
           }
         }
         SmartNotificationScheduler.syncSchedule(activeReminders: cachedReminders);
+        WidgetService.syncWidget(reminders: cachedReminders, langCode: _ref.read(languageProvider));
       } catch (_) {}
     }
 
@@ -96,6 +110,7 @@ class RemindersNotifier extends StateNotifier<AsyncValue<List<Reminder>>> {
 
         // Sync health tips when no active medication reminders
         SmartNotificationScheduler.syncSchedule(activeReminders: list);
+        WidgetService.syncWidget(reminders: list, langCode: _ref.read(languageProvider));
       }
     } catch (e, stack) {
       debugPrint('Error fetching reminders: $e');
@@ -127,6 +142,19 @@ class RemindersNotifier extends StateNotifier<AsyncValue<List<Reminder>>> {
     await NotificationService.requestPermissions();
 
     final String localId = 'reminder_${DateTime.now().millisecondsSinceEpoch}';
+    final parts = time.split(':');
+    final hour = int.tryParse(parts[0]) ?? 0;
+    final minute = int.tryParse(parts[1]) ?? 0;
+    final now = DateTime.now();
+    var initialNextDose = DateTime(now.year, now.month, now.day, hour, minute);
+    if (days != null && days.isNotEmpty) {
+      int loops = 0;
+      while (!days.contains(initialNextDose.weekday) && loops < 7) {
+        initialNextDose = initialNextDose.add(const Duration(days: 1));
+        loops++;
+      }
+    }
+
     final localReminder = Reminder(
       id: localId,
       medicationName: medicationName,
@@ -135,7 +163,7 @@ class RemindersNotifier extends StateNotifier<AsyncValue<List<Reminder>>> {
       frequency: frequency,
       days: days,
       active: true,
-      nextDose: DateTime.now(),
+      nextDose: initialNextDose,
       createdAt: DateTime.now(),
       updatedAt: DateTime.now(),
     );
@@ -158,6 +186,7 @@ class RemindersNotifier extends StateNotifier<AsyncValue<List<Reminder>>> {
 
     _ref.read(healthStatsProvider.notifier).fetchStats(quietly: true);
     SmartNotificationScheduler.syncSchedule(activeReminders: updatedList);
+    WidgetService.syncWidget(reminders: updatedList, langCode: _ref.read(languageProvider));
 
     // 2. Try syncing with backend API in background if authenticated
     if (user != null && !user.isAnonymous) {
@@ -178,6 +207,7 @@ class RemindersNotifier extends StateNotifier<AsyncValue<List<Reminder>>> {
           final finalList = [...listWithoutTemp, serverReminder];
           state = AsyncValue.data(finalList);
           _saveCache(userId, finalList);
+          WidgetService.syncWidget(reminders: finalList, langCode: _ref.read(languageProvider));
 
           NotificationService.cancelReminder(_getStableNotificationId(localId));
           NotificationService.scheduleReminder(
@@ -214,18 +244,32 @@ class RemindersNotifier extends StateNotifier<AsyncValue<List<Reminder>>> {
     final current = state.value ?? [];
     final existingReminder = current.firstWhere(
       (r) => r.id == id,
-      orElse: () => Reminder(
-        id: id,
-        medicationName: medicationName,
-        dosage: dosage,
-        time: time,
-        frequency: frequency,
-        days: days,
-        active: active,
-        nextDose: DateTime.now(),
-        createdAt: DateTime.now(),
-        updatedAt: DateTime.now(),
-      ),
+      orElse: () {
+        final parts = time.split(':');
+        final hour = int.tryParse(parts[0]) ?? 0;
+        final minute = int.tryParse(parts[1]) ?? 0;
+        final now = DateTime.now();
+        var initialNextDose = DateTime(now.year, now.month, now.day, hour, minute);
+        if (days != null && days.isNotEmpty) {
+          int loops = 0;
+          while (!days.contains(initialNextDose.weekday) && loops < 7) {
+            initialNextDose = initialNextDose.add(const Duration(days: 1));
+            loops++;
+          }
+        }
+        return Reminder(
+          id: id,
+          medicationName: medicationName,
+          dosage: dosage,
+          time: time,
+          frequency: frequency,
+          days: days,
+          active: active,
+          nextDose: initialNextDose,
+          createdAt: DateTime.now(),
+          updatedAt: DateTime.now(),
+        );
+      },
     );
 
     final updatedLocalReminder = existingReminder.copyWith(
@@ -262,6 +306,7 @@ class RemindersNotifier extends StateNotifier<AsyncValue<List<Reminder>>> {
 
     _ref.read(healthStatsProvider.notifier).fetchStats(quietly: true);
     SmartNotificationScheduler.syncSchedule(activeReminders: updatedList);
+    WidgetService.syncWidget(reminders: updatedList, langCode: _ref.read(languageProvider));
 
     if (user != null && !user.isAnonymous && !id.startsWith('reminder_')) {
       try {
@@ -280,6 +325,7 @@ class RemindersNotifier extends StateNotifier<AsyncValue<List<Reminder>>> {
           final finalList = (state.value ?? []).map((r) => r.id == id ? serverReminder : r).toList();
           state = AsyncValue.data(finalList);
           _saveCache(userId, finalList);
+          WidgetService.syncWidget(reminders: finalList, langCode: _ref.read(languageProvider));
         }
       } catch (e) {
         debugPrint('Backend sync for update reminder failed: $e');
@@ -315,6 +361,7 @@ class RemindersNotifier extends StateNotifier<AsyncValue<List<Reminder>>> {
 
     _ref.read(healthStatsProvider.notifier).fetchStats(quietly: true);
     SmartNotificationScheduler.syncSchedule(activeReminders: updatedList);
+    WidgetService.syncWidget(reminders: updatedList, langCode: _ref.read(languageProvider));
 
     if (user != null && !user.isAnonymous && !id.startsWith('reminder_')) {
       try {
@@ -333,7 +380,12 @@ class RemindersNotifier extends StateNotifier<AsyncValue<List<Reminder>>> {
     final current = state.value ?? [];
     final updatedList = current.map((r) {
       if (r.id == id) {
-        return r.copyWith(taken: true);
+        final newNextDose = r.calculateNextDoseTime(r.nextDose);
+        final isAllDone = newNextDose.day != r.nextDose.day;
+        return r.copyWith(
+          nextDose: newNextDose,
+          taken: isAllDone ? true : false,
+        );
       }
       return r;
     }).toList();
@@ -341,6 +393,7 @@ class RemindersNotifier extends StateNotifier<AsyncValue<List<Reminder>>> {
     _saveCache(userId, updatedList);
 
     _ref.read(healthStatsProvider.notifier).fetchStats(quietly: true);
+    WidgetService.syncWidget(reminders: updatedList, langCode: _ref.read(languageProvider));
 
     if (user != null && !user.isAnonymous && !id.startsWith('reminder_')) {
       try {

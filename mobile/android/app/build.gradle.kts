@@ -51,7 +51,7 @@ android {
             }
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
             ndk {
-                debugSymbolLevel = "NONE"
+                debugSymbolLevel = "none"
             }
         }
     }
@@ -59,6 +59,7 @@ android {
     packaging {
         jniLibs {
             keepDebugSymbols.add("**/*.so")
+            doNotStrip.add("**/*.so")
         }
     }
 }

@@ -11,6 +11,7 @@ class SharedPrefsService {
   static const String _keyOnboardingCompleted = 'onboarding_completed';
   static const String _keyDeviceId = 'mediscan_device_id';
   static const String _keyLocalName = 'mediscan_user_name';
+  static const String _keyLocalUsername = 'mediscan_user_username';
   static const String _keyAvatarCompleted = 'mediscan_avatar_completed';
   static const String _keyPharmacyCachePrefix = 'pharmacy_cache_';
   static const String _keyChatCachePrefix = 'chat_cache_';
@@ -62,6 +63,19 @@ class SharedPrefsService {
 
   Future<void> clearLocalName() async {
     await _prefs.remove(_keyLocalName);
+  }
+
+  // Local Username
+  String? getLocalUsername() {
+    return _prefs.getString(_keyLocalUsername);
+  }
+
+  Future<void> setLocalUsername(String username) async {
+    await _prefs.setString(_keyLocalUsername, username);
+  }
+
+  Future<void> clearLocalUsername() async {
+    await _prefs.remove(_keyLocalUsername);
   }
 
   // Device ID (Trial Tracking)

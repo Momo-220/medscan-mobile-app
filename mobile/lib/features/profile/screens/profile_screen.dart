@@ -10,6 +10,7 @@ import '../../../shared/utils/localization.dart';
 import '../../../shared/widgets/button.dart';
 import '../../../shared/widgets/card.dart';
 import '../../../shared/widgets/input.dart';
+import '../../../shared/services/widget_service.dart';
 import '../../auth/providers/auth_provider.dart';
 
 class ProfilePage extends ConsumerStatefulWidget {
@@ -91,6 +92,7 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
                     await ref.read(authProvider.notifier).updateProfile(displayName: newName);
                     final prefs = ref.read(sharedPrefsServiceProvider);
                     await prefs.setLocalName(newName);
+                    await WidgetService.syncWidget();
                   } catch (_) {}
                   if (mounted) {
                     setState(() {
@@ -195,7 +197,7 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
                           child: OutlinedButton(
                             style: OutlinedButton.styleFrom(
                               padding: const EdgeInsets.symmetric(vertical: 14),
-                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(50)),
                               side: BorderSide(color: isDark ? Colors.white24 : const Color(0xFFE2E8F0)),
                             ),
                             onPressed: () => Navigator.pop(context),
@@ -213,7 +215,7 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
                             style: ElevatedButton.styleFrom(
                               backgroundColor: AppColors.primary,
                               padding: const EdgeInsets.symmetric(vertical: 14),
-                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(50)),
                               elevation: 0,
                             ),
                             onPressed: () async {
@@ -226,6 +228,11 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
                                 }
                                 try {
                                   await ref.read(authProvider.notifier).updateProfile(photoURL: activeAvatar);
+                                  final avatarId = WidgetService.extractAvatarId(activeAvatar);
+                                  await WidgetService.syncWidget(
+                                    avatarId: avatarId,
+                                    langCode: ref.read(languageProvider),
+                                  );
                                 } catch (_) {}
                                 if (mounted) {
                                   setState(() {
@@ -416,6 +423,18 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
                           color: const Color(0xFF3B82F6),
                         ),
                       ),
+                      if (prefs.getLocalUsername() != null && prefs.getLocalUsername()!.isNotEmpty) ...[
+                        const SizedBox(height: 2),
+                        Text(
+                          prefs.getLocalUsername()!.startsWith('@')
+                              ? prefs.getLocalUsername()!
+                              : '@${prefs.getLocalUsername()}',
+                          style: AppTextStyles.small(isDark: isDark).copyWith(
+                            color: isDark ? AppColors.textMutedDark : AppColors.textSecondary,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ],
                     ],
                   ),
                 ),
@@ -513,7 +532,7 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
               // 4. Settings Card Shortcut
               AppCard(
                 padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 14.0),
-                onTap: () => context.push('/settings'),
+                onTap: () => context.go('/settings'),
                 hover: true,
                 children: Row(
                   children: [
@@ -562,7 +581,7 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
                   padding: const EdgeInsets.symmetric(vertical: 16),
                   decoration: BoxDecoration(
                     color: isDark ? Colors.redAccent.withOpacity(0.05) : Colors.white,
-                    borderRadius: BorderRadius.circular(20),
+                    borderRadius: BorderRadius.circular(50),
                     border: Border.all(
                       color: Colors.redAccent.withOpacity(0.4),
                       width: 1.5,

@@ -8,6 +8,7 @@ import '../../../core/constants/text_styles.dart';
 import '../../../core/di/providers.dart';
 import '../../../shared/utils/localization.dart';
 import '../../../shared/widgets/button.dart';
+import '../../../shared/services/widget_service.dart';
 
 class AskNamePage extends ConsumerStatefulWidget {
   const AskNamePage({super.key});
@@ -44,6 +45,7 @@ class _AskNamePageState extends ConsumerState<AskNamePage> {
 
     final prefs = ref.read(sharedPrefsServiceProvider);
     await prefs.setLocalName(trimmed);
+    await WidgetService.syncWidget();
     
     if (mounted) {
       context.go('/home');

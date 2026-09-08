@@ -9,6 +9,7 @@ from fastapi.responses import StreamingResponse
 from typing import Dict, Any
 import structlog
 import json
+import asyncio
 
 from app.models.schemas import ChatRequest, ChatResponse, ChatHistoryResponse, ChatMessage
 from app.services.auth_service import get_current_user
@@ -274,10 +275,33 @@ async def chat_with_assistant_stream(
             logger.warning("Failed to load chat history for stream", error=str(e))
     
     async def generate():
-        """Generate streaming response"""
+        """Generate streaming response with heartbeat to prevent connection timeouts"""
         full_response = ""
-        credits_consumed = False
         tokens_used = 0
+        lang_key = (chat_request.language or "fr").lower()[:2]
+        error_messages = {
+            "fr": {
+                "quota": "Le service est temporairement surchargé. Réessayez dans quelques minutes.",
+                "timeout": "La connexion avec l'IA a expiré. Veuillez renvoyer votre message.",
+                "generic": "Le service est indisponible pour le moment. Veuillez réessayer."
+            },
+            "tr": {
+                "quota": "Hizmet geçici olarak aşırı yüklendi. Lütfen birkaç dakika sonra tekrar deneyin.",
+                "timeout": "Yapay zeka bağlantısı zaman aşımına uğradı. Lütfen mesajınızı tekrar gönderin.",
+                "generic": "Hizmet şu anda kullanılamıyor. Lütfen daha sonra tekrar deneyin."
+            },
+            "en": {
+                "quota": "The service is temporarily overloaded. Please try again in a few minutes.",
+                "timeout": "The AI connection timed out. Please resend your message.",
+                "generic": "The service is currently unavailable. Please try again."
+            },
+            "ar": {
+                "quota": "الخدمة محملة بشكل زائد مؤقتاً. يرجى المحاولة مرة أخرى.",
+                "timeout": "انتهت مهلة الاتصال. يرجى إعادة إرسال رسالتك.",
+                "generic": "الخدمة غير متوفرة حالياً. يرجى المحاولة مرة أخرى."
+            }
+        }
+        msgs = error_messages.get(lang_key, error_messages["fr"])
         
         try:
             # S'assurer que Gemini est initialisé
@@ -285,25 +309,69 @@ async def chat_with_assistant_stream(
                 logger.info("Initializing Gemini service for chat")
                 await gemini_service.initialize()
             
-            async for chunk_text, chunk_tokens in gemini_service.chat_stream(chat_request.message, chat_history, chat_request.language):
-                if chunk_text:
-                    full_response += chunk_text
-                    # Send as SSE format
-                    yield f"data: {json.dumps({'chunk': chunk_text})}\n\n"
-                
-                # Le dernier chunk contient les tokens totaux
-                if chunk_tokens > 0:
-                    tokens_used = chunk_tokens
+            # Build a queue so we can interleave heartbeats with stream chunks
+            chunk_queue: asyncio.Queue = asyncio.Queue()
+            stream_done = asyncio.Event()
             
+            async def _read_stream():
+                """Read Gemini stream chunks into queue"""
+                nonlocal tokens_used
+                try:
+                    async for chunk_text, chunk_tokens in gemini_service.chat_stream(
+                        chat_request.message,
+                        chat_history,
+                        chat_request.language,
+                        mode=getattr(chat_request, 'mode', 'chat'),
+                        medication_context=getattr(chat_request, 'medication_context', None),
+                    ):
+                        if chunk_text:
+                            await chunk_queue.put(('chunk', chunk_text))
+                        if chunk_tokens > 0:
+                            tokens_used = chunk_tokens
+                    await chunk_queue.put(('done', None))
+                except Exception as e:
+                    await chunk_queue.put(('error', e))
+                finally:
+                    stream_done.set()
+            
+            # Start reading in background
+            stream_task = asyncio.create_task(_read_stream())
+            
+            HEARTBEAT_INTERVAL = 15  # seconds — keep connection alive
+            last_heartbeat = asyncio.get_event_loop().time()
+            
+            while True:
+                now = asyncio.get_event_loop().time()
+                # Send heartbeat if idle too long
+                if now - last_heartbeat >= HEARTBEAT_INTERVAL:
+                    yield f"data: {json.dumps({'heartbeat': True})}\n\n"
+                    last_heartbeat = now
+                
+                try:
+                    event_type, payload = await asyncio.wait_for(chunk_queue.get(), timeout=1.0)
+                except asyncio.TimeoutError:
+                    continue  # loop back to check heartbeat
+                
+                if event_type == 'chunk':
+                    full_response += payload
+                    yield f"data: {json.dumps({'chunk': payload})}\n\n"
+                elif event_type == 'done':
+                    break
+                elif event_type == 'error':
+                    raise payload
+            
+            await stream_task  # clean up
+            
+            # Consume credits after successful stream
             if tokens_used > 0:
                 credits_service.consume(user_id, credits_service.CHAT_COST, actual_tokens=tokens_used, is_anonymous=is_anonymous)
             else:
                 credits_service.consume(user_id, credits_service.CHAT_COST, is_anonymous=is_anonymous)
-            credits_consumed = True
             
             yield f"data: {json.dumps({'done': True})}\n\n"
             
-            if not is_anonymous:
+            # Save to Firestore (non-anonymous users only)
+            if not is_anonymous and full_response:
                 try:
                     await firebase_service.save_chat_message(
                         user_id=user_id,
@@ -319,38 +387,11 @@ async def chat_with_assistant_stream(
         except AIServiceError as e:
             logger.error("Streaming chat failed - AI Service Error", error=str(e))
             error_str = str(e).lower()
-            lang_key = (chat_request.language or "fr").lower()[:2]
-            
-            error_messages = {
-                "fr": {
-                    "quota": "Le service de discussion est temporairement surchargé. Réessayez dans quelques minutes.",
-                    "timeout": "La connexion avec l'IA a expiré. Veuillez renvoyer votre message.",
-                    "generic": "Le service de discussion est indisponible pour le moment. Veuillez réessayer."
-                },
-                "tr": {
-                    "quota": "Sohbet hizmeti geçici olarak aşırı yüklendi. Lütfen birkaç dakika sonra tekrar deneyin.",
-                    "timeout": "Yapay zeka bağlantısı zaman aşımına uğradı. Lütfen mesajınızı tekrar gönderin.",
-                    "generic": "Sohbet hizmeti şu anda kullanılamıyor. Lütfen daha sonra tekrar deneyin."
-                },
-                "en": {
-                    "quota": "The chat service is temporarily overloaded. Please try again in a few minutes.",
-                    "timeout": "The connection with the AI timed out. Please resend your message.",
-                    "generic": "The chat service is currently unavailable. Please try again."
-                },
-                "ar": {
-                    "quota": "خدمة الدردشة محملة بشكل زائد مؤقتاً. يرجى المحاولة مرة أخرى بعد بضع دقائق.",
-                    "timeout": "انتهت مهلة الاتصال بالذكاء الاصطناعي. يرجى إعادة إرسال رسالتك.",
-                    "generic": "خدمة الدردشة غير متوفرة حالياً. يرجى المحاولة مرة أخرى لاحقاً."
-                }
-            }
-            
-            msgs = error_messages.get(lang_key, error_messages["fr"])
             detail = msgs["generic"]
-            if "quota" in error_str or "429" in error_str or "surchargé" in error_str:
+            if "quota" in error_str or "429" in error_str:
                 detail = msgs["quota"]
-            elif "timeout" in error_str or "timed out" in error_str or "connection" in error_str:
+            elif "timeout" in error_str or "timed out" in error_str:
                 detail = msgs["timeout"]
-                
             yield f"data: {json.dumps({'error': detail})}\n\n"
         except HTTPException as e:
             if e.status_code == 402:
@@ -359,12 +400,11 @@ async def chat_with_assistant_stream(
                 yield f"data: {json.dumps({'error': str(e.detail)})}\n\n"
         except Exception as e:
             logger.error("Streaming chat failed", error=str(e), exc_info=True)
-            lang_key = (chat_request.language or "fr").lower()[:2]
             generic_errors = {
-                "fr": "Impossible de générer une réponse.",
-                "tr": "Yanıt oluşturulamadı.",
-                "en": "Failed to generate a response.",
-                "ar": "تعذر إنشاء رد."
+                "fr": "Impossible de générer une réponse. Veuillez réessayer.",
+                "tr": "Yanıt oluşturulamadı. Lütfen tekrar deneyin.",
+                "en": "Failed to generate a response. Please try again.",
+                "ar": "تعذر إنشاء رد. يرجى المحاولة مرة أخرى."
             }
             yield f"data: {json.dumps({'error': generic_errors.get(lang_key, generic_errors['fr'])})}\n\n"
     

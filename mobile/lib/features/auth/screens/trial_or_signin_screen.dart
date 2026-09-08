@@ -149,27 +149,40 @@ class _TrialOrSignInPageState extends ConsumerState<TrialOrSignInPage> {
                   const SizedBox(height: 24),
                 ],
 
-                // Try App CTA Button
+                // Sign Up Button
                 Button(
-                  loading: _loading,
                   width: double.infinity,
-                  onTap: _handleTryApp,
-                  child: Text(ref.t('tryApp')),
+                  onTap: () => context.go('/auth', extra: {'isLogin': false}),
+                  child: Text(ref.t('authRegister')),
+                ),
+                const SizedBox(height: 16),
+
+                // Login Button
+                Button(
+                  width: double.infinity,
+                  variant: ButtonVariant.secondary,
+                  onTap: () => context.go('/auth', extra: {'isLogin': true}),
+                  child: Text(ref.t('authLogin')),
                 ),
                 const SizedBox(height: 24),
 
-                // Sign In / Register Link Button
+                // Try App Link Button
                 TextButton(
-                  onPressed: () => context.go('/auth'),
-                  child: Text(
-                    ref.t('signInOrRegister'),
-                    style: AppTextStyles.small(
-                      color: isDark ? AppColors.textMutedDark : AppColors.textSecondary,
-                    ).copyWith(
-                      fontWeight: FontWeight.w600,
-                      decoration: TextDecoration.underline,
-                    ),
-                  ),
+                  onPressed: _loading ? null : _handleTryApp,
+                  child: _loading 
+                    ? const SizedBox(
+                        width: 16, height: 16, 
+                        child: CircularProgressIndicator(strokeWidth: 2)
+                      )
+                    : Text(
+                        ref.t('tryApp'),
+                        style: AppTextStyles.small(
+                          color: isDark ? AppColors.textMutedDark : AppColors.textSecondary,
+                        ).copyWith(
+                          fontWeight: FontWeight.w600,
+                          decoration: TextDecoration.underline,
+                        ),
+                      ),
                 ),
               ],
             ),

@@ -467,35 +467,8 @@ class _MedicationRemindersWidgetState extends ConsumerState<MedicationRemindersW
     return AppCard(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
       children: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Taken status Checkbox icon
-          GestureDetector(
-            onTap: () {
-              ref.read(remindersProvider.notifier).markTaken(r.id);
-              showPillSuccess(context, 'Médicament marqué comme pris !');
-            },
-            child: Container(
-              width: 28,
-              height: 28,
-              decoration: BoxDecoration(
-                color: (r.taken ?? false)
-                    ? AppColors.primary
-                    : (isDark ? const Color(0xFF1E293B) : const Color(0xFFF1F5F9)),
-                shape: BoxShape.circle,
-                border: Border.all(
-                  color: (r.taken ?? false) 
-                      ? AppColors.primary 
-                      : (isDark ? Colors.white24 : const Color(0xFFCBD5E1)),
-                  width: 2,
-                ),
-              ),
-              child: (r.taken ?? false)
-                  ? const Icon(Icons.check, color: Colors.white, size: 16)
-                  : null,
-            ),
-          ),
-          const SizedBox(width: 14),
-
           // Time & Medication description
           Expanded(
             child: Column(
@@ -525,8 +498,8 @@ class _MedicationRemindersWidgetState extends ConsumerState<MedicationRemindersW
                 Text(
                   r.medicationName,
                   style: AppTextStyles.smallBold(isDark: isDark).copyWith(
-                    decoration: (r.taken ?? false) ? TextDecoration.lineThrough : null,
-                    color: (r.taken ?? false) ? AppColors.textMuted : null,
+                    decoration: r.isUpToDate ? TextDecoration.lineThrough : null,
+                    color: r.isUpToDate ? AppColors.textMuted : null,
                   ),
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
@@ -540,42 +513,101 @@ class _MedicationRemindersWidgetState extends ConsumerState<MedicationRemindersW
                 ReminderCountdownWidget(
                   nextDose: r.nextDose,
                   active: r.active,
-                  taken: r.taken ?? false,
+                  status: r.status,
+                  dosesTaken: r.dosesTakenToday,
+                  totalDoses: r.totalDosesToday,
                 ),
               ],
             ),
           ),
 
-          const SizedBox(width: 4),
-          // Active switch, edit & delete buttons
-          Row(
-            mainAxisSize: MainAxisSize.min,
+          const SizedBox(width: 8),
+          
+          // Action Buttons Column
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.end,
             children: [
-              SizedBox(
-                width: 36,
-                child: Transform.scale(
-                  scale: 0.75,
-                  child: Switch(
-                    value: r.active,
-                    activeColor: AppColors.primary,
-                    onChanged: (val) {
-                      ref.read(remindersProvider.notifier).toggleReminderActive(r.id, val);
-                    },
+              Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  SizedBox(
+                    width: 36,
+                    child: Transform.scale(
+                      scale: 0.75,
+                      child: Switch(
+                        value: r.active,
+                        activeColor: AppColors.primary,
+                        onChanged: (val) {
+                          ref.read(remindersProvider.notifier).toggleReminderActive(r.id, val);
+                        },
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 2),
+                  IconButton(
+                    padding: EdgeInsets.zero,
+                    constraints: const BoxConstraints(minWidth: 28, minHeight: 28),
+                    icon: Icon(Icons.edit_outlined, color: isDark ? Colors.white60 : Colors.black45, size: 18),
+                    onPressed: () => _showAddEditReminderDialog(context, reminder: r),
+                  ),
+                  IconButton(
+                    padding: EdgeInsets.zero,
+                    constraints: const BoxConstraints(minWidth: 28, minHeight: 28),
+                    icon: Icon(Icons.delete_outline, color: Colors.red[400], size: 18),
+                    onPressed: () => _showDeleteConfirmation(context, r.id),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 8),
+              GestureDetector(
+                onTap: () {
+                  if (r.status == ReminderStatus.due) {
+                    ref.read(remindersProvider.notifier).markTaken(r.id);
+                    showPillSuccess(context, 'Dose marquée comme prise !');
+                  }
+                },
+                child: AnimatedContainer(
+                  duration: const Duration(milliseconds: 200),
+                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+                  decoration: BoxDecoration(
+                    color: r.status == ReminderStatus.completed
+                        ? AppColors.primary
+                        : (isDark ? const Color(0xFF1E293B) : const Color(0xFFF1F5F9)),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(
+                      color: r.status == ReminderStatus.completed
+                          ? AppColors.primary
+                          : (r.status == ReminderStatus.due 
+                              ? AppColors.primary 
+                              : (isDark ? Colors.white24 : const Color(0xFFCBD5E1))),
+                      width: 1.5,
+                    ),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      if (r.status == ReminderStatus.completed)
+                        const Icon(Icons.check, color: Colors.white, size: 14),
+                      if (r.status == ReminderStatus.pending)
+                        Icon(Icons.schedule, color: isDark ? Colors.white54 : Colors.black38, size: 14),
+                      if (r.status != ReminderStatus.due)
+                        const SizedBox(width: 4),
+                      Text(
+                        r.status == ReminderStatus.completed 
+                            ? 'Terminé' 
+                            : (r.status == ReminderStatus.pending ? 'En attente' : 'Prendre'),
+                        style: AppTextStyles.smallBold(isDark: isDark).copyWith(
+                          color: r.status == ReminderStatus.completed
+                              ? Colors.white
+                              : (r.status == ReminderStatus.due 
+                                  ? AppColors.primary 
+                                  : (isDark ? Colors.white54 : Colors.black45)),
+                          fontSize: 12,
+                        ),
+                      ),
+                    ],
                   ),
                 ),
-              ),
-              const SizedBox(width: 2),
-              IconButton(
-                padding: EdgeInsets.zero,
-                constraints: const BoxConstraints(minWidth: 28, minHeight: 28),
-                icon: Icon(Icons.edit_outlined, color: isDark ? Colors.white60 : Colors.black45, size: 18),
-                onPressed: () => _showAddEditReminderDialog(context, reminder: r),
-              ),
-              IconButton(
-                padding: EdgeInsets.zero,
-                constraints: const BoxConstraints(minWidth: 28, minHeight: 28),
-                icon: Icon(Icons.delete_outline, color: Colors.red[400], size: 18),
-                onPressed: () => _showDeleteConfirmation(context, r.id),
               ),
             ],
           ),

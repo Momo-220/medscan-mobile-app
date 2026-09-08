@@ -1,0 +1,532 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  MedScan Widget Layout — Glassmorphisme bleu ciel
+  Structure:
+    - En-tête : Message de bienvenue + badge MedScan
+    - Séparateur horizontal
+    - Corps : Rappel médicament + barre de progression
+-->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/widget_root"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical"
+    android:background="@drawable/widget_glass_bg"
+    android:padding="0dp">
+
+    <!-- ══════════════════════════════════════════════ -->
+    <!--  HEADER: Greeting + MedScan badge             -->
+    <!-- ══════════════════════════════════════════════ -->
+    <RelativeLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:paddingStart="14dp"
+        android:paddingEnd="14dp"
+        android:paddingTop="13dp"
+        android:paddingBottom="11dp">
+
+        <!-- Left: Avatar + Greeting + Username -->
+        <LinearLayout
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:gravity="center_vertical"
+            android:layout_centerVertical="true">
+
+            <ImageView
+                android:id="@+id/widget_avatar"
+                android:layout_width="28dp"
+                android:layout_height="28dp"
+                android:layout_marginEnd="10dp"
+                android:scaleType="centerCrop" />
+
+            <LinearLayout
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:orientation="vertical">
+
+                <LinearLayout
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:orientation="horizontal"
+                    android:gravity="center_vertical">
+                    
+                    <TextView
+                        android:id="@+id/widget_greeting"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="Bonjour"
+                        android:textSize="11sp"
+                        android:textStyle="bold"
+                        android:textColor="#1A3B5D"
+                        android:alpha="0.85" />
+
+                    <ImageView
+                        android:id="@+id/widget_greeting_icon"
+                        android:layout_width="12dp"
+                        android:layout_height="12dp"
+                        android:layout_marginStart="4dp"
+                        android:src="@drawable/ic_sun" />
+                </LinearLayout>
+
+                <TextView
+                    android:id="@+id/widget_username"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text=""
+                    android:textSize="14sp"
+                    android:textStyle="bold"
+                    android:textColor="#1A3B5D"
+                    android:maxLines="1"
+                    android:ellipsize="end" />
+
+            </LinearLayout>
+        </LinearLayout>
+
+        <!-- Right: Scanner button -->
+        <LinearLayout
+            android:id="@+id/widget_scan_button"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_alignParentEnd="true"
+            android:layout_centerVertical="true"
+            android:orientation="horizontal"
+            android:gravity="center_vertical"
+            android:paddingStart="12dp"
+            android:paddingEnd="12dp"
+            android:paddingTop="6dp"
+            android:paddingBottom="6dp"
+            android:background="@drawable/widget_button_bg">
+
+            <ImageView
+                android:layout_width="12dp"
+                android:layout_height="12dp"
+                android:src="@drawable/ic_camera"
+                android:layout_marginEnd="4dp" />
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Scanner"
+                android:textSize="11sp"
+                android:textStyle="bold"
+                android:textColor="#FFFFFF" />
+
+        </LinearLayout>
+
+    </RelativeLayout>
+
+    <!-- ─── Horizontal separator ─── -->
+    <FrameLayout
+        android:layout_width="match_parent"
+        android:layout_height="1dp"
+        android:layout_marginStart="10dp"
+        android:layout_marginEnd="10dp"
+        android:background="@drawable/widget_divider" />
+
+    <!-- ══════════════════════════════════════════════ -->
+    <!--  BODY: Medication reminder + progress bar     -->
+    <!-- ══════════════════════════════════════════════ -->
+    <LinearLayout
+        android:id="@+id/widget_main_content"
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1"
+        android:orientation="vertical"
+        android:paddingStart="14dp"
+        android:paddingEnd="14dp"
+        android:paddingTop="12dp"
+        android:paddingBottom="14dp">
+
+        <!-- Reminder row: icon + info + time -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:gravity="center_vertical">
+
+            <!-- Pill icon box -->
+            <ImageView
+                android:layout_width="56dp"
+                android:layout_height="56dp"
+                android:padding="14dp"
+                android:src="@drawable/ic_pill"
+                android:background="@drawable/widget_pill_icon_bg" />
+
+            <!-- Info column -->
+            <LinearLayout
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:orientation="vertical"
+                android:layout_marginStart="12dp">
+
+                <!-- "PROCHAIN RAPPEL" label -->
+                <LinearLayout
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:orientation="horizontal"
+                    android:gravity="center_vertical"
+                    android:layout_marginBottom="3dp">
+                    
+                    <ImageView
+                        android:layout_width="10dp"
+                        android:layout_height="10dp"
+                        android:src="@drawable/ic_bell"
+                        android:layout_marginEnd="3dp" />
+                        
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="PROCHAIN RAPPEL"
+                        android:textSize="9sp"
+                        android:textStyle="bold"
+                        android:textColor="#5B9FED"
+                        android:letterSpacing="0.05" />
+                </LinearLayout>
+
+                <!-- Medication name -->
+                <TextView
+                    android:id="@+id/widget_reminder_name"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="Doliprane 1000mg"
+                    android:textSize="14sp"
+                    android:textStyle="bold"
+                    android:textColor="#1A3B5D"
+                    android:maxLines="1"
+                    android:ellipsize="end" />
+
+                <!-- Dosage -->
+                <TextView
+                    android:id="@+id/widget_reminder_dosage"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="1 comprimé"
+                    android:textSize="11sp"
+                    android:textColor="#A0AEC0"
+                    android:maxLines="1" />
+
+            </LinearLayout>
+
+            <!-- Time badge & Pris button -->
+            <LinearLayout
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:gravity="center"
+                android:layout_marginStart="8dp">
+
+                <ImageView
+                    android:layout_width="10dp"
+                    android:layout_height="10dp"
+                    android:src="@drawable/ic_clock"
+                    android:layout_marginBottom="2dp" />
+
+                <TextView
+                    android:id="@+id/widget_reminder_time"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="09:00"
+                    android:textSize="13sp"
+                    android:textStyle="bold"
+                    android:textColor="#1A3B5D"
+                    android:fontFamily="monospace" />
+
+                <Chronometer
+                    android:id="@+id/widget_countdown"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="2dp"
+                    android:textSize="10sp"
+                    android:textStyle="bold"
+                    android:textColor="#5B9FED"
+                    android:fontFamily="monospace"
+                    android:visibility="gone" />
+
+            </LinearLayout>
+
+            <LinearLayout
+                android:id="@+id/widget_pris_button"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="12dp"
+                android:paddingStart="12dp"
+                android:paddingEnd="12dp"
+                android:paddingTop="6dp"
+                android:paddingBottom="6dp"
+                android:background="@drawable/widget_button_bg"
+                android:gravity="center"
+                android:orientation="horizontal"
+                android:visibility="gone">
+                <TextView
+                    android:id="@+id/widget_pris_text"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="✓ PRIS"
+                    android:textSize="10sp"
+                    android:textStyle="bold"
+                    android:textColor="#FFFFFF" />
+            </LinearLayout>
+
+            <LinearLayout
+                android:id="@+id/widget_pending_button"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="12dp"
+                android:paddingStart="12dp"
+                android:paddingEnd="12dp"
+                android:paddingTop="6dp"
+                android:paddingBottom="6dp"
+                android:background="@drawable/widget_pending_bg"
+                android:gravity="center"
+                android:orientation="horizontal"
+                android:visibility="gone">
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="EN ATTENTE"
+                    android:textSize="10sp"
+                    android:textStyle="bold"
+                    android:textColor="#1A3B5D"
+                    android:alpha="0.8" />
+            </LinearLayout>
+
+        </LinearLayout>
+
+        <!-- ─── Progress bar section ─── -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:layout_marginTop="8dp">
+
+            <!-- Labels row -->
+            <RelativeLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginBottom="5dp">
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="Progression vers la prochaine dose"
+                    android:textSize="9sp"
+                    android:textColor="#A0AEC0" />
+
+                <TextView
+                    android:id="@+id/widget_progress_label"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_alignParentEnd="true"
+                    android:text="45%"
+                    android:textSize="9sp"
+                    android:textStyle="bold"
+                    android:textColor="#5B9FED" />
+
+            </RelativeLayout>
+
+            <!-- Progress bar -->
+            <ProgressBar
+                android:id="@+id/widget_progress_bar"
+                style="?android:attr/progressBarStyleHorizontal"
+                android:layout_width="match_parent"
+                android:layout_height="6dp"
+                android:max="100"
+                android:progress="45"
+                android:progressDrawable="@drawable/widget_progress_drawable"
+                android:background="@drawable/widget_progress_track" />
+
+        </LinearLayout>
+
+        <!-- Weekly Compliance Row -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:gravity="center_vertical"
+            android:layout_marginTop="10dp"
+            android:layout_marginBottom="2dp">
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Semaine :"
+                android:textSize="9sp"
+                android:textStyle="bold"
+                android:textColor="#A0AEC0"
+                android:layout_marginEnd="10dp" />
+
+            <LinearLayout
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:orientation="horizontal"
+                android:gravity="center_vertical">
+
+                <!-- Mon -->
+                <LinearLayout android:orientation="vertical" android:gravity="center" android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1">
+                    <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="L" android:textSize="8sp" android:textColor="#1A3B5D" />
+                    <ImageView android:id="@+id/widget_day_0" android:layout_width="10dp" android:layout_height="10dp" android:src="@drawable/widget_dot_inactive" android:layout_marginTop="1dp" />
+                </LinearLayout>
+
+                <!-- Tue -->
+                <LinearLayout android:orientation="vertical" android:gravity="center" android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1">
+                    <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="M" android:textSize="8sp" android:textColor="#1A3B5D" />
+                    <ImageView android:id="@+id/widget_day_1" android:layout_width="10dp" android:layout_height="10dp" android:src="@drawable/widget_dot_inactive" android:layout_marginTop="1dp" />
+                </LinearLayout>
+
+                <!-- Wed -->
+                <LinearLayout android:orientation="vertical" android:gravity="center" android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1">
+                    <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="M" android:textSize="8sp" android:textColor="#1A3B5D" />
+                    <ImageView android:id="@+id/widget_day_2" android:layout_width="10dp" android:layout_height="10dp" android:src="@drawable/widget_dot_inactive" android:layout_marginTop="1dp" />
+                </LinearLayout>
+
+                <!-- Thu -->
+                <LinearLayout android:orientation="vertical" android:gravity="center" android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1">
+                    <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="J" android:textSize="8sp" android:textColor="#1A3B5D" />
+                    <ImageView android:id="@+id/widget_day_3" android:layout_width="10dp" android:layout_height="10dp" android:src="@drawable/widget_dot_inactive" android:layout_marginTop="1dp" />
+                </LinearLayout>
+
+                <!-- Fri -->
+                <LinearLayout android:orientation="vertical" android:gravity="center" android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1">
+                    <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="V" android:textSize="8sp" android:textColor="#1A3B5D" />
+                    <ImageView android:id="@+id/widget_day_4" android:layout_width="10dp" android:layout_height="10dp" android:src="@drawable/widget_dot_inactive" android:layout_marginTop="1dp" />
+                </LinearLayout>
+
+                <!-- Sat -->
+                <LinearLayout android:orientation="vertical" android:gravity="center" android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1">
+                    <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="S" android:textSize="8sp" android:textColor="#1A3B5D" />
+                    <ImageView android:id="@+id/widget_day_5" android:layout_width="10dp" android:layout_height="10dp" android:src="@drawable/widget_dot_inactive" android:layout_marginTop="1dp" />
+                </LinearLayout>
+
+                <!-- Sun -->
+                <LinearLayout android:orientation="vertical" android:gravity="center" android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1">
+                    <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="D" android:textSize="8sp" android:textColor="#1A3B5D" />
+                    <ImageView android:id="@+id/widget_day_6" android:layout_width="10dp" android:layout_height="10dp" android:src="@drawable/widget_dot_inactive" android:layout_marginTop="1dp" />
+                </LinearLayout>
+
+            </LinearLayout>
+
+        </LinearLayout>
+
+    </LinearLayout>
+
+    <!-- ══════════════════════════════════════════════ -->
+    <!--  EMPTY STATE: Quick Actions Dock               -->
+    <!-- ══════════════════════════════════════════════ -->
+    <LinearLayout
+        android:id="@+id/widget_empty_state"
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1"
+        android:orientation="vertical"
+        android:paddingStart="14dp"
+        android:paddingEnd="14dp"
+        android:paddingTop="12dp"
+        android:paddingBottom="14dp"
+        android:visibility="gone">
+
+        <!-- Title -->
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Aucun traitement programmé"
+            android:textSize="11sp"
+            android:textStyle="bold"
+            android:textColor="#1A3B5D"
+            android:alpha="0.8"
+            android:layout_gravity="center_horizontal"
+            android:layout_marginBottom="10dp" />
+
+        <!-- Quick actions grid -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:orientation="horizontal"
+            android:gravity="center_vertical">
+
+            <!-- Button: Scanner -->
+            <LinearLayout
+                android:id="@+id/widget_empty_scan_button"
+                android:layout_width="0dp"
+                android:layout_height="match_parent"
+                android:layout_weight="1"
+                android:orientation="vertical"
+                android:gravity="center"
+                android:background="@drawable/widget_pending_bg"
+                android:layout_marginEnd="8dp"
+                android:clickable="true"
+                android:focusable="true">
+                <ImageView
+                    android:layout_width="20dp"
+                    android:layout_height="20dp"
+                    android:src="@drawable/ic_camera"
+                    android:tint="#1A3B5D" />
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="Scanner"
+                    android:textSize="10sp"
+                    android:textStyle="bold"
+                    android:textColor="#1A3B5D"
+                    android:layout_marginTop="6dp" />
+            </LinearLayout>
+
+            <!-- Button: Ajouter -->
+            <LinearLayout
+                android:id="@+id/widget_empty_add_button"
+                android:layout_width="0dp"
+                android:layout_height="match_parent"
+                android:layout_weight="1"
+                android:orientation="vertical"
+                android:gravity="center"
+                android:background="@drawable/widget_pending_bg"
+                android:layout_marginEnd="8dp"
+                android:clickable="true"
+                android:focusable="true">
+                <ImageView
+                    android:layout_width="20dp"
+                    android:layout_height="20dp"
+                    android:src="@drawable/ic_plus"
+                    android:tint="#1A3B5D" />
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="Ajouter"
+                    android:textSize="10sp"
+                    android:textStyle="bold"
+                    android:textColor="#1A3B5D"
+                    android:layout_marginTop="6dp" />
+            </LinearLayout>
+
+            <!-- Button: Pharmacie -->
+            <LinearLayout
+                android:id="@+id/widget_empty_pharmacy_button"
+                android:layout_width="0dp"
+                android:layout_height="match_parent"
+                android:layout_weight="1"
+                android:orientation="vertical"
+                android:gravity="center"
+                android:background="@drawable/widget_pending_bg"
+                android:clickable="true"
+                android:focusable="true">
+                <ImageView
+                    android:layout_width="20dp"
+                    android:layout_height="20dp"
+                    android:src="@drawable/ic_pill" />
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="Pharmacie"
+                    android:textSize="10sp"
+                    android:textStyle="bold"
+                    android:textColor="#1A3B5D"
+                    android:layout_marginTop="6dp" />
+            </LinearLayout>
+
+        </LinearLayout>
+
+    </LinearLayout>
+
+</LinearLayout>

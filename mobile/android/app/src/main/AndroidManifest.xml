@@ -46,6 +46,21 @@
         </receiver>
         <receiver android:name="com.dexterous.flutterlocalnotifications.ActionBroadcastReceiver" android:exported="false" />
 
+        <!-- MedScan Android Home Screen Widget Receiver -->
+        <receiver android:name=".MedScanWidgetProvider" android:exported="true">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/medscan_widget_info" />
+        </receiver>
+        <receiver android:name=".MedScanWidgetActionReceiver" android:exported="false">
+            <intent-filter>
+                <action android:name="com.seinimomo.medscanapp.MARK_TAKEN" />
+            </intent-filter>
+        </receiver>
+
         <!-- Enable Impeller GPU rendering backend for 60/120fps ultra-fluid animations on Android -->
         <meta-data
             android:name="io.flutter.embedding.android.EnableImpeller"

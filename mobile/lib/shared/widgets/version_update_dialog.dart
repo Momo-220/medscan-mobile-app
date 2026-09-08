@@ -117,7 +117,7 @@ class VersionUpdateDialog extends StatelessWidget {
                   child: OutlinedButton(
                     style: OutlinedButton.styleFrom(
                       padding: const EdgeInsets.symmetric(vertical: 13),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(50)),
                       side: BorderSide(
                         color: isDark ? const Color(0xFF334155) : const Color(0xFFCBD5E1),
                       ),
@@ -140,7 +140,7 @@ class VersionUpdateDialog extends StatelessWidget {
                     padding: const EdgeInsets.symmetric(vertical: 13),
                     backgroundColor: const Color(0xFF2563EB),
                     elevation: 0,
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(50)),
                   ),
                   onPressed: () => _launchStore(context),
                   child: const Text(

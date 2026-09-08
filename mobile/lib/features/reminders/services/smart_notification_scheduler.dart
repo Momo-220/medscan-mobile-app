@@ -14,19 +14,25 @@ class SmartNotificationScheduler {
     required List activeReminders,
   }) async {
     try {
-      // Always schedule 4 daily health tips (10:00, 15:00, 19:30, 20:15)
+      // Always schedule 2 daily health tips (10:00, 18:00)
       final sp = await SharedPreferences.getInstance();
       int currentIndex = sp.getInt(_prefKeyLastIndex) ?? 0;
       final String langCode = sp.getString('language') ?? 'fr';
 
       final now = DateTime.now();
-      // Slots: 10:00 AM, 3:00 PM (15:00), 7:30 PM (19:30), 8:15 PM (20:15)
+      // Slots: 10:00 AM, 6:00 PM (18:00)
       final slots = [
         DateTime(now.year, now.month, now.day, 10, 0),
-        DateTime(now.year, now.month, now.day, 15, 0),
-        DateTime(now.year, now.month, now.day, 19, 30),
-        DateTime(now.year, now.month, now.day, 20, 15),
+        DateTime(now.year, now.month, now.day, 18, 0),
       ];
+
+      // Cancel unused slots from prior 4-slot implementation
+      try {
+        await NotificationService.cancelReminder(800003);
+        await NotificationService.cancelReminder(800004);
+      } catch (e) {
+        debugPrint('Error clearing old slot notifications: $e');
+      }
 
       for (int i = 0; i < slots.length; i++) {
         var scheduledTime = slots[i];
@@ -49,7 +55,7 @@ class SmartNotificationScheduler {
       }
 
       await sp.setInt(_prefKeyLastIndex, currentIndex);
-      debugPrint('SmartNotificationScheduler: Scheduled 3 daily tips for language "$langCode". Next index: $currentIndex');
+      debugPrint('SmartNotificationScheduler: Scheduled 2 daily tips for language "$langCode". Next index: $currentIndex');
     } catch (e) {
       debugPrint('SmartNotificationScheduler sync error: $e');
     }

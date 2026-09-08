@@ -8,6 +8,7 @@ import '../../../../core/constants/text_styles.dart';
 import '../../../../shared/utils/localization.dart';
 import '../../../../shared/widgets/card.dart';
 import '../../../../shared/widgets/skeleton.dart';
+import '../../../../shared/widgets/reminder_countdown_widget.dart';
 import '../../../reminders/providers/reminders_provider.dart';
 import '../../../../data/models/reminder.dart';
 
@@ -264,25 +265,41 @@ class _HealthTipsCardWidgetState extends ConsumerState<HealthTipsCardWidget> {
                                 ),
                                 if (_nextReminder!.dosage.isNotEmpty) ...[
                                   const SizedBox(width: 8),
-                                  Container(
-                                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                                    decoration: BoxDecoration(
-                                      color: isDark ? Colors.white10 : Colors.white.withOpacity(0.6),
-                                      borderRadius: BorderRadius.circular(8),
-                                    ),
-                                    child: Row(
-                                      children: [
-                                        const Icon(Icons.medication_outlined, size: 12, color: AppColors.primary),
-                                        const SizedBox(width: 4),
-                                        Text(
-                                          _nextReminder!.dosage,
-                                          style: AppTextStyles.micro(isDark: isDark).copyWith(fontWeight: FontWeight.bold),
-                                        ),
-                                      ],
+                                  Flexible(
+                                    child: Container(
+                                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                      decoration: BoxDecoration(
+                                        color: isDark ? Colors.white10 : Colors.white.withOpacity(0.6),
+                                        borderRadius: BorderRadius.circular(8),
+                                      ),
+                                      child: Row(
+                                        mainAxisSize: MainAxisSize.min,
+                                        children: [
+                                          const Icon(Icons.medication_outlined, size: 12, color: AppColors.primary),
+                                          const SizedBox(width: 4),
+                                          Flexible(
+                                            child: Text(
+                                              _nextReminder!.dosage,
+                                              style: AppTextStyles.micro(isDark: isDark).copyWith(
+                                                fontWeight: FontWeight.bold,
+                                              ),
+                                              overflow: TextOverflow.ellipsis,
+                                              maxLines: 1,
+                                            ),
+                                          ),
+                                        ],
+                                      ),
                                     ),
                                   ),
                                 ],
                               ],
+                            ),
+                            ReminderCountdownWidget(
+                              nextDose: _nextReminder!.nextDose,
+                              active: _nextReminder!.active,
+                              status: _nextReminder!.status,
+                              dosesTaken: _nextReminder!.dosesTakenToday,
+                              totalDoses: _nextReminder!.totalDosesToday,
                             ),
                           ],
                         )

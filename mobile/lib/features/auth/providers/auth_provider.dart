@@ -1,3 +1,6 @@
+import 'dart:convert';
+import 'dart:math';
+import 'package:crypto/crypto.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -5,6 +8,8 @@ import 'package:google_sign_in/google_sign_in.dart';
 import 'package:sign_in_with_apple/sign_in_with_apple.dart';
 import '../../../core/di/providers.dart';
 import '../../../shared/services/username_service.dart';
+import '../../../shared/services/widget_service.dart';
+import '../../../shared/utils/email_validator.dart';
 
 // ─────────────────────────────────────────────────────────────────
 // Firebase Auth State Stream (Riverpod 3.x: StreamProvider)
@@ -58,16 +63,23 @@ class AuthNotifier extends Notifier<AsyncValue<User?>> {
     }
     state = const AsyncValue.loading();
     try {
-      // Resolve username → email if no @ detected
-      String resolvedEmail = emailOrUsername.trim();
-      if (!resolvedEmail.contains('@')) {
-        final lookedUp = await usernameService.lookupEmail(resolvedEmail);
+      final prefs = ref.read(sharedPrefsServiceProvider);
+      final cleanInput = emailOrUsername.trim();
+      String resolvedEmail = cleanInput;
+      String? foundUsername;
+
+      // If input is a username (starts with @ or doesn't have an email domain)
+      final isEmail = cleanInput.contains('@') && cleanInput.contains('.');
+      if (!isEmail) {
+        final usernameToLookup = cleanInput.startsWith('@') ? cleanInput.substring(1).trim() : cleanInput;
+        foundUsername = usernameToLookup;
+        final lookedUp = await usernameService.lookupEmail(usernameToLookup);
         if (lookedUp == null) {
           state = AsyncValue.error(
-            Exception('Nom d\'utilisateur introuvable.'),
+            Exception('Nom d\'utilisateur introuvable. Essayez avec votre adresse e-mail.'),
             StackTrace.current,
           );
-          throw Exception('Nom d\'utilisateur introuvable.');
+          throw Exception('Nom d\'utilisateur introuvable. Essayez avec votre adresse e-mail.');
         }
         resolvedEmail = lookedUp;
       }
@@ -76,6 +88,21 @@ class AuthNotifier extends Notifier<AsyncValue<User?>> {
         email: resolvedEmail,
         password: password,
       );
+
+      if (credential.user != null) {
+        if (foundUsername != null && foundUsername.isNotEmpty) {
+          await prefs.setLocalUsername(foundUsername);
+        } else {
+          final lookedUpUsername = await usernameService.lookupUsernameByUid(credential.user!.uid);
+          if (lookedUpUsername != null && lookedUpUsername.isNotEmpty) {
+            await prefs.setLocalUsername(lookedUpUsername);
+          }
+        }
+        if (credential.user!.displayName != null) {
+          await prefs.setLocalName(credential.user!.displayName!);
+        }
+      }
+
       await _saveToken();
       state = AsyncValue.data(credential.user);
     } catch (e, stack) {
@@ -97,20 +124,34 @@ class AuthNotifier extends Notifier<AsyncValue<User?>> {
     }
     state = const AsyncValue.loading();
     try {
+      final prefs = ref.read(sharedPrefsServiceProvider);
+
+      // Validate email format and block fake/disposable domains
+      final cleanEmail = EmailValidator.normalize(email);
+      final emailError = EmailValidator.validate(cleanEmail);
+      if (emailError != null) {
+        state = AsyncValue.error(Exception(emailError), StackTrace.current);
+        throw Exception(emailError);
+      }
+
       // Validate & claim username before creating account
-      if (username != null && username.isNotEmpty) {
-        final validationError = UsernameService.validate(username);
+      final cleanUsername = username?.startsWith('@') == true
+          ? username!.substring(1).trim()
+          : username?.trim();
+
+      if (cleanUsername != null && cleanUsername.isNotEmpty) {
+        final validationError = UsernameService.validate(cleanUsername);
         if (validationError != null) {
           state = AsyncValue.error(Exception(validationError), StackTrace.current);
           throw Exception(validationError);
         }
-        final available = await usernameService.isAvailable(username);
+        final available = await usernameService.isAvailable(cleanUsername);
         if (!available) {
           state = AsyncValue.error(
-            Exception('Ce nom d\'utilisateur est déjà pris.'),
+            Exception('Ce nom d\'utilisateur est déjà pris. Veuillez en choisir un autre.'),
             StackTrace.current,
           );
-          throw Exception('Ce nom d\'utilisateur est déjà pris.');
+          throw Exception('Ce nom d\'utilisateur est déjà pris. Veuillez en choisir un autre.');
         }
       }
 
@@ -134,14 +175,16 @@ class AuthNotifier extends Notifier<AsyncValue<User?>> {
       if (credential.user != null) {
         await credential.user!.updateDisplayName(displayName);
         await credential.user!.reload();
+        await prefs.setLocalName(displayName);
 
-        // Save username to Firestore if provided
-        if (username != null && username.isNotEmpty) {
+        // Save username to Firestore & local preferences if provided
+        if (cleanUsername != null && cleanUsername.isNotEmpty) {
           await usernameService.claimUsername(
-            username: username,
+            username: cleanUsername,
             uid: credential.user!.uid,
             email: email,
           );
+          await prefs.setLocalUsername(cleanUsername);
         }
       }
 
@@ -220,6 +263,20 @@ class AuthNotifier extends Notifier<AsyncValue<User?>> {
     }
   }
 
+  /// Generates a cryptographically secure random nonce.
+  String _generateRandomNonce([int length = 32]) {
+    const charset = '0123456789ABCDEFGHIJKLMNOPQRSTUVXYZabcdefghijklmnopqrstuvwxyz-._';
+    final random = Random.secure();
+    return List.generate(length, (_) => charset[random.nextInt(charset.length)]).join();
+  }
+
+  /// Returns the SHA-256 digest of a string in hexadecimal format.
+  String _sha256ofString(String input) {
+    final bytes = utf8.encode(input);
+    final digest = sha256.convert(bytes);
+    return digest.toString();
+  }
+
   // ── Apple Sign‑In (required by Apple Guideline 4.8) ──────────
 
   Future<void> signInWithApple() async {
@@ -228,17 +285,21 @@ class AuthNotifier extends Notifier<AsyncValue<User?>> {
     }
     state = const AsyncValue.loading();
     try {
+      final rawNonce = _generateRandomNonce();
+      final nonce = _sha256ofString(rawNonce);
+
       final appleCredential = await SignInWithApple.getAppleIDCredential(
         scopes: [
           AppleIDAuthorizationScopes.email,
           AppleIDAuthorizationScopes.fullName,
         ],
+        nonce: nonce,
       );
 
       final oAuthProvider = OAuthProvider('apple.com');
       final credential = oAuthProvider.credential(
         idToken: appleCredential.identityToken,
-        accessToken: appleCredential.authorizationCode,
+        rawNonce: rawNonce,
       );
 
       final userCredential = await _auth!.signInWithCredential(credential);
@@ -296,6 +357,7 @@ class AuthNotifier extends Notifier<AsyncValue<User?>> {
 
     try {
       await prefs.clearLocalName();
+      await prefs.clearLocalUsername();
     } catch (_) {}
 
     try {
@@ -306,6 +368,11 @@ class AuthNotifier extends Notifier<AsyncValue<User?>> {
     } catch (_) {}
     try {
       await ref.read(secureStorageServiceProvider).clearAuthToken();
+    } catch (_) {}
+
+    // Clear Home Widget state so no data leaks to the next user
+    try {
+      await WidgetService.clearWidget();
     } catch (_) {}
 
     state = const AsyncValue.data(null);

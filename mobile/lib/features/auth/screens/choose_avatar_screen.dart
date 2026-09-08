@@ -8,6 +8,7 @@ import '../../../core/constants/colors.dart';
 import '../../../core/constants/text_styles.dart';
 import '../../../shared/utils/localization.dart';
 import '../../../shared/utils/pill_notification.dart';
+import '../../../shared/services/widget_service.dart';
 import '../../../shared/widgets/button.dart';
 import '../../../shared/widgets/card.dart';
 import '../providers/auth_provider.dart';
@@ -46,6 +47,11 @@ class _ChooseAvatarPageState extends ConsumerState<ChooseAvatarPage> {
 
     try {
       await ref.read(authProvider.notifier).updateProfile(photoURL: _selectedAvatar);
+      final avatarId = WidgetService.extractAvatarId(_selectedAvatar);
+      await WidgetService.syncWidget(
+        avatarId: avatarId,
+        langCode: ref.read(languageProvider),
+      );
       if (mounted) {
         context.go('/home');
       }

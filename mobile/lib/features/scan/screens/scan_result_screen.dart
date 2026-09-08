@@ -19,6 +19,7 @@ import '../../../shared/widgets/medical_sources_widget.dart';
 import '../providers/suggestions_provider.dart';
 import '../../../core/di/providers.dart';
 import '../../home/screens/widgets/medication_reminders.dart';
+import '../../chat/providers/chat_provider.dart';
 
 class ScanResultPage extends ConsumerStatefulWidget {
   final Map<String, dynamic> scanData;
@@ -512,9 +513,46 @@ class _ScanResultPageState extends ConsumerState<ScanResultPage> {
                     backgroundColor: AppColors.primary,
                     padding: const EdgeInsets.symmetric(vertical: 14),
                     shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(14),
+                      borderRadius: BorderRadius.circular(50),
                     ),
                     elevation: 0,
+                  ),
+                ),
+              ),
+              const SizedBox(height: 12),
+
+              // Chat with your medication button (scan-to-chat)
+              SizedBox(
+                width: double.infinity,
+                child: OutlinedButton.icon(
+                  onPressed: () {
+                    final medName = scan.medicationName;
+                    final resolvedImgUrl = scan.imageUrl != null && scan.imageUrl!.isNotEmpty
+                        ? (scan.imageUrl!.startsWith('http')
+                            ? _getResolvedImageUrl(scan.imageUrl)
+                            : scan.imageUrl)
+                        : null;
+                    // Pre-set chat mode to 'chat' (not consultation)
+                    ref.read(chatProvider.notifier).setMode('chat');
+                    ref.read(chatProvider.notifier).setMedicationContext(medName, imageUrl: resolvedImgUrl);
+                    // Navigate to chat tab with medication name and image as context
+                    context.go('/chat', extra: {'name': medName, 'imageUrl': resolvedImgUrl});
+                  },
+                  icon: const Icon(Icons.forum_rounded, size: 18),
+                  label: Text(
+                    ref.t('chatWithMedication'),
+                    style: const TextStyle(
+                      fontWeight: FontWeight.w600,
+                      fontSize: 14,
+                    ),
+                  ),
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: AppColors.primary,
+                    side: const BorderSide(color: AppColors.primary, width: 1.5),
+                    padding: const EdgeInsets.symmetric(vertical: 13),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(50),
+                    ),
                   ),
                 ),
               ),

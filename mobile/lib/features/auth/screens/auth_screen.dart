@@ -11,17 +11,24 @@ import '../../../shared/widgets/button.dart';
 import '../../../shared/widgets/card.dart';
 import '../../../shared/widgets/google_logo.dart';
 import '../../../shared/widgets/input.dart';
+import '../../../shared/services/username_service.dart';
+import '../../../shared/utils/email_validator.dart';
 import '../providers/auth_provider.dart';
 
 class AuthPage extends ConsumerStatefulWidget {
-  const AuthPage({super.key});
+  final bool isLoginDefault;
+  
+  const AuthPage({
+    super.key,
+    this.isLoginDefault = true,
+  });
 
   @override
   ConsumerState<AuthPage> createState() => _AuthPageState();
 }
 
 class _AuthPageState extends ConsumerState<AuthPage> {
-  bool _isLogin = true;
+  late bool _isLogin;
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
   final _passwordConfirmController = TextEditingController();
@@ -32,6 +39,12 @@ class _AuthPageState extends ConsumerState<AuthPage> {
   bool _showPasswordConfirm = false;
   bool _loading = false;
   String? _error;
+
+  @override
+  void initState() {
+    super.initState();
+    _isLogin = widget.isLoginDefault;
+  }
 
   int _getPasswordStrength(String pwd) {
     if (pwd.isEmpty) return 0;
@@ -57,6 +70,9 @@ class _AuthPageState extends ConsumerState<AuthPage> {
       if (code == 'user-not-found' || code == 'wrong-password' || code == 'invalid-credential') {
         return ref.t('authErrorInvalid');
       }
+      if (code == 'invalid-user-token' || code == 'operation-not-allowed') {
+        return ref.t('authErrorAppleFailed');
+      }
       if (code == 'email-already-in-use') {
         return ref.t('authErrorEmailUsed');
       }
@@ -64,13 +80,13 @@ class _AuthPageState extends ConsumerState<AuthPage> {
         return ref.t('authErrorWeakPassword');
       }
       if (code == 'invalid-email') {
-        return 'Adresse email invalide. Veuillez vérifier le format.';
+        return ref.t('authErrorInvalidEmail');
       }
       if (code == 'user-disabled') {
-        return 'Ce compte a été désactivé. Veuillez contacter le support.';
+        return ref.t('authErrorUserDisabled');
       }
       if (code == 'too-many-requests') {
-        return 'Trop de tentatives. Réessayez plus tard ou réinitialisez votre mot de passe.';
+        return ref.t('authErrorTooManyRequests');
       }
       if (code == 'network-request-failed') {
         return ref.t('authErrorNetwork');
@@ -80,12 +96,17 @@ class _AuthPageState extends ConsumerState<AuthPage> {
       }
     }
     
-    final errStr = err.toString();
+    final rawErrStr = err.toString();
+    final errStr = rawErrStr.replaceAll('Exception: ', '').trim();
+
     if (errStr.contains('introuvable') || errStr.contains('not found')) {
-      return 'Nom d\'utilisateur introuvable. Essayez avec votre email.';
+      return ref.t('authErrorUsernameNotFound');
     }
-    if (errStr.contains('déjà pris') || errStr.contains('taken')) {
-      return 'Ce nom d\'utilisateur est déjà pris.';
+    if (errStr.contains('déjà pris') || errStr.contains('taken') || errStr.contains('username_taken')) {
+      return ref.t('authErrorUsernameTaken');
+    }
+    if (errStr.contains('jetables') || errStr.contains('disposable')) {
+      return ref.t('authErrorDisposableEmail');
     }
     if (errStr.contains('mediscan-email-exists-signin')) {
       return ref.t('authErrorEmailExistsSignIn');
@@ -95,6 +116,25 @@ class _AuthPageState extends ConsumerState<AuthPage> {
     }
     if (errStr.contains('popup-blocked')) {
       return ref.t('authErrorPopupBlocked');
+    }
+    if (errStr.contains('SignInWithApple') ||
+        errStr.contains('apple') ||
+        errStr.contains('invalid-user-token') ||
+        errStr.contains('accessToken')) {
+      return ref.t('authErrorAppleFailed');
+    }
+
+    // Never display raw technical error strings (brackets, platform exceptions, tokens, etc.)
+    if (errStr.isNotEmpty &&
+        !errStr.startsWith('[') &&
+        !errStr.contains('PlatformException') &&
+        !errStr.contains('FirebaseException') &&
+        !errStr.contains('firebase_auth') &&
+        !errStr.contains('Instance of') &&
+        !errStr.contains('nil') &&
+        !errStr.contains('token') &&
+        errStr.length < 120) {
+      return errStr;
     }
     
     return ref.t('authErrorGeneric');
@@ -109,20 +149,71 @@ class _AuthPageState extends ConsumerState<AuthPage> {
     final password = _passwordController.text;
     final confirm = _passwordConfirmController.text;
     final name = _nameController.text.trim();
-    final username = _usernameController.text.trim();
+    final rawUsername = _usernameController.text.trim();
+    final cleanUsername = rawUsername.startsWith('@') ? rawUsername.substring(1).trim() : rawUsername;
 
-    if (emailOrUsername.isEmpty || password.isEmpty) {
-      setState(() {
-        _error = ref.t('authErrorGeneric');
-      });
-      return;
-    }
-
-    if (!_isLogin && password != confirm) {
-      setState(() {
-        _error = ref.t('authErrorPasswordMismatch');
-      });
-      return;
+    // Login validation
+    if (_isLogin) {
+      if (emailOrUsername.isEmpty) {
+        setState(() {
+          _error = ref.t('authErrorEmailLoginRequired');
+        });
+        return;
+      }
+      if (password.isEmpty) {
+        setState(() {
+          _error = ref.t('authErrorPasswordLoginRequired');
+        });
+        return;
+      }
+    } else {
+      // Register validation
+      if (name.isEmpty) {
+        setState(() {
+          _error = ref.t('authErrorNameRequired');
+        });
+        return;
+      }
+      if (name.length < 2) {
+        setState(() {
+          _error = ref.t('authErrorNameTooShort');
+        });
+        return;
+      }
+      if (cleanUsername.isNotEmpty) {
+        final usernameValidation = UsernameService.validate(cleanUsername);
+        if (usernameValidation != null) {
+          setState(() {
+            _error = usernameValidation;
+          });
+          return;
+        }
+      }
+      final emailValidation = EmailValidator.validate(emailOrUsername);
+      if (emailValidation != null) {
+        setState(() {
+          _error = emailValidation;
+        });
+        return;
+      }
+      if (password.isEmpty) {
+        setState(() {
+          _error = ref.t('authErrorPasswordRequired');
+        });
+        return;
+      }
+      if (password.length < 6) {
+        setState(() {
+          _error = ref.t('authErrorWeakPassword');
+        });
+        return;
+      }
+      if (password != confirm) {
+        setState(() {
+          _error = ref.t('authErrorPasswordMismatch');
+        });
+        return;
+      }
     }
 
     setState(() {
@@ -140,7 +231,7 @@ class _AuthPageState extends ConsumerState<AuthPage> {
           emailOrUsername,
           password,
           name,
-          username: username.isEmpty ? null : username,
+          username: cleanUsername.isEmpty ? null : cleanUsername,
         );
         if (mounted) {
           context.go('/choose-avatar');
@@ -205,6 +296,14 @@ class _AuthPageState extends ConsumerState<AuthPage> {
         }
       }
     } catch (err) {
+      final errStr = err.toString().toLowerCase();
+      if (errStr.contains('canceled') || errStr.contains('cancelled') || errStr.contains('1001') || errStr.contains('user-cancelled') || errStr.contains('authorization_error_code_canceled')) {
+        setState(() {
+          _loading = false;
+        });
+        return;
+      }
+      debugPrint('Apple Sign-In error details: $err');
       setState(() {
         _error = _getAuthErrorMessage(err);
         _loading = false;
@@ -276,18 +375,20 @@ class _AuthPageState extends ConsumerState<AuthPage> {
                             child: Column(
                               children: [
                                 Container(
-                                  width: 80,
-                                  height: 80,
+                                  width: 56,
+                                  height: 56,
                                   decoration: BoxDecoration(
-                                    color: isDark ? AppColors.cardDark : Colors.white,
-                                    borderRadius: BorderRadius.circular(20),
-                                    boxShadow: [
-                                      BoxShadow(
-                                        color: Colors.black.withOpacity(0.06),
-                                        blurRadius: 10,
-                                        offset: const Offset(0, 2),
-                                      ),
-                                    ],
+                                    color: isDark ? Colors.white : Colors.black,
+                                    borderRadius: BorderRadius.circular(50),
+                                    boxShadow: isDark
+                                        ? null
+                                        : [
+                                            BoxShadow(
+                                              color: Colors.black.withOpacity(0.08),
+                                              blurRadius: 6,
+                                              offset: const Offset(0, 2),
+                                            ),
+                                          ],
                                   ),
                                   padding: const EdgeInsets.all(12.0),
                                   child: Image.asset(
@@ -320,10 +421,10 @@ class _AuthPageState extends ConsumerState<AuthPage> {
 
                           // Toggle Selector: Login / Register
                           Container(
-                            padding: const EdgeInsets.all(6.0),
+                            padding: const EdgeInsets.all(5.0),
                             decoration: BoxDecoration(
-                              color: isDark ? const Color(0xFF1E293B) : AppColors.backgroundSecondary,
-                              borderRadius: BorderRadius.circular(16),
+                              color: isDark ? const Color(0xFF1E293B) : const Color(0xFFEFF6FF),
+                              borderRadius: BorderRadius.circular(20),
                             ),
                             child: Row(
                               children: [
@@ -333,30 +434,33 @@ class _AuthPageState extends ConsumerState<AuthPage> {
                                       _isLogin = true;
                                       _error = null;
                                     }),
-                                    child: Container(
+                                    child: AnimatedContainer(
+                                      duration: const Duration(milliseconds: 200),
                                       padding: const EdgeInsets.symmetric(vertical: 12),
                                       decoration: BoxDecoration(
                                         color: _isLogin
                                             ? (isDark ? const Color(0xFF334155) : Colors.white)
                                             : Colors.transparent,
-                                        borderRadius: BorderRadius.circular(10),
+                                        borderRadius: BorderRadius.circular(15),
                                         boxShadow: _isLogin && !isDark
                                             ? [
-                                                const BoxShadow(
-                                                  color: Colors.black12,
-                                                  blurRadius: 4,
-                                                  offset: Offset(0, 1),
-                                                )
+                                                BoxShadow(
+                                                  color: const Color(0xFF3B82F6).withOpacity(0.10),
+                                                  blurRadius: 8,
+                                                  spreadRadius: 0,
+                                                  offset: const Offset(0, 2),
+                                                ),
                                               ]
                                             : null,
                                       ),
                                       child: Text(
                                         ref.t('authLogin'),
-                                        style: AppTextStyles.small(
+                                        style: AppTextStyles.bodyBold(isDark: isDark).copyWith(
                                           color: _isLogin
-                                              ? AppColors.primary
-                                              : (isDark ? AppColors.textMutedDark : AppColors.textSecondary),
-                                          fontWeight: FontWeight.w600,
+                                              ? const Color(0xFF3B82F6)
+                                              : (isDark ? AppColors.textMutedDark : const Color(0xFF64748B)),
+                                          fontSize: 14.5,
+                                          fontWeight: _isLogin ? FontWeight.w700 : FontWeight.w500,
                                         ),
                                         textAlign: TextAlign.center,
                                       ),
@@ -369,30 +473,33 @@ class _AuthPageState extends ConsumerState<AuthPage> {
                                       _isLogin = false;
                                       _error = null;
                                     }),
-                                    child: Container(
+                                    child: AnimatedContainer(
+                                      duration: const Duration(milliseconds: 200),
                                       padding: const EdgeInsets.symmetric(vertical: 12),
                                       decoration: BoxDecoration(
                                         color: !_isLogin
                                             ? (isDark ? const Color(0xFF334155) : Colors.white)
                                             : Colors.transparent,
-                                        borderRadius: BorderRadius.circular(10),
+                                        borderRadius: BorderRadius.circular(15),
                                         boxShadow: !_isLogin && !isDark
                                             ? [
-                                                const BoxShadow(
-                                                  color: Colors.black12,
-                                                  blurRadius: 4,
-                                                  offset: Offset(0, 1),
-                                                )
+                                                BoxShadow(
+                                                  color: const Color(0xFF3B82F6).withOpacity(0.10),
+                                                  blurRadius: 8,
+                                                  spreadRadius: 0,
+                                                  offset: const Offset(0, 2),
+                                                ),
                                               ]
                                             : null,
                                       ),
                                       child: Text(
                                         ref.t('authRegister'),
-                                        style: AppTextStyles.small(
+                                        style: AppTextStyles.bodyBold(isDark: isDark).copyWith(
                                           color: !_isLogin
-                                              ? AppColors.primary
-                                              : (isDark ? AppColors.textMutedDark : AppColors.textSecondary),
-                                          fontWeight: FontWeight.w600,
+                                              ? const Color(0xFF3B82F6)
+                                              : (isDark ? AppColors.textMutedDark : const Color(0xFF64748B)),
+                                          fontSize: 14.5,
+                                          fontWeight: !_isLogin ? FontWeight.w700 : FontWeight.w500,
                                         ),
                                         textAlign: TextAlign.center,
                                       ),
@@ -597,7 +704,7 @@ class _AuthPageState extends ConsumerState<AuthPage> {
                                   height: 56,
                                   decoration: BoxDecoration(
                                     color: isDark ? Colors.white : Colors.black,
-                                    borderRadius: BorderRadius.circular(16),
+                                    borderRadius: BorderRadius.circular(50),
                                     boxShadow: isDark
                                         ? null
                                         : [
@@ -632,7 +739,7 @@ class _AuthPageState extends ConsumerState<AuthPage> {
                                           : const Color(0xFFDADCE0),
                                       width: 1,
                                     ),
-                                    borderRadius: BorderRadius.circular(16),
+                                    borderRadius: BorderRadius.circular(50),
                                     boxShadow: isDark
                                         ? null
                                         : [

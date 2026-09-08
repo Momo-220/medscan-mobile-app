@@ -78,12 +78,24 @@
 	<string>14523087808-v9is49662fi56e8i0cf0pcfb94vmppo8.apps.googleusercontent.com</string>
 	<key>CFBundleURLTypes</key>
 	<array>
+		<!-- Google Sign-In scheme -->
 		<dict>
 			<key>CFBundleTypeRole</key>
 			<string>Editor</string>
 			<key>CFBundleURLSchemes</key>
 			<array>
 				<string>com.googleusercontent.apps.14523087808-v9is49662fi56e8i0cf0pcfb94vmppo8</string>
+			</array>
+		</dict>
+		<!-- MedScan deep link scheme (widget tap) -->
+		<dict>
+			<key>CFBundleTypeRole</key>
+			<string>Editor</string>
+			<key>CFBundleURLName</key>
+			<string>com.seinimomo.medscanapp</string>
+			<key>CFBundleURLSchemes</key>
+			<array>
+				<string>medscan</string>
 			</array>
 		</dict>
 	</array>

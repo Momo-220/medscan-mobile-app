@@ -8,6 +8,8 @@ import '../../../core/constants/text_styles.dart';
 import '../../../core/di/providers.dart';
 import '../../../shared/services/notification_service.dart';
 import '../../../shared/services/version_service.dart';
+import '../../../shared/services/widget_service.dart';
+import '../../../shared/services/username_service.dart';
 import '../../../shared/widgets/version_update_dialog.dart';
 import '../../../shared/utils/localization.dart';
 import '../../../shared/widgets/button.dart';
@@ -15,6 +17,7 @@ import '../../../shared/widgets/card.dart';
 import '../providers/credits_provider.dart';
 import '../providers/health_stats_provider.dart';
 import '../providers/recent_scans_provider.dart';
+import '../../reminders/providers/reminders_provider.dart';
 import 'widgets/health_dashboard.dart';
 import 'widgets/recent_scans.dart';
 import 'widgets/medication_reminders.dart';
@@ -170,10 +173,33 @@ class HomePage extends ConsumerWidget {
       );
     });
     
-    // Auth & local name extraction
+    // Auth & local name / username extraction
     final user = FirebaseAuth.instance.currentUser;
     final prefs = ref.watch(sharedPrefsServiceProvider);
-    final String displayName = user?.displayName ?? prefs.getLocalName() ?? ref.t('user');
+    final localUsername = prefs.getLocalUsername();
+    final String greetingName = (localUsername != null && localUsername.isNotEmpty)
+        ? (localUsername.startsWith('@') ? localUsername : '@$localUsername')
+        : (user?.displayName ?? prefs.getLocalName() ?? ref.t('user'));
+
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      final remindersList = ref.read(remindersProvider).value;
+      WidgetService.syncWidget(
+        reminders: remindersList,
+        userName: greetingName,
+        avatarId: WidgetService.extractAvatarId(user?.photoURL),
+        langCode: ref.read(languageProvider),
+      );
+
+      // Asynchronously load username from Firestore if missing locally
+      if ((prefs.getLocalUsername() == null || prefs.getLocalUsername()!.isEmpty) &&
+          user != null &&
+          !user.isAnonymous) {
+        final fetched = await UsernameService().lookupUsernameByUid(user.uid);
+        if (fetched != null && fetched.isNotEmpty) {
+          await prefs.setLocalUsername(fetched);
+        }
+      }
+    });
 
     final String greeting = _getGreeting(ref.t('goodMorning'), ref.t('goodEvening'));
     final creditsAsync = ref.watch(creditsProvider);
@@ -220,7 +246,7 @@ class HomePage extends ConsumerWidget {
                             GestureDetector(
                               onTap: () => context.push('/profile'),
                               child: Text(
-                                displayName,
+                                greetingName,
                                 style: AppTextStyles.h2(isDark: isDark).copyWith(
                                   fontSize: 24,
                                   fontWeight: FontWeight.bold,

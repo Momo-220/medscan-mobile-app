@@ -1,3 +1,9 @@
+enum ReminderStatus {
+  due,
+  completed,
+  pending
+}
+
 class Reminder {
   final String id;
   final String medicationName;
@@ -95,5 +101,88 @@ class Reminder {
       createdAt: createdAt ?? this.createdAt,
       updatedAt: updatedAt ?? this.updatedAt,
     );
+  }
+
+  bool get isUpToDate {
+    return nextDose.isAfter(DateTime.now());
+  }
+
+  int get dosesTakenToday {
+    final parts = time.split(':');
+    if (parts.length != 2) return 0;
+    final hour = int.tryParse(parts[0]) ?? 0;
+    final minute = int.tryParse(parts[1]) ?? 0;
+    
+    final now = DateTime.now();
+    final baseToday = DateTime(now.year, now.month, now.day, hour, minute);
+    
+    final List<DateTime> slots = [];
+    if (frequency == 'twice') {
+      slots.add(baseToday);
+      slots.add(baseToday.add(const Duration(hours: 12)));
+    } else if (frequency == 'three-times') {
+      slots.add(baseToday);
+      slots.add(baseToday.add(const Duration(hours: 8)));
+      slots.add(baseToday.add(const Duration(hours: 16)));
+    } else {
+      slots.add(baseToday);
+    }
+    
+    int count = 0;
+    for (var slot in slots) {
+      if (nextDose.isAfter(slot)) {
+        count++;
+      }
+    }
+    return count;
+  }
+  
+  int get totalDosesToday {
+    if (frequency == 'twice') return 2;
+    if (frequency == 'three-times') return 3;
+    return 1;
+  }
+
+  ReminderStatus get status {
+    if (!isUpToDate) return ReminderStatus.due;
+    if (dosesTakenToday >= totalDosesToday) return ReminderStatus.completed;
+    return ReminderStatus.pending;
+  }
+
+  DateTime calculateNextDoseTime(DateTime baseTime) {
+    final parts = time.split(':');
+    if (parts.length != 2) return baseTime.add(const Duration(days: 1));
+    final hour = int.tryParse(parts[0]) ?? 0;
+    final minute = int.tryParse(parts[1]) ?? 0;
+    
+    var baseDate = DateTime(baseTime.year, baseTime.month, baseTime.day, hour, minute);
+    
+    List<DateTime> getSlots(DateTime date) {
+      if (frequency == 'twice') {
+        return [date, date.add(const Duration(hours: 12))];
+      } else if (frequency == 'three-times') {
+        return [date, date.add(const Duration(hours: 8)), date.add(const Duration(hours: 16))];
+      }
+      return [date];
+    }
+    
+    var slots = getSlots(baseDate);
+    var candidates = slots.where((d) => d.isAfter(baseTime)).toList();
+    
+    DateTime next;
+    if (candidates.isNotEmpty) {
+      next = candidates.first;
+    } else {
+      next = getSlots(baseDate.add(const Duration(days: 1))).first;
+    }
+    
+    if (days != null && days!.isNotEmpty) {
+      int loops = 0;
+      while (!days!.contains(next.weekday) && loops < 365) {
+        next = next.add(const Duration(days: 1));
+        loops++;
+      }
+    }
+    return next;
   }
 }

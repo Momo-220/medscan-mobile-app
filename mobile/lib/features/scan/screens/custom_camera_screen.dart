@@ -132,13 +132,30 @@ class _CustomCameraPageState extends State<CustomCameraPage> with WidgetsBinding
     final size = MediaQuery.of(context).size;
     final topPadding = MediaQuery.of(context).padding.top;
 
+    // Scale preview to prevent stretching (BoxFit.cover behavior)
+    final deviceRatio = size.width / size.height;
+    double scale = 1.0;
+    if (_controller != null && _controller!.value.isInitialized) {
+      scale = 1 / (deviceRatio * _controller!.value.aspectRatio);
+      if (scale < 1.0) {
+        scale = 1.0 / scale;
+      }
+    }
+
     return Scaffold(
       backgroundColor: Colors.black,
       body: Stack(
         children: [
           // ── Camera Preview ────────────────────────────────────────────────
           Positioned.fill(
-            child: CameraPreview(_controller!),
+            child: ClipRect(
+              child: Transform.scale(
+                scale: scale,
+                child: Center(
+                  child: CameraPreview(_controller!),
+                ),
+              ),
+            ),
           ),
 
           // ── Transparent overlay with cut-out cadrant ──────────────────────

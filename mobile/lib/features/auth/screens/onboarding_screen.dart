@@ -247,7 +247,7 @@ class _OnboardingPageState extends ConsumerState<OnboardingPage> {
                       height: 56,
                       decoration: BoxDecoration(
                         gradient: AppColors.scanButtonGradient,
-                        borderRadius: BorderRadius.circular(16),
+                        borderRadius: BorderRadius.circular(50),
                         boxShadow: [
                           BoxShadow(
                             color: AppColors.primary.withOpacity(0.3),

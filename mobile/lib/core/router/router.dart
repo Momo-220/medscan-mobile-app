@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 
 import '../../features/auth/screens/ask_name_screen.dart';
 import '../../features/auth/screens/auth_screen.dart';
@@ -25,13 +26,35 @@ final _shellNavigatorKey = GlobalKey<NavigatorState>(debugLabel: 'shell');
 final GoRouter _router = GoRouter(
   navigatorKey: _rootNavigatorKey,
   initialLocation: '/splash',
+  // Handle deep links from the home screen widget (medscan://home → /home)
+  redirect: (context, state) {
+    final uri = state.uri;
+    // When opened via medscan:// scheme from the widget, redirect to /home
+    if (uri.scheme == 'medscan') {
+      final user = FirebaseAuth.instance.currentUser;
+      if (user == null) {
+        // If the user is logged out, force them to the login screen
+        return '/trial-or-signin';
+      }
+      
+      final path = uri.host; // e.g. 'home' from medscan://home
+      return '/$path';
+    }
+    return null; // no redirect otherwise
+  },
   routes: [
     GoRoute(path: '/splash', builder: (_, __) => const SplashPage()),
     GoRoute(path: '/language', builder: (_, __) => const LanguageSelectionPage()),
     GoRoute(path: '/onboarding', builder: (_, __) => const OnboardingPage()),
     GoRoute(path: '/trial-or-signin', builder: (_, __) => const TrialOrSignInPage()),
     GoRoute(path: '/ask-name', builder: (_, __) => const AskNamePage()),
-    GoRoute(path: '/auth', builder: (_, __) => const AuthPage()),
+    GoRoute(
+      path: '/auth',
+      builder: (context, state) {
+        final extra = state.extra as Map<String, dynamic>? ?? {};
+        return AuthPage(isLoginDefault: extra['isLogin'] ?? true);
+      },
+    ),
     GoRoute(path: '/choose-avatar', builder: (_, __) => const ChooseAvatarPage()),
     GoRoute(path: '/profile', builder: (_, __) => const ProfilePage()),
     GoRoute(path: '/scan', builder: (_, __) => const ScanPage()),
@@ -52,13 +75,36 @@ final GoRouter _router = GoRouter(
       ),
       routes: [
         GoRoute(path: '/home', builder: (_, __) => const HomePage()),
-        GoRoute(path: '/chat', builder: (_, __) => const ChatPage()),
+        GoRoute(
+          path: '/chat',
+          builder: (context, state) {
+            // extra can be:
+            //   - a medication name String (legacy scan-to-chat)
+            //   - a Map with 'name' and 'imageUrl' keys (scan-to-chat with image)
+            //   - null (normal chat)
+            String? medicationContext;
+            String? medicationImageUrl;
+            if (state.extra is String) {
+              medicationContext = state.extra as String;
+            } else if (state.extra is Map<String, dynamic>) {
+              final map = state.extra as Map<String, dynamic>;
+              medicationContext = map['name'] as String?;
+              medicationImageUrl = map['imageUrl'] as String?;
+            }
+            return ChatPage(
+              key: ValueKey('chat_${medicationContext ?? "default"}_${state.pageKey.value}'),
+              medicationContext: medicationContext,
+              medicationImageUrl: medicationImageUrl,
+            );
+          },
+        ),
         GoRoute(path: '/pharmacy', builder: (_, __) => const PharmacyPage()),
         GoRoute(path: '/settings', builder: (_, __) => const SettingsPage()),
       ],
     ),
   ],
 );
+
 
 // Single instance — Riverpod guarantees it's created only once
 final routerProvider = Provider<GoRouter>((ref) {

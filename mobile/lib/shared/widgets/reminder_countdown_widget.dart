@@ -5,16 +5,22 @@ import '../../core/constants/colors.dart';
 import '../../core/constants/text_styles.dart';
 import '../utils/localization.dart';
 
+import '../../data/models/reminder.dart';
+
 class ReminderCountdownWidget extends ConsumerStatefulWidget {
   final DateTime nextDose;
   final bool active;
-  final bool taken;
+  final ReminderStatus status;
+  final int dosesTaken;
+  final int totalDoses;
 
   const ReminderCountdownWidget({
     super.key,
     required this.nextDose,
     required this.active,
-    required this.taken,
+    required this.status,
+    this.dosesTaken = 0,
+    this.totalDoses = 1,
   });
 
   @override
@@ -56,7 +62,7 @@ class _ReminderCountdownWidgetState extends ConsumerState<ReminderCountdownWidge
 
   void _startTimer() {
     _timer?.cancel();
-    if (!widget.active || widget.taken) return;
+    if (!widget.active || widget.status == ReminderStatus.completed) return;
     
     _timer = Timer.periodic(const Duration(seconds: 1), (timer) {
       if (mounted) {
@@ -80,9 +86,12 @@ class _ReminderCountdownWidgetState extends ConsumerState<ReminderCountdownWidge
       return const SizedBox.shrink();
     }
     
-    if (widget.taken) {
+    if (widget.status == ReminderStatus.completed) {
       return const SizedBox.shrink();
     }
+    
+    final currentDose = widget.dosesTaken + 1;
+    final prefix = widget.totalDoses > 1 ? 'Dose $currentDose/${widget.totalDoses} - ' : '';
 
     if (_remaining.isNegative) {
       return ScaleTransition(
@@ -101,7 +110,7 @@ class _ReminderCountdownWidgetState extends ConsumerState<ReminderCountdownWidge
               Icon(Icons.alarm_on, color: Colors.red[500], size: 14),
               const SizedBox(width: 4),
               Text(
-                ref.t('dueNow'),
+                '$prefix${ref.t('dueNow')}',
                 style: AppTextStyles.micro(isDark: isDark).copyWith(
                   color: isDark ? Colors.red[300] : Colors.red[700],
                   fontWeight: FontWeight.bold,
@@ -141,7 +150,7 @@ class _ReminderCountdownWidgetState extends ConsumerState<ReminderCountdownWidge
           const SizedBox(width: 4),
           Flexible(
             child: Text(
-              displayString,
+              '$prefix$displayString',
               style: AppTextStyles.micro(isDark: isDark).copyWith(
                 color: AppColors.primary,
                 fontWeight: FontWeight.w700,

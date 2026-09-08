@@ -13,13 +13,15 @@ class UsernameService {
 
   // ── Validation ─────────────────────────────────────────────────
 
-  /// Username rules: 3-20 chars, letters/digits/underscores only, no spaces
+  /// Username rules: 2-30 chars, allow letters (uppercase & lowercase), numbers,
+  /// accents, underscores, dots, hyphens and special characters. No spaces or slashes.
   static String? validate(String username) {
-    if (username.isEmpty) return 'Nom d\'utilisateur requis';
-    if (username.length < 3) return 'Minimum 3 caractères';
-    if (username.length > 20) return 'Maximum 20 caractères';
-    if (!RegExp(r'^[a-zA-Z0-9_]+$').hasMatch(username)) {
-      return 'Lettres, chiffres et _ uniquement';
+    final clean = username.startsWith('@') ? username.substring(1).trim() : username.trim();
+    if (clean.isEmpty) return 'Nom d\'utilisateur requis';
+    if (clean.length < 2) return 'Le nom d\'utilisateur doit contenir au moins 2 caractères.';
+    if (clean.length > 30) return 'Le nom d\'utilisateur ne doit pas dépasser 30 caractères.';
+    if (clean.contains(' ') || clean.contains('/') || clean.contains('\\')) {
+      return 'Le nom d\'utilisateur ne doit pas contenir d\'espaces ni de barres obliques.';
     }
     return null;
   }
@@ -33,7 +35,8 @@ class UsernameService {
     required String uid,
     required String email,
   }) async {
-    final key = username.toLowerCase().trim();
+    final rawKey = username.startsWith('@') ? username.substring(1).trim() : username.trim();
+    final key = rawKey.toLowerCase();
     final ref = _db.collection(_collection).doc(key);
 
     try {
@@ -43,7 +46,7 @@ class UsernameService {
         tx.set(ref, {
           'uid': uid,
           'email': email,
-          'username': key,
+          'username': rawKey, // store with original casing
           'created_at': FieldValue.serverTimestamp(),
         });
       });
@@ -60,7 +63,8 @@ class UsernameService {
   /// Returns the email associated with a username, or null if not found.
   Future<String?> lookupEmail(String username) async {
     try {
-      final key = username.toLowerCase().trim();
+      final rawKey = username.startsWith('@') ? username.substring(1).trim() : username.trim();
+      final key = rawKey.toLowerCase();
       final doc = await _db.collection(_collection).doc(key).get();
       if (!doc.exists) return null;
       return doc.data()?['email'] as String?;
@@ -70,11 +74,24 @@ class UsernameService {
     }
   }
 
+  /// Returns the username associated with a user UID, or null if not found.
+  Future<String?> lookupUsernameByUid(String uid) async {
+    try {
+      final snap = await _db.collection(_collection).where('uid', isEqualTo: uid).limit(1).get();
+      if (snap.docs.isEmpty) return null;
+      return snap.docs.first.data()['username'] as String?;
+    } catch (e) {
+      debugPrint('UsernameService.lookupUsernameByUid error: $e');
+      return null;
+    }
+  }
+
   // ── Check availability ─────────────────────────────────────────
 
   Future<bool> isAvailable(String username) async {
     try {
-      final key = username.toLowerCase().trim();
+      final rawKey = username.startsWith('@') ? username.substring(1) : username;
+      final key = rawKey.toLowerCase().trim();
       final doc = await _db.collection(_collection).doc(key).get();
       return !doc.exists;
     } catch (e) {
@@ -86,9 +103,10 @@ class UsernameService {
 
   Future<void> releaseUsername(String username) async {
     try {
+      final rawKey = username.startsWith('@') ? username.substring(1) : username;
       await _db
           .collection(_collection)
-          .doc(username.toLowerCase().trim())
+          .doc(rawKey.toLowerCase().trim())
           .delete();
     } catch (e) {
       debugPrint('UsernameService.releaseUsername error: $e');
