@@ -69,6 +69,7 @@ dependencies:
   permission_handler: ^12.0.3
   uuid: ^4.4.0
   intl: ^0.20.3
+  in_app_review: ^2.0.9
 
   # UI & Animations
   flutter_markdown: ^0.7.3

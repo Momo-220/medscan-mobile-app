@@ -394,5 +394,16 @@
   "alreadyNewConversation": "Zaten yeni bir sohbettesiniz",
   "refreshHistory": "Geçmişi yenile",
   "chatWithMedication": "İlacınızla sohbet edin",
-  "medicationChatPrompt": "Merhaba Dr. Sarah, bu ilaç hakkında temel bilgileri verir misiniz: {name} (kullanım amacı, standart dozaj ve önlemler)?"
+  "medicationChatPrompt": "Merhaba Dr. Sarah, bu ilaç hakkında temel bilgileri verir misiniz: {name} (kullanım amacı, standart dozaj ve önlemler)?",
+  "ratingTitle": "MedScan'i beğendiniz mi?",
+  "ratingSubtitle": "Görüşleriniz uygulamayı geliştirmemize ve diğer hastalara yardımcı olmamıza çok katkı sağlar.",
+  "ratingStorePromptTitle": "Güveniniz için teşekkürler! ⭐",
+  "ratingStorePromptSubtitle": "Mağazada değerlendirme bırakmak için 10 saniyenizi ayırın. Bize çok büyük destek olur!",
+  "ratingRateOnStore": "Mağazada Puanla",
+  "ratingFeedbackTitle": "Gelişmemize yardımcı olun",
+  "ratingFeedbackSubtitle": "Deneyiminizi mükemmel kılmak için ne yapabiliriz?",
+  "ratingFeedbackPlaceholder": "Neyin eksik olduğunu veya neyin geliştirilebileceğini bize iletin...",
+  "ratingSendFeedback": "Geri Bildirimi Gönder",
+  "ratingFeedbackThanks": "Geri bildiriminiz için çok teşekkürler!",
+  "ratingLater": "Daha sonra"
 }

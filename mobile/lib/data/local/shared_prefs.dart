@@ -15,6 +15,9 @@ class SharedPrefsService {
   static const String _keyAvatarCompleted = 'mediscan_avatar_completed';
   static const String _keyPharmacyCachePrefix = 'pharmacy_cache_';
   static const String _keyChatCachePrefix = 'chat_cache_';
+  static const String _keySuccessfulScansCount = 'medscan_successful_scans_count';
+  static const String _keyHasRatedApp = 'medscan_has_rated_app';
+  static const String _keyLastRatingPromptTimestamp = 'medscan_last_rating_prompt_ts';
 
   // Theme
   String getTheme() {
@@ -130,6 +133,36 @@ class SharedPrefsService {
 
   Future<void> setCreditsCache(String userId, int credits) async {
     await _prefs.setInt('credits_cache_$userId', credits);
+  }
+
+  // In-App Review / Rating Tracking
+  int getSuccessfulScansCount() {
+    return _prefs.getInt(_keySuccessfulScansCount) ?? 0;
+  }
+
+  Future<void> incrementSuccessfulScansCount() async {
+    final current = getSuccessfulScansCount();
+    await _prefs.setInt(_keySuccessfulScansCount, current + 1);
+  }
+
+  Future<void> setSuccessfulScansCount(int count) async {
+    await _prefs.setInt(_keySuccessfulScansCount, count);
+  }
+
+  bool hasRatedApp() {
+    return _prefs.getBool(_keyHasRatedApp) ?? false;
+  }
+
+  Future<void> setHasRatedApp(bool rated) async {
+    await _prefs.setBool(_keyHasRatedApp, rated);
+  }
+
+  int? getLastRatingPromptTimestamp() {
+    return _prefs.getInt(_keyLastRatingPromptTimestamp);
+  }
+
+  Future<void> setLastRatingPromptTimestamp(int timestamp) async {
+    await _prefs.setInt(_keyLastRatingPromptTimestamp, timestamp);
   }
 
   // Generic Getters/Setters

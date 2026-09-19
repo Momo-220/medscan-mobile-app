@@ -20,6 +20,9 @@ import '../providers/suggestions_provider.dart';
 import '../../../core/di/providers.dart';
 import '../../home/screens/widgets/medication_reminders.dart';
 import '../../chat/providers/chat_provider.dart';
+import '../../history/providers/pharmacy_provider.dart';
+import '../../../shared/services/review_service.dart';
+import '../../../shared/widgets/rating_dialog.dart';
 
 class ScanResultPage extends ConsumerStatefulWidget {
   final Map<String, dynamic> scanData;
@@ -46,6 +49,7 @@ class _ScanResultPageState extends ConsumerState<ScanResultPage> {
     _resolveImagePath();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _fetchTranslatedDetails();
+      _checkAndPromptReview();
     });
   }
 
@@ -53,6 +57,27 @@ class _ScanResultPageState extends ConsumerState<ScanResultPage> {
   void dispose() {
     _carouselController.dispose();
     super.dispose();
+  }
+
+  Future<void> _checkAndPromptReview() async {
+    try {
+      final reviewService = ref.read(reviewServiceProvider);
+      await reviewService.onScanSuccessful();
+
+      final pharmacyScans = ref.read(pharmacyProvider).allScans;
+      final shouldPrompt = reviewService.shouldPromptForReview(
+        existingPharmacyCount: pharmacyScans.length,
+      );
+
+      if (shouldPrompt && mounted) {
+        await Future.delayed(const Duration(milliseconds: 2500));
+        if (mounted) {
+          RatingDialog.show(context);
+        }
+      }
+    } catch (e) {
+      debugPrint('🚨 Review prompt check error: $e');
+    }
   }
 
   Future<void> _fetchTranslatedDetails() async {

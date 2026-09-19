@@ -394,5 +394,16 @@
   "alreadyNewConversation": "You are already on a new conversation",
   "refreshHistory": "Refresh history",
   "chatWithMedication": "Chat with your medication",
-  "medicationChatPrompt": "Hello Dr. Sarah, could you please give me key information about this medication: {name} (indications, dosage, and precautions)?"
+  "medicationChatPrompt": "Hello Dr. Sarah, could you please give me key information about this medication: {name} (indications, dosage, and precautions)?",
+  "ratingTitle": "Enjoying MedScan?",
+  "ratingSubtitle": "Your feedback helps us improve the app and assist other patients.",
+  "ratingStorePromptTitle": "Thank you for your trust! ⭐",
+  "ratingStorePromptSubtitle": "Take 10 seconds to leave a review on the store. It helps us tremendously!",
+  "ratingRateOnStore": "Rate on the Store",
+  "ratingFeedbackTitle": "Help us improve",
+  "ratingFeedbackSubtitle": "What can we do to make your experience perfect?",
+  "ratingFeedbackPlaceholder": "Tell us what's missing or could be improved...",
+  "ratingSendFeedback": "Send feedback",
+  "ratingFeedbackThanks": "Thank you so much for your feedback!",
+  "ratingLater": "Later"
 }

@@ -394,5 +394,16 @@
   "alreadyNewConversation": "Vous êtes déjà sur une nouvelle conversation",
   "refreshHistory": "Rafraîchir l'historique",
   "chatWithMedication": "Chatter avec votre médicament",
-  "medicationChatPrompt": "Bonjour Dr. Sarah, pouvez-vous me donner les informations essentielles sur ce médicament : {name} (indications, posologie et précautions) ?"
+  "medicationChatPrompt": "Bonjour Dr. Sarah, pouvez-vous me donner les informations essentielles sur ce médicament : {name} (indications, posologie et précautions) ?",
+  "ratingTitle": "Vous aimez MedScan ?",
+  "ratingSubtitle": "Votre avis nous aide énormément à améliorer l'application et aider d'autres patients.",
+  "ratingStorePromptTitle": "Merci pour votre confiance ! ⭐",
+  "ratingStorePromptSubtitle": "Prenez 10 secondes pour laisser une note sur le store. Cela nous soutient énormément !",
+  "ratingRateOnStore": "Noter sur le store",
+  "ratingFeedbackTitle": "Aidez-nous à nous améliorer",
+  "ratingFeedbackSubtitle": "Que pouvons-nous faire pour que votre expérience soit parfaite ?",
+  "ratingFeedbackPlaceholder": "Dites-nous ce qui manque ou ce qui pourrait être amélioré...",
+  "ratingSendFeedback": "Envoyer mon avis",
+  "ratingFeedbackThanks": "Merci beaucoup pour votre retour !",
+  "ratingLater": "Plus tard"
 }

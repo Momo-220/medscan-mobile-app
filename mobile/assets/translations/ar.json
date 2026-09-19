@@ -392,5 +392,16 @@
   "alreadyNewConversation": "أنت بالفعل في محادثة جديدة",
   "refreshHistory": "تحديث السجل",
   "chatWithMedication": "تحدث مع دوائك",
-  "medicationChatPrompt": "مرحباً د. سارة، هل يمكنك تزويدي بالمعلومات الأساسية حول هذا الدواء: {name} (دواعي الاستعمال، الجرعة المعتادة والاحتياطات)؟"
+  "medicationChatPrompt": "مرحباً د. سارة، هل يمكنك تزويدي بالمعلومات الأساسية حول هذا الدواء: {name} (دواعي الاستعمال، الجرعة المعتادة والاحتياطات)؟",
+  "ratingTitle": "هل يعجبك ميدسكان؟",
+  "ratingSubtitle": "رأيك يساعدنا كثيراً في تحسين التطبيق ومساعدة مرضى آخرين.",
+  "ratingStorePromptTitle": "شكراً لثقتك بنا! ⭐",
+  "ratingStorePromptSubtitle": "خصص 10 ثوانٍ لترك تقييم على المتجر. هذا يدعمنا كثيراً!",
+  "ratingRateOnStore": "التقييم على المتجر",
+  "ratingFeedbackTitle": "ساعدنا على التحسين",
+  "ratingFeedbackSubtitle": "ما الذي يمكننا فعله لتكون تجربتك مثالية؟",
+  "ratingFeedbackPlaceholder": "أخبرنا بما ينقص أو ما يمكن تحسينه...",
+  "ratingSendFeedback": "إرسال الملاحظات",
+  "ratingFeedbackThanks": "شكراً جزيلاً على ملاحظاتك!",
+  "ratingLater": "لاحقاً"
 }
