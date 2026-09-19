@@ -21,10 +21,16 @@ security = HTTPBearer(auto_error=False)
 
 
 def _get_client_ip(request: Request) -> str:
-    """Extract client IP from request."""
+    """Extract real client IP from request.
+    
+    Reads the LAST entry in X-Forwarded-For, which is set by the trusted
+    reverse proxy (Render). The first entries can be spoofed by the client.
+    Falls back to the direct connection IP.
+    """
     forwarded = request.headers.get("X-Forwarded-For")
     if forwarded:
-        return forwarded.split(",")[0].strip()
+        ips = [ip.strip() for ip in forwarded.split(",")]
+        return ips[-1] if ips else ""
     return request.client.host if request.client else ""
 
 

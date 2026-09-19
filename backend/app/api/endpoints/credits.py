@@ -53,23 +53,38 @@ async def add_credits(
 ) -> CreditsResponse:
     """
     Add credits to the current user.
+    ⚠️ ADMIN ONLY — restricted to the configured ADMIN_EMAIL.
     Body: { "amount": 10 }
     """
+    from app.config import settings
+
+    # Security: only the admin can add credits
+    user_email = user.get("email", "").strip().lower()
+    is_admin = bool(
+        user.get("is_admin")
+        or (user_email and user_email == settings.ADMIN_EMAIL.strip().lower())
+    )
+    if not is_admin:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Réservé à l'administrateur",
+        )
+
     user_id = user["uid"]
-    
+
     try:
         body = await http_request.json()
         amount = body.get("amount")
-        
-        if not amount or not isinstance(amount, int) or amount <= 0:
+
+        if not amount or not isinstance(amount, int) or amount <= 0 or amount > 10000:
             raise HTTPException(
                 status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-                detail="Le champ 'amount' doit être un entier supérieur à 0"
+                detail="Le champ 'amount' doit être un entier entre 1 et 10 000"
             )
-        
+
         is_anonymous = user.get("is_anonymous", False)
         credits = credits_service.add_credits(user_id, amount, is_anonymous)
-        logger.info("Credits added", user_id=user_id, amount=amount, total=credits)
+        logger.info("Credits added by admin", admin=user_id, amount=amount, total=credits)
         return CreditsResponse(credits=credits, next_reset_at=None if is_anonymous else _next_reset_utc())
     except HTTPException:
         raise

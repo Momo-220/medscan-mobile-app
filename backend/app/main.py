@@ -15,12 +15,13 @@ from typing import Dict
 
 from app.config import settings
 from app.core.logging_config import setup_logging
+from app.core.limiter import limiter
+from app.middleware.security import SecurityHeadersMiddleware
 from app.api.routes import router as api_router
 from app.core.exceptions import MediScanException
 
-# Rate limiting (SlowAPI - compatible async FastAPI)
-from slowapi import Limiter, _rate_limit_exceeded_handler
-from slowapi.util import get_remote_address
+# Rate limiting handlers
+from slowapi import _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
 
 # Setup structured logging
@@ -116,39 +117,42 @@ app = FastAPI(
 )
 
 # Rate limiting (SlowAPI)
-limiter = Limiter(
-    key_func=get_remote_address,
-    default_limits=[f"{settings.RATE_LIMIT_PER_MINUTE}/minute", f"{settings.RATE_LIMIT_PER_HOUR}/hour"],
-    enabled=True,
-)
 app.state.limiter = limiter
 app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 
 
 # ============================================================================
 # MIDDLEWARE STACK
-# UNIQUEMENT CORSMiddleware + GZip
-# PAS de BaseHTTPMiddleware custom (casse les async dependencies de FastAPI)
 # ============================================================================
 
 app.add_middleware(GZipMiddleware, minimum_size=1000)
+
+# Security headers on every response (X-Frame-Options, HSTS, CSP, etc.)
+app.add_middleware(SecurityHeadersMiddleware)
 
 if settings.is_production:
     app.add_middleware(
         CORSMiddleware,
         allow_origins=settings.cors_origins_list,
         allow_credentials=True,
-        allow_methods=["*"],
-        allow_headers=["*"],
+        allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+        allow_headers=["Authorization", "Content-Type", "X-Request-ID"],
         expose_headers=["X-Request-ID"],
     )
 else:
+    # Dev: still restrict to known local origins (no true wildcard)
     app.add_middleware(
         CORSMiddleware,
-        allow_origins=["*"],
+        allow_origins=[
+            "http://localhost:3001",
+            "http://localhost:3002",
+            "http://localhost:8080",
+            "http://127.0.0.1:3001",
+            "http://127.0.0.1:8080",
+        ],
         allow_credentials=False,
-        allow_methods=["*"],
-        allow_headers=["*"],
+        allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+        allow_headers=["Authorization", "Content-Type", "X-Request-ID"],
         expose_headers=["X-Request-ID"],
     )
 

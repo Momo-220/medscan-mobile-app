@@ -31,10 +31,12 @@ class _TrialOrSignInPageState extends ConsumerState<TrialOrSignInPage> {
       // 0. Crucial: Clean up any previous Firebase or local auth sessions first
       await ref.read(authProvider.notifier).signOut();
 
-      final prefs = ref.read(sharedPrefsServiceProvider);
       final secureStorage = ref.read(secureStorageServiceProvider);
       final client = ref.read(apiClientProvider);
-      final deviceId = prefs.getDeviceId();
+
+      // Use the secure device ID (stored in Keychain/EncryptedSharedPrefs)
+      // to prevent easy bypass of trial limits on rooted devices
+      final deviceId = await secureStorage.getSecureDeviceId();
 
       // 1. Request a trial token from the backend (checks eligibility + registers device)
       final tokenResponse = await client.post('/trial/token', data: {'device_id': deviceId});

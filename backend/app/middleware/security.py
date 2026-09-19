@@ -24,9 +24,16 @@ class SecurityHeadersMiddleware(BaseHTTPMiddleware):
         response.headers["Content-Security-Policy"] = (
             "default-src 'self'; "
             "img-src 'self' data: https:; "
-            "script-src 'self' 'unsafe-inline'; "
-            "style-src 'self' 'unsafe-inline';"
+            "script-src 'self'; "
+            "style-src 'self' 'unsafe-inline'; "
+            "object-src 'none'; "
+            "frame-ancestors 'none';"
         )
+        
+        # Prevent caching sensitive API responses
+        if request.url.path.startswith("/api/"):
+            response.headers["Cache-Control"] = "no-store"
+            response.headers["Pragma"] = "no-cache"
         
         return response
 
