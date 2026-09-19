@@ -1235,18 +1235,29 @@ class _ChatPageState extends ConsumerState<ChatPage>
               ),
               padding: const EdgeInsets.only(left: 20, right: 8),
               child: Row(
+                // Pin icon + send button to the BOTTOM as the text grows
+                crossAxisAlignment: CrossAxisAlignment.end,
                 children: [
-                  Icon(
-                    isConsultation
-                        ? Icons.medical_services_outlined
-                        : Icons.chat_bubble_outline_rounded,
-                    color: accentColor,
-                    size: 20,
+                  // Icon stays vertically centered relative to the bottom row
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: 14),
+                    child: Icon(
+                      isConsultation
+                          ? Icons.medical_services_outlined
+                          : Icons.chat_bubble_outline_rounded,
+                      color: accentColor,
+                      size: 20,
+                    ),
                   ),
                   const SizedBox(width: 10),
                   Expanded(
                     child: TextField(
                       controller: _messageController,
+                      // ── Auto-expanding: starts at 1 line, grows as needed ──
+                      minLines: 1,
+                      maxLines: 5, // max 5 lines, then scrolls
+                      keyboardType: TextInputType.multiline,
+                      textInputAction: TextInputAction.newline,
                       style: AppTextStyles.body(
                               isDark: isDark, fontWeight: FontWeight.w400)
                           .copyWith(fontSize: 15),
@@ -1265,12 +1276,12 @@ class _ChatPageState extends ConsumerState<ChatPage>
                         contentPadding:
                             const EdgeInsets.symmetric(vertical: 14),
                       ),
-                      onSubmitted: (_) => _handleSend(),
+                      // onSubmitted removed: multiline uses the send button
                     ),
                   ),
                   if (_sending)
                     Padding(
-                      padding: const EdgeInsets.all(8.0),
+                      padding: const EdgeInsets.only(bottom: 8, left: 4),
                       child: SizedBox(
                         width: 24,
                         height: 24,
@@ -1282,7 +1293,7 @@ class _ChatPageState extends ConsumerState<ChatPage>
                     GestureDetector(
                       onTap: _handleSend,
                       child: Container(
-                        margin: const EdgeInsets.symmetric(vertical: 6),
+                        margin: const EdgeInsets.only(bottom: 6, top: 6),
                         padding: const EdgeInsets.all(8),
                         decoration: BoxDecoration(
                           gradient: LinearGradient(
