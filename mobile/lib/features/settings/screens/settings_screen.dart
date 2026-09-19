@@ -42,7 +42,7 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
         _notificationsEnabled = granted;
       });
       if (!granted && mounted) {
-        showPillError(context, 'Veuillez activer les notifications dans les paramètres de votre téléphone.');
+        showPillError(context, ref.t('settingsNotificationPermissionError'));
       }
     } else {
       await NotificationService.cancelAll();
@@ -211,11 +211,11 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
                     await user.delete();
                   }
                   if (!mounted) return;
-                  showPillSuccess(context, 'Compte supprimé avec succès.');
+                  showPillSuccess(context, ref.t('accountDeletedSuccess'));
                   context.go('/splash');
                 } catch (e) {
                   if (!mounted) return;
-                  showPillError(context, 'Veuillez vous reconnecter pour supprimer votre compte en toute sécurité.');
+                  showPillError(context, ref.t('reauthRequiredForDelete'));
                 }
               },
               child: Text(
@@ -336,7 +336,7 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Text(
-                              'Authentication',
+                              ref.t('authentication'),
                               style: AppTextStyles.bodyBold(isDark: isDark).copyWith(
                                 fontSize: 17,
                                 color: isDark ? Colors.white : const Color(0xFF1E293B),
@@ -344,7 +344,7 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
                             ),
                             const SizedBox(height: 4),
                             Text(
-                              'Secure your account',
+                              ref.t('secureYourAccount'),
                               style: AppTextStyles.small(isDark: isDark).copyWith(
                                 fontSize: 13,
                                 color: isDark ? AppColors.textMutedDark : const Color(0xFF64748B),
@@ -660,7 +660,7 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
                                 ),
                                 const SizedBox(height: 4),
                                 Text(
-                                  'MedScan Native Mobile',
+                                  ref.t('appSubName'),
                                   style: AppTextStyles.small(isDark: isDark).copyWith(
                                     fontSize: 13,
                                     color: isDark ? AppColors.textMutedDark : const Color(0xFF64748B),

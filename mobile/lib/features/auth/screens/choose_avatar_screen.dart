@@ -121,7 +121,7 @@ class _ChooseAvatarPageState extends ConsumerState<ChooseAvatarPage> {
                           ),
                           const SizedBox(height: 8),
                           Text(
-                            "Personnalise ton profil pour commencer l'aventure",
+                            ref.t('chooseAvatarSubtitle'),
                             style: AppTextStyles.small(
                               color: isDark ? AppColors.textMutedDark : AppColors.textSecondary,
                             ),
@@ -199,7 +199,7 @@ class _ChooseAvatarPageState extends ConsumerState<ChooseAvatarPage> {
                             disabled: _selectedAvatar == null,
                             width: double.infinity,
                             onTap: _handleConfirm,
-                            child: const Text('Continuer'),
+                            child: Text(ref.t('continue')),
                           ),
                         ],
                       ),

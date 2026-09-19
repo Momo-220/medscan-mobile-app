@@ -120,7 +120,7 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(
-            "Les avatars ne sont pas disponibles en mode d'essai. Inscrivez-vous !",
+            ref.t('avatarGuestWarning'),
             style: AppTextStyles.smallBold(isDark: false).copyWith(color: Colors.white),
           ),
           backgroundColor: AppColors.primary,
@@ -270,7 +270,7 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
           title: Text(ref.t('signOut'), style: AppTextStyles.h3(isDark: isDark)),
           content: Text(
-            'Êtes-vous sûr de vouloir vous déconnecter ?',
+            ref.t('confirmLogout'),
             style: AppTextStyles.small(isDark: isDark),
           ),
           actions: [
@@ -555,7 +555,7 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
                           ),
                           const SizedBox(height: 2),
                           Text(
-                            'Notifications, confidentialité, etc.',
+                            ref.t('profileSettingsSubtitle'),
                             style: AppTextStyles.micro(isDark: isDark).copyWith(
                               color: isDark ? AppColors.textMutedDark : AppColors.textSecondary,
                             ),

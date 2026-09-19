@@ -67,7 +67,7 @@ void showAddEditReminderDialog(
                   const SizedBox(height: 6),
                   CustomInput(
                     controller: nameController,
-                    hintText: 'Ex: Paracétamol',
+                    hintText: ref.t('medicationNameHint'),
                   ),
                   const SizedBox(height: 16),
 
@@ -76,7 +76,7 @@ void showAddEditReminderDialog(
                   const SizedBox(height: 6),
                   CustomInput(
                     controller: dosageController,
-                    hintText: 'Ex: 1 comprimé',
+                    hintText: ref.t('dosageHint'),
                   ),
                   const SizedBox(height: 16),
 
@@ -333,7 +333,7 @@ class _MedicationRemindersWidgetState extends ConsumerState<MedicationRemindersW
                 if (context.mounted) Navigator.pop(context);
               },
               child: Text(
-                'Supprimer',
+                ref.t('delete'),
                 style: AppTextStyles.smallBold().copyWith(color: Colors.red[600]),
               ),
             ),
@@ -563,7 +563,7 @@ class _MedicationRemindersWidgetState extends ConsumerState<MedicationRemindersW
                 onTap: () {
                   if (r.status == ReminderStatus.due) {
                     ref.read(remindersProvider.notifier).markTaken(r.id);
-                    showPillSuccess(context, 'Dose marquée comme prise !');
+                    showPillSuccess(context, ref.t('doseMarkedTaken'));
                   }
                 },
                 child: AnimatedContainer(
@@ -594,8 +594,8 @@ class _MedicationRemindersWidgetState extends ConsumerState<MedicationRemindersW
                         const SizedBox(width: 4),
                       Text(
                         r.status == ReminderStatus.completed 
-                            ? 'Terminé' 
-                            : (r.status == ReminderStatus.pending ? 'En attente' : 'Prendre'),
+                            ? ref.t('reminderCompleted') 
+                            : (r.status == ReminderStatus.pending ? ref.t('reminderPending') : ref.t('takeDose')),
                         style: AppTextStyles.smallBold(isDark: isDark).copyWith(
                           color: r.status == ReminderStatus.completed
                               ? Colors.white

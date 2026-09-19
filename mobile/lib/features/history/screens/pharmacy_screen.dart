@@ -177,12 +177,12 @@ class _PharmacyPageState extends ConsumerState<PharmacyPage> {
             ),
             const SizedBox(height: 16),
             Text(
-              'Historique restreint',
+              ref.t('restrictedHistoryTitle'),
               style: AppTextStyles.bodyBold(isDark: isDark),
             ),
             const SizedBox(height: 8),
             Text(
-              'Créez un compte pour archiver vos scans, accéder à votre pharmacie et suivre vos prises.',
+              ref.t('restrictedHistoryDesc'),
               style: AppTextStyles.small(isDark: isDark),
               textAlign: TextAlign.center,
             ),

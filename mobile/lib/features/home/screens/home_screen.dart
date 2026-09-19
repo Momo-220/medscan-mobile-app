@@ -80,7 +80,7 @@ class HomePage extends ConsumerWidget {
                   data: (data) => Column(
                     children: [
                       Text(
-                        '${data.credits} ${ref.read(languageProvider) == 'fr' ? 'Gemmes' : (ref.read(languageProvider) == 'en' ? 'Gems' : (ref.read(languageProvider) == 'tr' ? 'Mücevher' : 'جواهر'))}',
+                        '${data.credits} ${ref.t('gems')}',
                         style: AppTextStyles.displayHero(color: AppColors.primary),
                       ),
                       if (data.nextResetAt != null) ...[

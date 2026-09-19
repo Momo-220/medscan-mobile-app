@@ -846,7 +846,7 @@ class _ScanResultPageState extends ConsumerState<ScanResultPage> {
             ),
             const SizedBox(height: 12),
             Text(
-              "Aucune image disponible",
+              ref.t('noImageAvailable'),
               style: AppTextStyles.small(isDark: isDark).copyWith(
                 color: isDark ? AppColors.textMutedDark : AppColors.textMuted,
               ),

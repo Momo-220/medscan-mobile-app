@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'package:flutter/widgets.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_riverpod/legacy.dart'; // StateNotifier, StateNotifierProvider (Riverpod 3.x legacy)
@@ -63,5 +64,16 @@ final translationsProvider = StateNotifierProvider<TranslationsStateNotifier, Ma
 extension TranslateExtension on WidgetRef {
   String t(String key) {
     return watch(translationsProvider)[key] ?? key;
+  }
+}
+
+extension BuildContextTranslateExtension on BuildContext {
+  String t(String key) {
+    try {
+      final container = ProviderScope.containerOf(this, listen: false);
+      return container.read(translationsProvider)[key] ?? key;
+    } catch (_) {
+      return key;
+    }
   }
 }

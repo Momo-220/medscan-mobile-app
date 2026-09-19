@@ -5,6 +5,7 @@ import 'package:url_launcher/url_launcher.dart';
 import '../../core/constants/colors.dart';
 import '../../core/constants/text_styles.dart';
 import '../../data/models/app_version.dart';
+import '../utils/localization.dart';
 
 class VersionUpdateDialog extends StatelessWidget {
   final AppVersionModel config;
@@ -84,7 +85,7 @@ class VersionUpdateDialog extends StatelessWidget {
 
           // Simple Title
           Text(
-            isForceUpdate ? 'Mise à jour requise' : 'Mise à jour disponible',
+            isForceUpdate ? context.t('updateRequired') : context.t('updateAvailable'),
             style: AppTextStyles.h2(isDark: isDark).copyWith(
               fontWeight: FontWeight.bold,
               fontSize: 19,
@@ -97,8 +98,8 @@ class VersionUpdateDialog extends StatelessWidget {
           // Simple Body text
           Text(
             isForceUpdate
-                ? 'Veuillez mettre à jour MedScan pour pouvoir continuer à utiliser l\'application.'
-                : 'Veuillez mettre à jour votre application MedScan pour bénéficier des dernières améliorations.',
+                ? context.t('forceUpdateMessage')
+                : context.t('optionalUpdateMessage'),
             style: AppTextStyles.small(isDark: isDark).copyWith(
               height: 1.45,
               fontSize: 14,
@@ -124,7 +125,7 @@ class VersionUpdateDialog extends StatelessWidget {
                     ),
                     onPressed: () => Navigator.pop(context),
                     child: Text(
-                      'Plus tard',
+                      context.t('later'),
                       style: AppTextStyles.smallBold(isDark: isDark).copyWith(
                         color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
                         fontSize: 14,
@@ -143,9 +144,9 @@ class VersionUpdateDialog extends StatelessWidget {
                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(50)),
                   ),
                   onPressed: () => _launchStore(context),
-                  child: const Text(
-                    'Mettre à jour',
-                    style: TextStyle(
+                  child: Text(
+                    context.t('updateButton'),
+                    style: const TextStyle(
                       color: Colors.white,
                       fontSize: 14,
                       fontWeight: FontWeight.bold,
@@ -209,7 +210,7 @@ class MaintenanceDialog extends StatelessWidget {
           ),
           const SizedBox(height: 18),
           Text(
-            'Maintenance en cours',
+            context.t('maintenanceTitle'),
             style: AppTextStyles.h2(isDark: isDark).copyWith(fontWeight: FontWeight.bold, fontSize: 19),
             textAlign: TextAlign.center,
           ),
@@ -217,7 +218,7 @@ class MaintenanceDialog extends StatelessWidget {
           Text(
             message.isNotEmpty
                 ? message
-                : 'MedScan est actuellement en cours de maintenance. Veuillez réessayer plus tard.',
+                : context.t('maintenanceDefaultMessage'),
             style: AppTextStyles.small(isDark: isDark).copyWith(
               height: 1.45,
               color: isDark ? Colors.white70 : AppColors.textSecondary,

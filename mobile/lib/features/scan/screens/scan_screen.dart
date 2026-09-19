@@ -149,7 +149,7 @@ class _ScanPageState extends ConsumerState<ScanPage> with SingleTickerProviderSt
                 Text(
                   isAnonymous
                       ? ref.t('trialOrSignInTagline')
-                      : 'Vous avez épuisé vos gemmes quotidiennes. Veuillez patienter jusqu\'à minuit pour votre renouvellement.',
+                      : ref.t('gemsDepletedMessage'),
                   style: AppTextStyles.small(isDark: isDark),
                   textAlign: TextAlign.center,
                 ),
@@ -366,7 +366,7 @@ class _ScanPageState extends ConsumerState<ScanPage> with SingleTickerProviderSt
                       TextButton(
                         onPressed: _cancelScan,
                         child: Text(
-                          'Cancel',
+                          ref.t('cancel'),
                           style: AppTextStyles.smallBold(isDark: isDark).copyWith(
                             color: Colors.red[400],
                           ),

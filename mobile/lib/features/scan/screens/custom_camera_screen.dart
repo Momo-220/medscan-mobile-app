@@ -5,6 +5,7 @@ import 'package:image_picker/image_picker.dart';
 
 import '../../../core/constants/colors.dart';
 import '../../../core/constants/text_styles.dart';
+import '../../../shared/utils/localization.dart';
 
 class CustomCameraPage extends StatefulWidget {
   const CustomCameraPage({super.key});
@@ -185,9 +186,9 @@ class _CustomCameraPageState extends State<CustomCameraPage> with WidgetsBinding
                     color: Colors.black.withOpacity(0.5),
                     borderRadius: BorderRadius.circular(12),
                   ),
-                  child: const Text(
-                    'Scanner de boîte',
-                    style: TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.w600),
+                  child: Text(
+                    context.t('boxScannerTitle'),
+                    style: const TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.w600),
                   ),
                 ),
                 // Flash Toggle Button
@@ -215,9 +216,9 @@ class _CustomCameraPageState extends State<CustomCameraPage> with WidgetsBinding
                   color: Colors.black.withOpacity(0.6),
                   borderRadius: BorderRadius.circular(20),
                 ),
-                child: const Text(
-                  'Cadrez le médicament à l\'intérieur du cadre',
-                  style: TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.w500),
+                child: Text(
+                  context.t('boxScannerInstruction'),
+                  style: const TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.w500),
                   textAlign: TextAlign.center,
                 ),
               ),

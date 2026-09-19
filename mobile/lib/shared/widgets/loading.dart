@@ -1,13 +1,14 @@
 import 'package:flutter/material.dart';
 import '../../core/constants/colors.dart';
 import '../../core/constants/text_styles.dart';
+import '../utils/localization.dart';
 
 class Loading extends StatelessWidget {
-  final String text;
+  final String? text;
 
   const Loading({
     super.key,
-    this.text = 'Chargement...',
+    this.text,
   });
 
   @override
@@ -30,7 +31,7 @@ class Loading extends StatelessWidget {
           ),
           const SizedBox(height: 16),
           Text(
-            text,
+            text ?? context.t('loading'),
             style: AppTextStyles.body(
               color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondary,
               fontWeight: FontWeight.w400,
@@ -125,7 +126,7 @@ class _OrganicWaveLoaderState extends State<OrganicWaveLoader>
           ),
           const SizedBox(height: 8),
           Text(
-            'Cela peut prendre quelques secondes',
+            context.t('loadingSecondsHint'),
             style: AppTextStyles.small(isDark: isDark),
           ),
         ],
