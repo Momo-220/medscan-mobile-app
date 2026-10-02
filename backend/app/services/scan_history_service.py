@@ -49,34 +49,67 @@ class ScanHistoryService:
             ScanHistoryService._cleanup_old_scans(user_id)
 
             now = datetime.utcnow()
-            doc = {
-                "user_id": user_id,
-                "scan_id": scan_id,
-                "medication_name": scan_data.get("medication_name", "Unknown"),
-                "generic_name": scan_data.get("generic_name"),
-                "dosage": scan_data.get("dosage"),
-                "form": scan_data.get("form"),
-                "manufacturer": scan_data.get("manufacturer"),
-                "confidence": scan_data.get("confidence", "low"),
-                "analysis_data": scan_data.get("analysis_data", {}),
-                "warnings": scan_data.get("warnings", []),
-                "contraindications": scan_data.get("contraindications", []),
-                "interactions": scan_data.get("interactions", []),
-                "side_effects": scan_data.get("side_effects", []),
-                "image_url": scan_data.get("image_url"),
-                "packaging_language": scan_data.get("packaging_language", "fr"),
-                "category": scan_data.get("category", "autre"),
-                "created_at": now,
-                "updated_at": now,
-            }
+            
+            # Preserve original date if provided in scan_data (from client or migration)
+            raw_date = scan_data.get("created_at") or scan_data.get("scanned_at")
+            if isinstance(raw_date, str):
+                try:
+                    created_at = datetime.fromisoformat(raw_date.replace("Z", "+00:00"))
+                except Exception:
+                    created_at = now
+            elif isinstance(raw_date, datetime):
+                created_at = raw_date
+            else:
+                created_at = now
+
             existing = coll.find_one({"scan_id": scan_id})
             if existing:
+                # Strictly preserve the original creation date on update!
+                original_created_at = existing.get("created_at") or created_at
+                update_fields = {
+                    "medication_name": scan_data.get("medication_name") or existing.get("medication_name", "Unknown"),
+                    "generic_name": scan_data.get("generic_name") or existing.get("generic_name"),
+                    "dosage": scan_data.get("dosage") or existing.get("dosage"),
+                    "form": scan_data.get("form") or existing.get("form"),
+                    "manufacturer": scan_data.get("manufacturer") or existing.get("manufacturer"),
+                    "confidence": scan_data.get("confidence") or existing.get("confidence", "low"),
+                    "analysis_data": scan_data.get("analysis_data") or existing.get("analysis_data", {}),
+                    "warnings": scan_data.get("warnings") or existing.get("warnings", []),
+                    "contraindications": scan_data.get("contraindications") or existing.get("contraindications", []),
+                    "interactions": scan_data.get("interactions") or existing.get("interactions", []),
+                    "side_effects": scan_data.get("side_effects") or existing.get("side_effects", []),
+                    "image_url": scan_data.get("image_url") or existing.get("image_url"),
+                    "packaging_language": scan_data.get("packaging_language") or existing.get("packaging_language", "fr"),
+                    "category": scan_data.get("category") or existing.get("category", "autre"),
+                    "created_at": original_created_at,
+                    "updated_at": now,
+                }
                 coll.update_one(
                     {"scan_id": scan_id},
-                    {"$set": {**doc, "updated_at": now}},
+                    {"$set": update_fields},
                 )
-                logger.warning("Scan ID already exists, updated", scan_id=scan_id)
+                logger.info("Scan updated while preserving original date", scan_id=scan_id, created_at=original_created_at)
             else:
+                doc = {
+                    "user_id": user_id,
+                    "scan_id": scan_id,
+                    "medication_name": scan_data.get("medication_name", "Unknown"),
+                    "generic_name": scan_data.get("generic_name"),
+                    "dosage": scan_data.get("dosage"),
+                    "form": scan_data.get("form"),
+                    "manufacturer": scan_data.get("manufacturer"),
+                    "confidence": scan_data.get("confidence", "low"),
+                    "analysis_data": scan_data.get("analysis_data", {}),
+                    "warnings": scan_data.get("warnings", []),
+                    "contraindications": scan_data.get("contraindications", []),
+                    "interactions": scan_data.get("interactions", []),
+                    "side_effects": scan_data.get("side_effects", []),
+                    "image_url": scan_data.get("image_url"),
+                    "packaging_language": scan_data.get("packaging_language", "fr"),
+                    "category": scan_data.get("category", "autre"),
+                    "created_at": created_at,
+                    "updated_at": now,
+                }
                 coll.insert_one(doc)
                 logger.info("Scan saved to MongoDB", user_id=user_id, scan_id=scan_id, medication=doc["medication_name"])
             return scan_id
