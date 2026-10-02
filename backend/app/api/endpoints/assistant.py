@@ -266,7 +266,7 @@ async def chat_with_assistant_stream(
     chat_history = []
     if chat_request.include_history:
         try:
-            history_data = await firebase_service.get_chat_history(user_id, limit=20)
+            history_data = await firebase_service.get_chat_history(user_id, limit=6)
             chat_history = [
                 {"role": msg.get("role", "user"), "content": msg.get("content", "")}
                 for msg in history_data

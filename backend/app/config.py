@@ -26,6 +26,14 @@ class Settings(BaseSettings):
     # MongoDB (remplace Cloud SQL + GCS)
     MONGODB_URI: str = "mongodb://localhost:27017"
     
+    # Storage - Cloudflare R2
+    R2_ACCOUNT_ID: Optional[str] = None
+    R2_ACCESS_KEY_ID: Optional[str] = None
+    R2_SECRET_ACCESS_KEY: Optional[str] = None
+    R2_BUCKET_NAME: str = "medscan-scans"
+    R2_PUBLIC_URL: Optional[str] = None
+    R2_ENDPOINT_URL: Optional[str] = None
+    
     # Google Gemini AI
     GEMINI_API_KEY: str
     GEMINI_API_KEY_2: Optional[str] = None
@@ -83,6 +91,15 @@ class Settings(BaseSettings):
     def is_production(self) -> bool:
         """Check if running in production"""
         return self.ENVIRONMENT == "production"
+    
+    @property
+    def r2_endpoint(self) -> Optional[str]:
+        """Compute the R2 S3 endpoint URL"""
+        if self.R2_ENDPOINT_URL:
+            return self.R2_ENDPOINT_URL.rstrip("/")
+        if self.R2_ACCOUNT_ID:
+            return f"https://{self.R2_ACCOUNT_ID}.r2.cloudflarestorage.com"
+        return None
     
     @property
     def cors_origins_list(self) -> List[str]:

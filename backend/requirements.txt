@@ -10,8 +10,9 @@ python-multipart==0.0.6
 google-generativeai==0.3.2
 firebase-admin==6.4.0
 
-# MongoDB
+# MongoDB & Storage
 pymongo[srv]==4.6.1
+boto3==1.34.107
 
 # Database (legacy SQLite pour medication_service - optionnel)
 sqlalchemy==2.0.25
