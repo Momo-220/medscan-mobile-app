@@ -10,6 +10,7 @@ plugins {
 android {
     namespace = "com.seinimomo.medscanapp"
     compileSdk = flutter.compileSdkVersion
+    ndkVersion = "28.2.13676358"
 
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
@@ -48,20 +49,10 @@ android {
                 signingConfig = signingConfigs.getByName("debug")
             }
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
+            ndk {
+                debugSymbolLevel = "none"
+            }
         }
-    }
-
-    packaging {
-        jniLibs {
-            keepDebugSymbols.add("**/*.so")
-            doNotStrip.add("**/*.so")
-        }
-    }
-}
-
-tasks.whenTaskAdded {
-    if (name.startsWith("strip") && name.contains("DebugSymbols", ignoreCase = true)) {
-        enabled = false
     }
 }
 
