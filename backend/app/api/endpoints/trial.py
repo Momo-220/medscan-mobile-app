@@ -69,30 +69,24 @@ async def get_trial_token(body: TrialTokenRequest) -> TrialTokenResponse:
             detail="device_id requis",
         )
 
-    if has_used_trial(body.device_id):
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="trial_already_used",
-        )
-
     # Generate a stable anonymous UID for this device
     uid = f"trial_{uuid.uuid5(uuid.NAMESPACE_DNS, body.device_id).hex}"
 
-    # Register the device
+    # Register or keep device active
     register_trial_device(body.device_id, uid)
 
-    # Issue a JWT signed with the backend secret
+    # Issue a JWT signed with the backend secret with long validity (1 year)
     payload = {
         "uid": uid,
         "is_anonymous": True,
         "is_trial": True,
         "device_id": body.device_id,
-        "exp": datetime.utcnow() + timedelta(days=30),
+        "exp": datetime.utcnow() + timedelta(days=365),
         "iat": datetime.utcnow(),
     }
     token = jwt.encode(payload, settings.JWT_SECRET_KEY, algorithm=settings.JWT_ALGORITHM)
 
-    logger.info("Trial token issued", uid=uid, device_id=body.device_id[:16])
+    logger.info("Trial token issued/renewed", uid=uid, device_id=body.device_id[:16])
     return TrialTokenResponse(token=token, uid=uid)
 
 

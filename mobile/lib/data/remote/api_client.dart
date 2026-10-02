@@ -1,4 +1,3 @@
-import 'dart:io';
 import 'package:dio/dio.dart';
 import 'package:firebase_auth/firebase_auth.dart' as fb;
 import 'package:flutter/foundation.dart';
@@ -83,7 +82,7 @@ class ApiClient {
               try {
                 // Force refresh token
                 final newToken = await fbUser.getIdToken(true);
-                if (newToken != null) {
+                if (newToken != null && newToken.isNotEmpty) {
                   await _secureStorage.setAuthToken(newToken);
                   
                   // Retry the request with the new token
@@ -96,8 +95,33 @@ class ApiClient {
                 }
               } catch (e) {
                 debugPrint('Failed to refresh Firebase token: $e');
+                // Do not clear auth token if it failed due to a temporary network issue
+                return handler.next(error);
+              }
+            } else {
+              // Trial / anonymous user: automatically renew the trial token
+              try {
+                final deviceId = await _secureStorage.getSecureDeviceId();
+                final refreshDio = Dio();
+                refreshDio.options.connectTimeout = const Duration(seconds: 5);
+                final res = await refreshDio.post(
+                  '${ApiConstants.baseUrl}/trial/token',
+                  data: {'device_id': deviceId},
+                  options: Options(headers: {'Content-Type': 'application/json'}),
+                );
+                final String? refreshedToken = res.data?['token'];
+                if (refreshedToken != null && refreshedToken.isNotEmpty) {
+                  await _secureStorage.setAuthToken(refreshedToken);
+                  final options = error.requestOptions;
+                  options.headers['Authorization'] = 'Bearer $refreshedToken';
+                  final retryResponse = await _dio.fetch(options);
+                  return handler.resolve(retryResponse);
+                }
+              } catch (e) {
+                debugPrint('Auto trial token refresh failed: $e');
               }
             }
+            // Only if neither Firebase nor Trial could renew do we clear
             await _secureStorage.clearAuthToken();
           }
 

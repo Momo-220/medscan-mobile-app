@@ -3,7 +3,6 @@ import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_riverpod/legacy.dart'; // StateNotifier, StateNotifierProvider (Riverpod 3.x legacy)
-import 'package:firebase_auth/firebase_auth.dart';
 import 'package:path_provider/path_provider.dart';
 
 import '../../../core/constants/api_constants.dart';
@@ -57,78 +56,74 @@ class PharmacyNotifier extends StateNotifier<PharmacyState> {
       : _client = _ref.read(apiClientProvider),
         _storage = _ref.read(secureStorageServiceProvider),
         super(PharmacyState(allScans: [], filteredScans: [])) {
-    _syncAuthState();
+    _ref.listen(firebaseAuthStateProvider, (previous, next) {
+      final user = next.value;
+      if (user != null) {
+        _migrateTrialScansIfAny(user.uid);
+        _loadCacheAndFetch(user.uid);
+      } else {
+        _syncUnauthenticatedState();
+      }
+    }, fireImmediately: true);
   }
 
-  void _syncAuthState() async {
-    final user = _ref.read(firebaseAuthStateProvider).value;
-    final token = await _storage.getAuthToken();
-    if (!mounted) return;
-    
-    if (user != null) {
-      final oldUser = _ref.read(firebaseAuthStateProvider).value;
-      if (oldUser != null && oldUser.isAnonymous && !user.isAnonymous) {
-        _migrateAnonymousScans(oldUser.uid, user.uid);
-      } else {
-        _loadCacheAndFetch(user.uid);
+  void _syncUnauthenticatedState() {
+    state = PharmacyState(allScans: [], filteredScans: []);
+  }
+
+  /// Migrates ONLY anonymous/guest trial scans (if any) to the newly authenticated user.
+  /// Never touches or reads scans belonging to any other user account on this device.
+  void _migrateTrialScansIfAny(String targetUid) async {
+    try {
+      final prefs = _ref.read(sharedPrefsServiceProvider);
+      final trialScans = prefs.getTrialScans();
+      if (trialScans.isEmpty) return;
+
+      final targetCacheJson = prefs.getPharmacyCache(targetUid);
+      List<dynamic> targetList = [];
+      if (targetCacheJson != null && targetCacheJson.isNotEmpty) {
+        try {
+          targetList = json.decode(targetCacheJson);
+        } catch (_) {}
       }
-    } else if (token != null && token.isNotEmpty) {
-      _loadCacheAndFetch('trial');
-    } else {
-      state = PharmacyState(allScans: [], filteredScans: []);
+
+      final Map<String, dynamic> combinedMap = {};
+      for (var item in targetList) {
+        final scanId = item['scanId'] ?? item['id'] ?? item['scan_id'];
+        if (scanId != null) combinedMap[scanId.toString()] = item;
+      }
+      for (var item in trialScans) {
+        final scanId = item['scanId'] ?? item['id'] ?? item['scan_id'];
+        if (scanId != null) combinedMap[scanId.toString()] = item;
+      }
+
+      final combinedList = combinedMap.values.toList();
+      await prefs.setPharmacyCache(targetUid, json.encode(combinedList));
+
+      // Clear trial scans immediately so they are never migrated again or to another account
+      await prefs.clearTrialScans();
+
+      // Sync migrated trial scans to backend MongoDB under targetUid
+      final client = _ref.read(apiClientProvider);
+      for (var item in trialScans) {
+        try {
+          await client.post('/history/migrate', data: item);
+        } catch (_) {}
+      }
+    } catch (e) {
+      debugPrint('Trial scan migration error: $e');
     }
   }
 
-  void _migrateAnonymousScans(String anonUid, String targetUid) async {
-    try {
-      final prefs = _ref.read(sharedPrefsServiceProvider);
-      final anonCacheJson = prefs.getPharmacyCache(anonUid);
-      if (anonCacheJson != null && anonCacheJson.isNotEmpty) {
-        final List<dynamic> anonList = json.decode(anonCacheJson);
-        if (anonList.isNotEmpty) {
-          List<dynamic> targetList = [];
-          final targetCacheJson = prefs.getPharmacyCache(targetUid);
-          if (targetCacheJson != null && targetCacheJson.isNotEmpty) {
-            try {
-              targetList = json.decode(targetCacheJson);
-            } catch (_) {}
-          }
-
-          // Merge lists keeping unique scanIds
-          final Map<String, dynamic> combinedMap = {};
-          for (var item in targetList) {
-            final scanId = item['scanId'] ?? item['id'] ?? item['scan_id'];
-            if (scanId != null) combinedMap[scanId.toString()] = item;
-          }
-          for (var item in anonList) {
-            final scanId = item['scanId'] ?? item['id'] ?? item['scan_id'];
-            if (scanId != null) combinedMap[scanId.toString()] = item;
-          }
-
-          final combinedList = combinedMap.values.toList();
-          await prefs.setPharmacyCache(targetUid, json.encode(combinedList));
-          final lang = _ref.read(languageProvider);
-          await prefs.setPharmacyCacheLanguage(targetUid, lang);
-          
-          // Also sync to backend so the new user account permanently stores these scans in MongoDB
-          final client = _ref.read(apiClientProvider);
-          for (var item in anonList) {
-            try {
-              await client.post('/history/migrate', data: item);
-            } catch (_) {}
-          }
-        }
-      }
-    } catch (_) {}
-    // Load fresh target user scans (will include the migrated ones since we synced them above)
-    _loadCacheAndFetch(targetUid);
-  }
-
   void _loadCacheAndFetch(String userId) async {
-    // 1. Load local cache first (offline support)
+    // Immediately clear in-memory state so previous user's data does not linger
+    state = PharmacyState(allScans: [], filteredScans: [], loading: true);
+
+    // 1. Load local cache first strictly for this user (offline support & immediate display)
     final prefs = _ref.read(sharedPrefsServiceProvider);
-    final cacheJson = prefs.getPharmacyCache(userId);
-    if (cacheJson != null) {
+    final String? cacheJson = prefs.getPharmacyCache(userId);
+
+    if (cacheJson != null && cacheJson.isNotEmpty) {
       try {
         final List<dynamic> list = json.decode(cacheJson);
         final cachedScans = list.map((e) => RecentScan.fromJson(e)).toList();
@@ -162,11 +157,6 @@ class PharmacyNotifier extends StateNotifier<PharmacyState> {
           }
         }
 
-        state = PharmacyState(
-          allScans: cachedScans,
-          filteredScans: cachedScans,
-        );
-
         final appDir = await getApplicationDocumentsDirectory();
         if (!mounted) return;
         final resolvedScans = cachedScans.map<RecentScan>((scan) {
@@ -178,9 +168,13 @@ class PharmacyNotifier extends StateNotifier<PharmacyState> {
           return scan;
         }).toList();
 
+        // Sort descending: most recent first
+        resolvedScans.sort((a, b) => b.scannedAt.compareTo(a.scannedAt));
+
         state = PharmacyState(
           allScans: resolvedScans,
           filteredScans: resolvedScans,
+          loading: false,
         );
         _applyFilters();
       } catch (_) {}
@@ -231,13 +225,51 @@ class PharmacyNotifier extends StateNotifier<PharmacyState> {
         return scan;
       }).toList();
 
+      // 3. Merge backend scans strictly with this user's local cache so offline scans are preserved
+      final prefs = _ref.read(sharedPrefsServiceProvider);
+      final userCacheJson = prefs.getPharmacyCache(userId);
+      List<RecentScan> userLocalScans = [];
+      if (userCacheJson != null && userCacheJson.isNotEmpty) {
+        try {
+          final List<dynamic> localDecoded = json.decode(userCacheJson);
+          userLocalScans = localDecoded.map((e) => RecentScan.fromJson(e)).toList();
+        } catch (_) {}
+      }
+
+      final Map<String, RecentScan> mergedMap = {};
+      for (final localScan in userLocalScans) {
+        mergedMap[localScan.scanId] = localScan;
+      }
+      for (final backendScan in resolvedScans) {
+        if (mergedMap.containsKey(backendScan.scanId)) {
+          final local = mergedMap[backendScan.scanId]!;
+          final earliestScannedAt = local.scannedAt.isBefore(backendScan.scannedAt)
+              ? local.scannedAt
+              : backendScan.scannedAt;
+          mergedMap[backendScan.scanId] = backendScan.copyWith(scannedAt: earliestScannedAt);
+        } else {
+          mergedMap[backendScan.scanId] = backendScan;
+        }
+      }
+      final mergedList = mergedMap.values.toList();
+      mergedList.sort((a, b) => b.scannedAt.compareTo(a.scannedAt));
+
+      // Auto-sync any user local-only scans to MongoDB backend in background
+      for (final scan in userLocalScans) {
+        if (!list.any((b) => (b.scanId == scan.scanId || b.id == scan.id))) {
+          try {
+            _client.post('/history/migrate', data: scan.toJson());
+          } catch (_) {}
+        }
+      }
+
       if (mounted) {
         state = state.copyWith(
-          allScans: resolvedScans,
-          filteredScans: resolvedScans,
+          allScans: mergedList,
+          filteredScans: mergedList,
           loading: false,
         );
-        _saveCache(userId, resolvedScans);
+        _saveCache(userId, mergedList);
         _applyFilters();
       }
     } catch (e) {
@@ -280,7 +312,7 @@ class PharmacyNotifier extends StateNotifier<PharmacyState> {
           .toList();
     }
 
-    // Apply search search query filter
+    // Apply search query filter
     if (state.searchQuery.isNotEmpty) {
       final query = state.searchQuery.toLowerCase();
       filtered = filtered.where((s) {
@@ -290,6 +322,9 @@ class PharmacyNotifier extends StateNotifier<PharmacyState> {
         return matchesName || matchesGeneric || matchesCategory;
       }).toList();
     }
+
+    // STRICT SORTING: Always from most recent to oldest
+    filtered.sort((a, b) => b.scannedAt.compareTo(a.scannedAt));
 
     state = state.copyWith(filteredScans: filtered);
   }

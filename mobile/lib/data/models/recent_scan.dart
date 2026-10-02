@@ -73,8 +73,12 @@ class RecentScan {
       imageUrl: json['image_url'] as String?,
       confidence: _parseStringOrList(json['confidence']) ?? 'medium',
       scannedAt: json['scanned_at'] != null 
-          ? DateTime.parse(json['scanned_at'] as String) 
-          : DateTime.now(),
+          ? (DateTime.tryParse(json['scanned_at'].toString()) ?? DateTime.now())
+          : (json['created_at'] != null 
+              ? (DateTime.tryParse(json['created_at'].toString()) ?? DateTime.now())
+              : (json['scannedAt'] != null 
+                  ? (DateTime.tryParse(json['scannedAt'].toString()) ?? DateTime.now())
+                  : DateTime.now())),
       analysisData: json['analysis_data'] as Map<String, dynamic>?,
       warnings: _parseUnionList(json['warnings']),
       contraindications: _parseUnionList(json['contraindications']),

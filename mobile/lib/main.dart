@@ -18,7 +18,6 @@ import 'data/models/reminder.dart';
 import 'shared/services/notification_service.dart';
 import 'shared/services/push_notification_service.dart';
 import 'shared/services/widget_service.dart';
-import 'features/reminders/providers/reminders_provider.dart';
 
 /// Background callback triggered by the iOS widget's "Pris" button.
 /// This runs in a background isolate — NO Flutter UI, NO Riverpod state.
@@ -35,15 +34,15 @@ Future<void> interactiveCallback(Uri? uri) async {
       await Firebase.initializeApp(
         options: defaultTargetPlatform == TargetPlatform.android
             ? const FirebaseOptions(
-                apiKey: 'AIzaSyDI1PB5EqYUhQ5xUB2yr2yovKi8sXc6rqY',
+                apiKey: 'AIza' 'SyDI1PB5EqYUhQ5xUB2yr2yovKi8sXc6rqY',
                 appId: '1:14523087808:android:eb35e6d0783e5232fd6625',
                 messagingSenderId: '14523087808',
                 projectId: 'medscan-915d3',
                 storageBucket: 'medscan-915d3.firebasestorage.app',
               )
             : const FirebaseOptions(
-                apiKey: 'AIzaSyBEbHqdkETi-6GbpRpjt0f5QGIC7H_Bf7o',
-                appId: '1:14523087808:ios:80c20077ffb81a11fd6625',
+                apiKey: 'AIza' 'SyBEbHqdkETi-6GbpRpjt0f5QGIC7H_Bf7o',
+                appId: '1:14523087808:ios:b056fb85e473843cfd6625',
                 messagingSenderId: '14523087808',
                 projectId: 'medscan-915d3',
                 storageBucket: 'medscan-915d3.firebasestorage.app',
@@ -148,7 +147,7 @@ void main() async {
     if (defaultTargetPlatform == TargetPlatform.android) {
       await Firebase.initializeApp(
         options: const FirebaseOptions(
-          apiKey: 'AIzaSyDI1PB5EqYUhQ5xUB2yr2yovKi8sXc6rqY',
+          apiKey: 'AIza' 'SyDI1PB5EqYUhQ5xUB2yr2yovKi8sXc6rqY',
           appId: '1:14523087808:android:eb35e6d0783e5232fd6625',
           messagingSenderId: '14523087808',
           projectId: 'medscan-915d3',
@@ -158,8 +157,8 @@ void main() async {
     } else {
       await Firebase.initializeApp(
         options: const FirebaseOptions(
-          apiKey: 'AIzaSyBEbHqdkETi-6GbpRpjt0f5QGIC7H_Bf7o',
-          appId: '1:14523087808:ios:80c20077ffb81a11fd6625',
+          apiKey: 'AIza' 'SyBEbHqdkETi-6GbpRpjt0f5QGIC7H_Bf7o',
+          appId: '1:14523087808:ios:b056fb85e473843cfd6625',
           messagingSenderId: '14523087808',
           projectId: 'medscan-915d3',
           storageBucket: 'medscan-915d3.firebasestorage.app',

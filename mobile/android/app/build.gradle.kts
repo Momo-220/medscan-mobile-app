@@ -19,8 +19,6 @@ android {
 
     defaultConfig {
         applicationId = "com.seinimomo.medscanapp"
-        // You can update the following values to match your application needs.
-        // For more information, see: https://flutter.dev/to/review-gradle-config.
         minSdk = flutter.minSdkVersion
         targetSdk = flutter.targetSdkVersion
         versionCode = flutter.versionCode
@@ -50,9 +48,6 @@ android {
                 signingConfig = signingConfigs.getByName("debug")
             }
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
-            ndk {
-                debugSymbolLevel = "none"
-            }
         }
     }
 
@@ -61,6 +56,12 @@ android {
             keepDebugSymbols.add("**/*.so")
             doNotStrip.add("**/*.so")
         }
+    }
+}
+
+tasks.whenTaskAdded {
+    if (name.startsWith("strip") && name.contains("DebugSymbols", ignoreCase = true)) {
+        enabled = false
     }
 }
 

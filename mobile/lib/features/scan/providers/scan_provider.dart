@@ -217,12 +217,16 @@ class ScanNotifier extends StateNotifier<ScanState> {
       } catch (_) {}
 
       final scanResponseRaw = response.data;
-      // Override imageUrl with local path
-      scanResponseRaw['image_url'] = finalLocalImagePath;
+      final serverImageUrl = scanResponseRaw['image_url'];
+      // Prioritize persistent server image URL so images are never lost on updates or reinstallation
+      final String persistentImageUrl = (serverImageUrl != null && serverImageUrl.toString().isNotEmpty)
+          ? serverImageUrl.toString()
+          : finalLocalImagePath;
+      scanResponseRaw['image_url'] = persistentImageUrl;
 
       final scanResponse = ScanResponse.fromJson(scanResponseRaw);
       
-      // 2. Save to local pharmacy history cache immediately (using phone local storage instead of MongoDB)
+      // 2. Save to local pharmacy history cache immediately
       final user = FirebaseAuth.instance.currentUser;
       if (user != null) {
         final prefs = _ref.read(sharedPrefsServiceProvider);
@@ -245,7 +249,7 @@ class ScanNotifier extends StateNotifier<ScanState> {
           category: scanResponse.category,
           manufacturer: scanResponse.manufacturer,
           packagingLanguage: scanResponse.packagingLanguage,
-          imageUrl: finalLocalImagePath,
+          imageUrl: persistentImageUrl,
           confidence: scanResponse.confidence,
           scannedAt: DateTime.now(),
           analysisData: scanResponse.toJson(), // save full scan response to JSON analysisData

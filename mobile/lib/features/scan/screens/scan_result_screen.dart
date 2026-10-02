@@ -10,6 +10,7 @@ import 'package:path_provider/path_provider.dart';
 import '../../../core/constants/colors.dart';
 import '../../../core/constants/text_styles.dart';
 import '../../../core/constants/api_constants.dart';
+import '../../../core/widgets/responsive_layout.dart';
 import '../../../data/models/scan_response.dart';
 import '../../../shared/utils/localization.dart';
 import '../../../shared/widgets/card.dart';
@@ -375,14 +376,14 @@ class _ScanResultPageState extends ConsumerState<ScanResultPage> {
         ),
         centerTitle: false,
       ),
-      bottomNavigationBar: const CustomNavigationBar(currentPath: '/pharmacy'),
       body: SafeArea(
         child: SingleChildScrollView(
           padding: const EdgeInsets.all(16.0),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              // 1. Medication Image Card (matching layout)
+          child: ResponsiveContainer(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // 1. Medication Image Card (matching layout)
               Center(
                 child: Container(
                   width: double.infinity,
@@ -823,13 +824,14 @@ class _ScanResultPageState extends ConsumerState<ScanResultPage> {
                 explicitSources: scan.sources,
                 isAiResponse: true,
               ),
-              // Generous bottom spacer to scroll above CustomNavigationBar
-              const SizedBox(height: 120),
+              // Generous bottom spacer for scrolling
+              const SizedBox(height: 48),
             ],
           ),
         ),
       ),
-    );
+    ),
+  );
   }
 
   Widget _buildNoImagePlaceholder(bool isDark) {

@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:uuid/uuid.dart';
 
@@ -13,6 +14,7 @@ class SharedPrefsService {
   static const String _keyLocalName = 'mediscan_user_name';
   static const String _keyLocalUsername = 'mediscan_user_username';
   static const String _keyAvatarCompleted = 'mediscan_avatar_completed';
+  static const String _keyLocalAvatar = 'mediscan_user_avatar';
   static const String _keyPharmacyCachePrefix = 'pharmacy_cache_';
   static const String _keyChatCachePrefix = 'chat_cache_';
   static const String _keySuccessfulScansCount = 'medscan_successful_scans_count';
@@ -53,6 +55,19 @@ class SharedPrefsService {
 
   Future<void> setAvatarCompleted(bool completed) async {
     await _prefs.setBool(_keyAvatarCompleted, completed);
+  }
+
+  // Local Avatar (for instant and resilient avatar access across app)
+  String? getLocalAvatar() {
+    return _prefs.getString(_keyLocalAvatar);
+  }
+
+  Future<void> setLocalAvatar(String avatarPath) async {
+    await _prefs.setString(_keyLocalAvatar, avatarPath);
+  }
+
+  Future<void> clearLocalAvatar() async {
+    await _prefs.remove(_keyLocalAvatar);
   }
 
   // Local Name (for Trial/Anonymous User)
@@ -174,13 +189,33 @@ class SharedPrefsService {
     await _prefs.setString(key, value);
   }
 
-  // Clear Preferences on Logout
+  // Clear Preferences on Logout — NEVER delete pharmacy scans cache
   Future<void> clearUserSession(String userId) async {
-    await _prefs.remove('$_keyPharmacyCachePrefix$userId');
+    // We intentionally KEEP pharmacy_cache_$userId so offline medical scans are NEVER lost!
     await _prefs.remove('$_keyChatCachePrefix$userId');
     await _prefs.remove('reminders_cache_$userId');
     await _prefs.remove('credits_cache_$userId');
     await _prefs.remove(_keyAvatarCompleted);
-    // Keep theme, language, deviceId, onboarding
+    await _prefs.remove(_keyLocalAvatar);
+    // Keep theme, language, deviceId, onboarding, and pharmacy scan history!
+  }
+
+  /// Retrieves scans saved during anonymous/guest trial mode ONLY.
+  /// Strictly prevents cross-account data leakage.
+  List<dynamic> getTrialScans() {
+    final cacheStr = _prefs.getString('$_keyPharmacyCachePrefix' 'trial');
+    if (cacheStr != null && cacheStr.isNotEmpty) {
+      try {
+        final decoded = json.decode(cacheStr);
+        if (decoded is List) return decoded;
+      } catch (_) {}
+    }
+    return [];
+  }
+
+  /// Clears anonymous trial scans after migration to a user account.
+  Future<void> clearTrialScans() async {
+    await _prefs.remove('$_keyPharmacyCachePrefix' 'trial');
+    await _prefs.remove('pharmacy_cache_language_trial');
   }
 }

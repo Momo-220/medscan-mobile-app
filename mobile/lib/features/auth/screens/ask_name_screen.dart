@@ -4,7 +4,7 @@ import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 import '../../../core/constants/colors.dart';
-import '../../../core/constants/text_styles.dart';
+import '../../../core/widgets/responsive_layout.dart';
 import '../../../core/di/providers.dart';
 import '../../../shared/utils/localization.dart';
 import '../../../shared/widgets/button.dart';
@@ -45,6 +45,7 @@ class _AskNamePageState extends ConsumerState<AskNamePage> {
 
     final prefs = ref.read(sharedPrefsServiceProvider);
     await prefs.setLocalName(trimmed);
+    await prefs.setOnboardingCompleted(true);
     await WidgetService.syncWidget();
     
     if (mounted) {
@@ -69,11 +70,13 @@ class _AskNamePageState extends ConsumerState<AskNamePage> {
         child: Center(
           child: SingleChildScrollView(
             padding: const EdgeInsets.symmetric(horizontal: 32.0, vertical: 24.0),
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              crossAxisAlignment: CrossAxisAlignment.center,
-              children: [
-                // Logo Container
+            child: ResponsiveContainer(
+              maxWidth: 480,
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                crossAxisAlignment: CrossAxisAlignment.center,
+                children: [
+                  // Logo Container
                 Container(
                   width: 80,
                   height: 80,
@@ -159,6 +162,7 @@ class _AskNamePageState extends ConsumerState<AskNamePage> {
           ),
         ),
       ),
-    );
+    ),
+  );
   }
 }

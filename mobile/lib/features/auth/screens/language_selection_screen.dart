@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 
 import '../../../core/constants/colors.dart';
 import '../../../core/constants/text_styles.dart';
+import '../../../core/widgets/responsive_layout.dart';
 import '../../../shared/utils/localization.dart';
 import '../../../shared/widgets/card.dart';
 
@@ -60,11 +61,13 @@ class LanguageSelectionPage extends ConsumerWidget {
             child: Center(
               child: SingleChildScrollView(
                 padding: const EdgeInsets.symmetric(horizontal: 24.0, vertical: 16.0),
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  crossAxisAlignment: CrossAxisAlignment.center,
-                  children: [
-                    // Elevated Logo Container
+                child: ResponsiveContainer(
+                  maxWidth: 480,
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    crossAxisAlignment: CrossAxisAlignment.center,
+                    children: [
+                      // Elevated Logo Container
                     Container(
                       width: 80,
                       height: 80,
@@ -160,6 +163,7 @@ class LanguageSelectionPage extends ConsumerWidget {
               ),
             ),
           ),
+        ),
         ],
       ),
     );

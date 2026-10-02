@@ -189,21 +189,26 @@ class _OnboardingPageState extends ConsumerState<OnboardingPage> {
                     // Text Details
                     Positioned(
                       top: topPadding + screenH * 0.20 + 155,
-                      left: 32,
-                      right: 32,
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.center,
-                        children: [
-                          _buildRichTitle(ref.t(titleKey), context),
-                          const SizedBox(height: 16),
-                          Text(
-                            ref.t(descKey),
-                            style: AppTextStyles.body(
-                              color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondary,
-                            ).copyWith(fontSize: 15, height: 1.5),
-                            textAlign: TextAlign.center,
+                      left: 24,
+                      right: 24,
+                      child: Center(
+                        child: ConstrainedBox(
+                          constraints: const BoxConstraints(maxWidth: 520),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.center,
+                            children: [
+                              _buildRichTitle(ref.t(titleKey), context),
+                              const SizedBox(height: 16),
+                              Text(
+                                ref.t(descKey),
+                                style: AppTextStyles.body(
+                                  color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondary,
+                                ).copyWith(fontSize: 15, height: 1.5),
+                                textAlign: TextAlign.center,
+                              ),
+                            ],
                           ),
-                        ],
+                        ),
                       ),
                     ),
                   ],
@@ -216,7 +221,10 @@ class _OnboardingPageState extends ConsumerState<OnboardingPage> {
               left: 24,
               right: 24,
               bottom: bottomPadding + 32,
-              child: Column(
+              child: Center(
+                child: ConstrainedBox(
+                  constraints: const BoxConstraints(maxWidth: 440),
+                  child: Column(
                 children: [
                   // Pagination Indicator Dots (5 total)
                   Row(
@@ -279,9 +287,11 @@ class _OnboardingPageState extends ConsumerState<OnboardingPage> {
                 ],
               ),
             ),
-          ],
+          ),
         ),
-      ),
-    );
+      ],
+    ),
+  ),
+);
   }
 }

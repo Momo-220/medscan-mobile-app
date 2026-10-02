@@ -5,15 +5,14 @@ import 'package:go_router/go_router.dart';
 
 import '../../../core/constants/colors.dart';
 import '../../../core/constants/text_styles.dart';
+import '../../../core/widgets/responsive_layout.dart';
 import '../../../core/di/providers.dart';
-import '../../../shared/services/notification_service.dart';
 import '../../../shared/services/version_service.dart';
 import '../../../shared/services/widget_service.dart';
 import '../../../shared/services/username_service.dart';
 import '../../../shared/widgets/version_update_dialog.dart';
 import '../../../shared/utils/localization.dart';
 import '../../../shared/widgets/button.dart';
-import '../../../shared/widgets/card.dart';
 import '../providers/credits_provider.dart';
 import '../providers/health_stats_provider.dart';
 import '../providers/recent_scans_provider.dart';
@@ -176,6 +175,10 @@ class HomePage extends ConsumerWidget {
     // Auth & local name / username extraction
     final user = FirebaseAuth.instance.currentUser;
     final prefs = ref.watch(sharedPrefsServiceProvider);
+    final localAvatar = prefs.getLocalAvatar();
+    final String activeAvatar = (user?.photoURL != null && user!.photoURL!.isNotEmpty)
+        ? user.photoURL!
+        : (localAvatar ?? '');
     final localUsername = prefs.getLocalUsername();
     final String greetingName = (localUsername != null && localUsername.isNotEmpty)
         ? (localUsername.startsWith('@') ? localUsername : '@$localUsername')
@@ -186,7 +189,7 @@ class HomePage extends ConsumerWidget {
       WidgetService.syncWidget(
         reminders: remindersList,
         userName: greetingName,
-        avatarId: WidgetService.extractAvatarId(user?.photoURL),
+        avatarId: WidgetService.extractAvatarId(activeAvatar),
         langCode: ref.read(languageProvider),
       );
 
@@ -219,159 +222,161 @@ class HomePage extends ConsumerWidget {
         child: SafeArea(
           child: SingleChildScrollView(
             physics: const AlwaysScrollableScrollPhysics(),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                // Premium Header Section (User info + Gem badge)
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 20.0),
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      // User Info details (Left Side)
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              greeting,
-                              style: AppTextStyles.h1(isDark: isDark).copyWith(
-                                fontSize: 30,
-                                fontWeight: FontWeight.w800,
-                                color: isDark ? Colors.white : const Color(0xFF1E293B),
+            child: ResponsiveContainer(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // Premium Header Section (User info + Gem badge)
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 20.0),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        // User Info details (Left Side)
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                greeting,
+                                style: AppTextStyles.h1(isDark: isDark).copyWith(
+                                  fontSize: 30,
+                                  fontWeight: FontWeight.w800,
+                                  color: isDark ? Colors.white : const Color(0xFF1E293B),
+                                ),
                               ),
-                            ),
-                            const SizedBox(height: 4),
+                              const SizedBox(height: 4),
+                              GestureDetector(
+                                onTap: () => context.push('/profile'),
+                                child: Text(
+                                  greetingName,
+                                  style: AppTextStyles.h2(isDark: isDark).copyWith(
+                                    fontSize: 24,
+                                    fontWeight: FontWeight.bold,
+                                    color: const Color(0xFF9333EA), // Purple color!
+                                  ),
+                                ),
+                              ),
+                              const SizedBox(height: 6),
+                              Text(
+                                ref.t('howDoYouFeel'),
+                                style: AppTextStyles.small(isDark: isDark).copyWith(
+                                  fontSize: 14,
+                                  color: isDark ? AppColors.textMutedDark : AppColors.textSecondary,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        
+                        // Gem badge + Avatar (Right Side)
+                        Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            // Credits Gemme Badge
                             GestureDetector(
-                              onTap: () => context.push('/profile'),
-                              child: Text(
-                                greetingName,
-                                style: AppTextStyles.h2(isDark: isDark).copyWith(
-                                  fontSize: 24,
-                                  fontWeight: FontWeight.bold,
-                                  color: const Color(0xFF9333EA), // Purple color!
+                              onTap: () => _showCreditsDialog(context, ref),
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                                decoration: BoxDecoration(
+                                  gradient: AppColors.gemsBadgeGradient,
+                                  borderRadius: BorderRadius.circular(16),
+                                  border: Border.all(
+                                    color: Colors.yellow[600]!.withOpacity(0.2),
+                                    width: 1,
+                                  ),
+                                ),
+                                child: Row(
+                                  children: [
+                                    const Text('💎', style: TextStyle(fontSize: 16)),
+                                    const SizedBox(width: 6),
+                                    creditsAsync.when(
+                                      loading: () => const SizedBox(
+                                        width: 12,
+                                        height: 12,
+                                        child: CircularProgressIndicator(strokeWidth: 2),
+                                      ),
+                                      error: (_, __) => const Text('0'),
+                                      data: (data) => Text(
+                                        data.credits.toString(),
+                                        style: AppTextStyles.smallBold(
+                                          color: isDark ? AppColors.textPrimaryDark : AppColors.textPrimary,
+                                        ),
+                                      ),
+                                    ),
+                                  ],
                                 ),
                               ),
                             ),
-                            const SizedBox(height: 6),
-                            Text(
-                              ref.t('howDoYouFeel'),
-                              style: AppTextStyles.small(isDark: isDark).copyWith(
-                                fontSize: 14,
-                                color: isDark ? AppColors.textMutedDark : AppColors.textSecondary,
+                            const SizedBox(width: 12),
+                            
+                            // Circular Avatar Frame
+                            GestureDetector(
+                              onTap: () => context.push('/profile'),
+                              child: Container(
+                                width: 48,
+                                height: 48,
+                                decoration: BoxDecoration(
+                                  shape: BoxShape.circle,
+                                  gradient: AppColors.scanButtonGradient,
+                                  border: Border.all(
+                                    color: AppColors.primaryLight.withOpacity(0.5),
+                                    width: 2,
+                                  ),
+                                ),
+                                child: ClipOval(
+                                  child: activeAvatar.isNotEmpty
+                                      ? (activeAvatar.startsWith('http')
+                                          ? Image.network(
+                                              activeAvatar,
+                                              fit: BoxFit.cover,
+                                              errorBuilder: (_, __, ___) => const Icon(
+                                                Icons.person,
+                                                color: Colors.white,
+                                              ),
+                                            )
+                                          : Image.asset(
+                                              activeAvatar,
+                                              fit: BoxFit.cover,
+                                              errorBuilder: (_, __, ___) => const Icon(
+                                                Icons.person,
+                                                color: Colors.white,
+                                              ),
+                                            ))
+                                      : const Icon(
+                                          Icons.person,
+                                          color: Colors.white,
+                                        ),
+                                ),
                               ),
                             ),
                           ],
                         ),
-                      ),
-                      
-                      // Gem badge + Avatar (Right Side)
-                      Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          // Credits Gemme Badge
-                          GestureDetector(
-                            onTap: () => _showCreditsDialog(context, ref),
-                            child: Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                              decoration: BoxDecoration(
-                                gradient: AppColors.gemsBadgeGradient,
-                                borderRadius: BorderRadius.circular(16),
-                                border: Border.all(
-                                  color: Colors.yellow[600]!.withOpacity(0.2),
-                                  width: 1,
-                                ),
-                              ),
-                              child: Row(
-                                children: [
-                                  const Text('💎', style: TextStyle(fontSize: 16)),
-                                  const SizedBox(width: 6),
-                                  creditsAsync.when(
-                                    loading: () => const SizedBox(
-                                      width: 12,
-                                      height: 12,
-                                      child: CircularProgressIndicator(strokeWidth: 2),
-                                    ),
-                                    error: (_, __) => const Text('0'),
-                                    data: (data) => Text(
-                                      data.credits.toString(),
-                                      style: AppTextStyles.smallBold(
-                                        color: isDark ? AppColors.textPrimaryDark : AppColors.textPrimary,
-                                      ),
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                          ),
-                          const SizedBox(width: 12),
-                          
-                          // Circular Avatar Frame
-                          GestureDetector(
-                            onTap: () => context.push('/profile'),
-                            child: Container(
-                              width: 48,
-                              height: 48,
-                              decoration: BoxDecoration(
-                                shape: BoxShape.circle,
-                                gradient: AppColors.scanButtonGradient,
-                                border: Border.all(
-                                  color: AppColors.primaryLight.withOpacity(0.5),
-                                  width: 2,
-                                ),
-                              ),
-                              child: ClipOval(
-                                child: user?.photoURL != null && user!.photoURL!.isNotEmpty
-                                    ? (user.photoURL!.startsWith('http')
-                                        ? Image.network(
-                                            user.photoURL!,
-                                            fit: BoxFit.cover,
-                                            errorBuilder: (_, __, ___) => const Icon(
-                                              Icons.person,
-                                              color: Colors.white,
-                                            ),
-                                          )
-                                        : Image.asset(
-                                            user.photoURL!,
-                                            fit: BoxFit.cover,
-                                            errorBuilder: (_, __, ___) => const Icon(
-                                              Icons.person,
-                                              color: Colors.white,
-                                            ),
-                                          ))
-                                    : const Icon(
-                                        Icons.person,
-                                        color: Colors.white,
-                                      ),
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ],
+                      ],
+                    ),
                   ),
-                ),
-                const SizedBox(height: 12),
+                  const SizedBox(height: 12),
 
-                // Next Reminder & Health Tip Cards
-                const HealthTipsCardWidget(),
-                const SizedBox(height: 24),
+                  // Next Reminder & Health Tip Cards
+                  const HealthTipsCardWidget(),
+                  const SizedBox(height: 24),
 
-                // Health Stats Dashboard
-                const HealthDashboardWidget(),
-                const SizedBox(height: 32),
+                  // Health Stats Dashboard
+                  const HealthDashboardWidget(),
+                  const SizedBox(height: 32),
 
-                // Medication Reminders List
-                const MedicationRemindersWidget(),
-                const SizedBox(height: 32),
+                  // Medication Reminders List
+                  const MedicationRemindersWidget(),
+                  const SizedBox(height: 32),
 
-                // Recent Scans List
-                const RecentScansWidget(),
-                
-                // Bottom spacing margin for floating navigation bar
-                const SizedBox(height: 140),
-              ],
+                  // Recent Scans List
+                  const RecentScansWidget(),
+                  
+                  // Bottom spacing margin for floating navigation bar
+                  SizedBox(height: AppResponsive.bottomBarSpacing(context)),
+                ],
+              ),
             ),
           ),
         ),

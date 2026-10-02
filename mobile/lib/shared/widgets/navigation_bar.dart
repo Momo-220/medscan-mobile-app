@@ -18,101 +18,106 @@ class CustomNavigationBar extends StatelessWidget {
     final bool isPharmacy = currentPath == '/pharmacy' || currentPath == '/history';
     final bool isSettings = currentPath == '/settings';
 
-    final safeAreaBottom = MediaQuery.of(context).padding.bottom;
-    final double bottomMargin = safeAreaBottom > 0 ? safeAreaBottom : 20.0;
+    final safeAreaBottom = MediaQuery.paddingOf(context).bottom;
+    final double bottomMargin = safeAreaBottom > 0 ? safeAreaBottom : 16.0;
 
-    return Padding(
-      padding: EdgeInsets.only(
-        left: 16.0,
-        right: 16.0,
-        bottom: bottomMargin,
-      ),
-      child: Stack(
-        clipBehavior: Clip.none,
-        children: [
-          // The Navigation Bar Container
-          Container(
-            height: 85,
-            decoration: BoxDecoration(
-              color: Theme.of(context).cardColor,
-              borderRadius: BorderRadius.circular(40),
-              boxShadow: [
-                BoxShadow(
-                  color: const Color(0xFF1A3B5D).withOpacity(0.06),
-                  blurRadius: 40,
-                  offset: const Offset(0, 10),
-                ),
-              ],
-            ),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceAround,
-              children: [
-                _buildNavItem(
-                  context: context,
-                  icon: Icons.home_outlined,
-                  activeIcon: Icons.home,
-                  isActive: isHome,
-                  onTap: () => context.go('/home'),
-                ),
-                _buildNavItem(
-                  context: context,
-                  icon: Icons.chat_bubble_outline,
-                  activeIcon: Icons.chat_bubble,
-                  isActive: isChat,
-                  onTap: () => context.go('/chat'),
-                ),
-                // Spacer for the center Scan button
-                const SizedBox(width: 68),
-                _buildNavItem(
-                  context: context,
-                  icon: Icons.local_pharmacy_outlined,
-                  activeIcon: Icons.local_pharmacy,
-                  isActive: isPharmacy,
-                  onTap: () => context.go('/pharmacy'),
-                ),
-                _buildNavItem(
-                  context: context,
-                  icon: Icons.settings_outlined,
-                  activeIcon: Icons.settings,
-                  isActive: isSettings,
-                  onTap: () => context.go('/settings'),
-                ),
-              ],
-            ),
+    return Center(
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 540),
+        child: Padding(
+          padding: EdgeInsets.only(
+            left: 16.0,
+            right: 16.0,
+            bottom: bottomMargin,
           ),
+          child: Stack(
+            clipBehavior: Clip.none,
+            children: [
+              // The Navigation Bar Container
+              Container(
+                height: 85,
+                decoration: BoxDecoration(
+                  color: Theme.of(context).cardColor,
+                  borderRadius: BorderRadius.circular(40),
+                  boxShadow: [
+                    BoxShadow(
+                      color: const Color(0xFF1A3B5D).withOpacity(0.06),
+                      blurRadius: 40,
+                      offset: const Offset(0, 10),
+                    ),
+                  ],
+                ),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceAround,
+                  children: [
+                    _buildNavItem(
+                      context: context,
+                      icon: Icons.home_outlined,
+                      activeIcon: Icons.home,
+                      isActive: isHome,
+                      onTap: () => context.go('/home'),
+                    ),
+                    _buildNavItem(
+                      context: context,
+                      icon: Icons.chat_bubble_outline,
+                      activeIcon: Icons.chat_bubble,
+                      isActive: isChat,
+                      onTap: () => context.go('/chat'),
+                    ),
+                    // Spacer for the center Scan button
+                    const SizedBox(width: 68),
+                    _buildNavItem(
+                      context: context,
+                      icon: Icons.local_pharmacy_outlined,
+                      activeIcon: Icons.local_pharmacy,
+                      isActive: isPharmacy,
+                      onTap: () => context.go('/pharmacy'),
+                    ),
+                    _buildNavItem(
+                      context: context,
+                      icon: Icons.settings_outlined,
+                      activeIcon: Icons.settings,
+                      isActive: isSettings,
+                      onTap: () => context.go('/settings'),
+                    ),
+                  ],
+                ),
+              ),
 
-          // Central FAB Portal Button
-          Positioned(
-            left: 0,
-            right: 0,
-            top: -24,
-            child: Center(
-              child: GestureDetector(
-                onTap: () => context.push('/scan'),
-                child: Container(
-                  width: 68,
-                  height: 68,
-                  decoration: BoxDecoration(
-                    gradient: AppColors.scanButtonGradient,
-                    shape: BoxShape.circle,
-                    boxShadow: [
-                      BoxShadow(
-                        color: AppColors.primary.withOpacity(0.4),
-                        blurRadius: 20,
-                        offset: const Offset(0, 4),
+              // Central FAB Portal Button
+              Positioned(
+                left: 0,
+                right: 0,
+                top: -24,
+                child: Center(
+                  child: GestureDetector(
+                    onTap: () => context.push('/scan'),
+                    child: Container(
+                      width: 68,
+                      height: 68,
+                      decoration: BoxDecoration(
+                        gradient: AppColors.scanButtonGradient,
+                        shape: BoxShape.circle,
+                        boxShadow: [
+                          BoxShadow(
+                            color: AppColors.primary.withOpacity(0.4),
+                            blurRadius: 20,
+                            offset: const Offset(0, 4),
+                          ),
+                        ],
                       ),
-                    ],
-                  ),
-                  child: const Icon(
-                    Icons.add,
-                    color: Colors.white,
-                    size: 32,
+                      child: const Icon(
+                        Icons.add,
+                        color: Colors.white,
+                        size: 32,
+                      ),
+                    ),
                   ),
                 ),
               ),
-            ),
+            ],
           ),
-        ],
+        ),
       ),
     );
   }

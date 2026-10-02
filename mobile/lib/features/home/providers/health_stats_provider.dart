@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_riverpod/legacy.dart'; // StateNotifier, StateNotifierProvider (Riverpod 3.x legacy)
@@ -104,8 +105,17 @@ class HealthStatsNotifier extends StateNotifier<AsyncValue<HealthStats>> {
       }
 
       // === Process Scans ===
-      final List<dynamic> scansJson = historyData['scans'] ?? [];
-      final int scansCount = historyData['count'] ?? 0;
+      List<dynamic> scansJson = historyData['scans'] ?? [];
+      if (scansJson.isEmpty) {
+        final prefs = _ref.read(sharedPrefsServiceProvider);
+        final user = _ref.read(firebaseAuthStateProvider).value;
+        final cacheJson = prefs.getPharmacyCache(user?.uid ?? 'trial');
+        if (cacheJson != null) {
+          try {
+            scansJson = json.decode(cacheJson);
+          } catch (_) {}
+        }
+      }
       
       // Filter scans in the last 7 days
       final now = DateTime.now().toUtc();

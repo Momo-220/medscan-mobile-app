@@ -8,6 +8,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 
 import '../../../core/constants/colors.dart';
 import '../../../core/constants/text_styles.dart';
+import '../../../core/widgets/responsive_layout.dart';
 import '../../../shared/utils/localization.dart';
 import '../../../shared/widgets/card.dart';
 import '../../../shared/widgets/input.dart';
@@ -78,85 +79,89 @@ class _PharmacyPageState extends ConsumerState<PharmacyPage> {
             }
           },
           color: AppColors.primary,
-          child: Column(
-            children: [
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
-                child: CustomInput(
-                  controller: _searchController,
-                  hintText: ref.t('searchMedications'),
-                  icon: Icon(
-                    Icons.search,
-                    color: isDark ? AppColors.textMutedDark : AppColors.textMuted,
-                  ),
-                  onChanged: (val) {
-                    ref.read(pharmacyProvider.notifier).setSearchQuery(val);
-                  },
-                ),
-              ),
-
-              // 1b. Stat Boxes Row
-              _buildStatBoxesRow(context, pharmacyState),
-
-              // 2. Horizontal Categories list
-              if (categories.length > 1) ...[
-                SizedBox(
-                  height: 48,
-                  child: ListView.builder(
-                    scrollDirection: Axis.horizontal,
-                    padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 4.0),
-                    itemCount: categories.length,
-                    itemBuilder: (context, index) {
-                      final cat = categories[index];
-                      final isSelected = pharmacyState.selectedCategory == cat;
-                      final label = cat.isEmpty ? ref.t('allCategories') : cat;
-
-                      return Padding(
-                        padding: const EdgeInsets.only(right: 8.0),
-                        child: ChoiceChip(
-                          label: Text(label),
-                          selected: isSelected,
-                          onSelected: (selected) {
-                            if (selected) {
-                              ref.read(pharmacyProvider.notifier).setCategory(cat);
-                            }
-                          },
-                          selectedColor: AppColors.primary,
-                          backgroundColor: isDark ? AppColors.cardDark : Colors.white,
-                          labelStyle: AppTextStyles.small(
-                            color: isSelected
-                                ? Colors.white
-                                : (isDark ? AppColors.textPrimaryDark : AppColors.textPrimary),
-                            fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
-                          ),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(12),
-                            side: BorderSide(
-                              color: isSelected 
-                                  ? AppColors.primary 
-                                  : (isDark ? Colors.white10 : const Color(0xFFE2E8F0)),
-                            ),
-                          ),
-                          showCheckmark: false,
-                        ),
-                      );
+          child: ResponsiveContainer(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // 1. Search Bar
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
+                  child: CustomInput(
+                    controller: _searchController,
+                    hintText: ref.t('searchMedications'),
+                    icon: Icon(
+                      Icons.search,
+                      color: isDark ? AppColors.textMutedDark : AppColors.textMuted,
+                    ),
+                    onChanged: (value) {
+                      ref.read(pharmacyProvider.notifier).setSearchQuery(value);
                     },
                   ),
                 ),
-                const SizedBox(height: 12),
-              ],
 
-              // 3. Main Results Grid/List
-              Expanded(
-                child: isAnonymous
-                    ? _buildTrialState(isDark)
-                    : (pharmacyState.loading && pharmacyState.filteredScans.isEmpty)
-                        ? _buildSkeletonList()
-                        : pharmacyState.filteredScans.isEmpty
-                            ? _buildEmptyState(isDark)
-                            : _buildScansGrid(pharmacyState.filteredScans, isDark),
-              ),
-            ],
+                // 1b. Stat Boxes Row
+                _buildStatBoxesRow(context, pharmacyState),
+
+                // 2. Categories Horizontal Scroll
+                if (categories.length > 1) ...[
+                  SizedBox(
+                    height: 38,
+                    child: ListView.builder(
+                      scrollDirection: Axis.horizontal,
+                      padding: const EdgeInsets.symmetric(horizontal: 16.0),
+                      itemCount: categories.length,
+                      itemBuilder: (context, index) {
+                        final cat = categories[index];
+                        final isSelected = pharmacyState.selectedCategory == cat;
+                        final label = cat.isEmpty ? ref.t('all') : cat;
+
+                        return Padding(
+                          padding: const EdgeInsets.only(right: 8.0),
+                          child: ChoiceChip(
+                            label: Text(label),
+                            selected: isSelected,
+                            onSelected: (selected) {
+                              if (selected) {
+                                ref.read(pharmacyProvider.notifier).setCategory(cat);
+                              }
+                            },
+                            selectedColor: AppColors.primary,
+                            backgroundColor: isDark ? AppColors.cardDark : Colors.white,
+                            labelStyle: AppTextStyles.small(
+                              color: isSelected
+                                  ? Colors.white
+                                  : (isDark ? AppColors.textPrimaryDark : AppColors.textPrimary),
+                              fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                            ),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12),
+                              side: BorderSide(
+                                color: isSelected 
+                                    ? AppColors.primary 
+                                    : (isDark ? Colors.white10 : const Color(0xFFE2E8F0)),
+                              ),
+                            ),
+                            showCheckmark: false,
+                          ),
+                        );
+                      },
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                ],
+
+                // 3. Main Results Grid/List
+                Expanded(
+                  child: isAnonymous
+                      ? _buildTrialState(isDark)
+                      : (pharmacyState.loading && pharmacyState.filteredScans.isEmpty)
+                          ? _buildSkeletonList(context)
+                          : pharmacyState.filteredScans.isEmpty
+                              ? _buildEmptyState(isDark)
+                              : _buildScansGrid(context, pharmacyState.filteredScans, isDark),
+                ),
+              ],
+            ),
           ),
         ),
       ),
@@ -220,9 +225,14 @@ class _PharmacyPageState extends ConsumerState<PharmacyPage> {
     );
   }
 
-  Widget _buildScansGrid(List<RecentScan> scans, bool isDark) {
+  Widget _buildScansGrid(BuildContext context, List<RecentScan> scans, bool isDark) {
     return ListView.builder(
-      padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
+      padding: EdgeInsets.only(
+        left: 16.0,
+        right: 16.0,
+        top: 8.0,
+        bottom: AppResponsive.bottomBarSpacing(context),
+      ),
       itemCount: scans.length,
       itemBuilder: (context, index) {
         final scan = scans[index];
@@ -361,9 +371,14 @@ class _PharmacyPageState extends ConsumerState<PharmacyPage> {
     );
   }
 
-  Widget _buildSkeletonList() {
+  Widget _buildSkeletonList(BuildContext context) {
     return ListView.builder(
-      padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
+      padding: EdgeInsets.only(
+        left: 16.0,
+        right: 16.0,
+        top: 8.0,
+        bottom: AppResponsive.bottomBarSpacing(context),
+      ),
       itemCount: 4,
       itemBuilder: (context, index) {
         return const Padding(

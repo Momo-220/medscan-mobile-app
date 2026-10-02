@@ -4,12 +4,14 @@ import 'package:go_router/go_router.dart';
 
 import '../../../core/constants/colors.dart';
 import '../../../core/constants/text_styles.dart';
+import '../../../core/widgets/responsive_layout.dart';
 import '../../../shared/utils/localization.dart';
 import '../../../shared/widgets/card.dart';
 import '../../../shared/services/notification_service.dart';
 import '../../../shared/utils/pill_notification.dart';
 import '../../auth/providers/auth_provider.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import '../../../core/di/providers.dart';
 
 class SettingsPage extends ConsumerStatefulWidget {
@@ -207,8 +209,14 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
                 try {
                   final user = FirebaseAuth.instance.currentUser;
                   if (user != null) {
-                    await ref.read(authProvider.notifier).signOut();
+                    final uid = user.uid;
+                    try {
+                      await FirebaseFirestore.instance.collection('users').doc(uid).delete();
+                    } catch (fsErr) {
+                      debugPrint('Error deleting user doc: $fsErr');
+                    }
                     await user.delete();
+                    await ref.read(authProvider.notifier).signOut();
                   }
                   if (!mounted) return;
                   showPillSuccess(context, ref.t('accountDeletedSuccess'));
@@ -249,10 +257,11 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
         child: SingleChildScrollView(
           physics: const AlwaysScrollableScrollPhysics(),
           padding: const EdgeInsets.symmetric(horizontal: 24.0, vertical: 24.0),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              // 1. Settings Header Title & Subtitle
+          child: ResponsiveContainer(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // 1. Settings Header Title & Subtitle
               Text(
                 ref.t('settingsTitle'),
                 style: AppTextStyles.h1(isDark: isDark).copyWith(
@@ -784,12 +793,13 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
                   ],
                 ),
               ),
-              const SizedBox(height: 100),
+              SizedBox(height: AppResponsive.bottomBarSpacing(context)),
             ],
           ),
         ),
       ),
-    );
+    ),
+  );
   }
 
   void _showThemeSelector(BuildContext context) {

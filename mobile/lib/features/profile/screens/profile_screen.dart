@@ -5,6 +5,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 
 import '../../../core/constants/colors.dart';
 import '../../../core/constants/text_styles.dart';
+import '../../../core/widgets/responsive_layout.dart';
 import '../../../core/di/providers.dart';
 import '../../../shared/utils/localization.dart';
 import '../../../shared/widgets/button.dart';
@@ -129,7 +130,10 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
       );
       return;
     }
-    String activeAvatar = user.photoURL ?? '';
+    final localAv = ref.read(sharedPrefsServiceProvider).getLocalAvatar();
+    String activeAvatar = (user.photoURL != null && user.photoURL!.isNotEmpty)
+        ? user.photoURL!
+        : (localAv ?? '');
 
     showDialog(
       context: context,
@@ -227,6 +231,8 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
                                   });
                                 }
                                 try {
+                                  await ref.read(sharedPrefsServiceProvider).setLocalAvatar(activeAvatar);
+                                  await ref.read(sharedPrefsServiceProvider).setAvatarCompleted(true);
                                   await ref.read(authProvider.notifier).updateProfile(photoURL: activeAvatar);
                                   final avatarId = WidgetService.extractAvatarId(activeAvatar);
                                   await WidgetService.syncWidget(
@@ -307,10 +313,27 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
     final prefs = ref.watch(sharedPrefsServiceProvider);
     final displayName = isTrial 
         ? (prefs.getLocalName() ?? 'Essai') 
-        : (user?.displayName ?? 'Utilisateur');
-    final userEmail = isTrial 
-        ? 'Mode Essai' 
-        : (user?.email ?? 'Compte anonyme');
+        : (user.displayName ?? 'Utilisateur');
+    String computeUserEmail() {
+      if (isTrial) return 'Mode Essai';
+
+      // 1. Chercher si un fournisseur (Apple, Google) a transmis un vrai email direct
+      for (final provider in user.providerData) {
+        final pEmail = provider.email;
+        if (pEmail != null && pEmail.isNotEmpty && !pEmail.contains('@privaterelay')) {
+          return pEmail;
+        }
+      }
+
+      final email = user.email ?? '';
+      // 2. Si c'est un relais privé Apple, afficher un libellé sobre et élégant
+      if (email.contains('@privaterelay.appleid.com')) {
+        return 'E-mail privé';
+      }
+      return email.isNotEmpty ? email : 'Compte anonyme';
+    }
+
+    final userEmail = computeUserEmail();
 
     return Scaffold(
       backgroundColor: isDark ? AppColors.backgroundDark : AppColors.background,
@@ -337,10 +360,11 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
       body: SafeArea(
         child: SingleChildScrollView(
           padding: const EdgeInsets.symmetric(horizontal: 20.0, vertical: 12.0),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              // 1. Page Title & Subtitle (Turkish format)
+          child: ResponsiveContainer(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // 1. Page Title & Subtitle (Turkish format)
               Text(
                 ref.t('myProfile'),
                 style: AppTextStyles.h2(isDark: isDark).copyWith(fontWeight: FontWeight.bold),
@@ -375,11 +399,18 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
                                 ),
                               ),
                               child: ClipOval(
-                                child: user?.photoURL != null && user!.photoURL!.isNotEmpty
-                                    ? (user.photoURL!.startsWith('http')
-                                        ? Image.network(user.photoURL!, fit: BoxFit.cover)
-                                        : Image.asset(user.photoURL!, fit: BoxFit.cover))
-                                    : const Icon(Icons.person, color: AppColors.primary, size: 56),
+                                child: () {
+                                  final localAv = ref.watch(sharedPrefsServiceProvider).getLocalAvatar();
+                                  final av = (user?.photoURL != null && user!.photoURL!.isNotEmpty)
+                                      ? user!.photoURL!
+                                      : (localAv ?? '');
+                                  if (av.isNotEmpty) {
+                                    return av.startsWith('http')
+                                        ? Image.network(av, fit: BoxFit.cover)
+                                        : Image.asset(av, fit: BoxFit.cover);
+                                  }
+                                  return const Icon(Icons.person, color: AppColors.primary, size: 56);
+                                }(),
                               ),
                             ),
                             if (!isTrial)
@@ -612,6 +643,7 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
           ),
         ),
       ),
-    );
+    ),
+  );
   }
 }

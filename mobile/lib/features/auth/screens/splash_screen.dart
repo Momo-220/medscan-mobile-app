@@ -23,8 +23,7 @@ class _SplashPageState extends ConsumerState<SplashPage>
   final List<_StarData> _stars = [];
   final Random _random = Random();
   
-  // Phase of the logo animation
-  String _animationPhase = 'pop-in'; // pop-in, visible, pop-out
+
 
   @override
   void initState() {
@@ -66,25 +65,48 @@ class _SplashPageState extends ConsumerState<SplashPage>
     _runSplashLifecycle();
   }
 
+  Future<Map<String, dynamic>> _resolveSession() async {
+    User? user;
+    try {
+      user = FirebaseAuth.instance.currentUser;
+      if (user == null) {
+        user = await FirebaseAuth.instance
+            .authStateChanges()
+            .first
+            .timeout(const Duration(milliseconds: 1500), onTimeout: () => FirebaseAuth.instance.currentUser);
+      }
+    } catch (e) {
+      debugPrint('Firebase Auth check failed: $e');
+    }
+
+    bool hasTrialToken = false;
+    try {
+      final storedToken = await ref.read(secureStorageServiceProvider).getAuthToken();
+      if (storedToken != null && storedToken.isNotEmpty) {
+        hasTrialToken = true;
+      }
+    } catch (e) {
+      debugPrint('Could not read secure storage: $e');
+    }
+
+    return {
+      'user': user,
+      'hasTrialToken': hasTrialToken,
+    };
+  }
+
   Future<void> _runSplashLifecycle() async {
-    // 1. Start pop-in animation
+    // 0. Preload session in parallel while animation plays
+    final sessionFuture = _resolveSession();
+
+    // 1. Pop-in animation (500ms)
     _controller.forward();
-    
-    // 2. Logo visible phase (duration is 5000ms total, first phase is 600ms)
-    await Future.delayed(const Duration(milliseconds: 600));
+    await Future.delayed(const Duration(milliseconds: 500));
+    // 2. Logo visible phase (1400ms)
+    await Future.delayed(const Duration(milliseconds: 1400));
     if (!mounted) return;
-    setState(() {
-      _animationPhase = 'visible';
-    });
 
-    // Wait until it is time to pop out (5000ms - 1200ms = 3800ms)
-    await Future.delayed(const Duration(milliseconds: 3200));
-    if (!mounted) return;
-    setState(() {
-      _animationPhase = 'pop-out';
-    });
-
-    // Reconfigure animation for ease-in pop-out
+    // 3. Pop-out animation (400ms)
     _scaleAnimation = Tween<double>(begin: 1.0, end: 0.0).animate(
       CurvedAnimation(
         parent: _controller,
@@ -97,39 +119,54 @@ class _SplashPageState extends ConsumerState<SplashPage>
         curve: Curves.easeIn,
       ),
     );
-    
     _controller.reverse(from: 1.0);
 
-    await Future.delayed(const Duration(milliseconds: 600));
+    await Future.delayed(const Duration(milliseconds: 400));
     if (!mounted) return;
 
-    // 3. Navigation routing logic based on onboarding and auth status
+    // 4. Retrieve resolved session (already finished in parallel)
+    final session = await sessionFuture;
+    final User? user = session['user'] as User?;
+    final bool hasTrialToken = session['hasTrialToken'] as bool? ?? false;
     final prefs = ref.read(sharedPrefsServiceProvider);
-    final onboardingCompleted = prefs.isOnboardingCompleted();
-    
-    User? user;
-    try {
-      user = FirebaseAuth.instance.currentUser;
-    } catch (e) {
-      debugPrint('Firebase Auth not initialized: $e');
-    }
 
-    // Also check for a stored trial JWT token (trial users don't use Firebase)
-    bool hasTrialToken = false;
-    try {
-      final storedToken = await ref.read(secureStorageServiceProvider).getAuthToken();
-      if (storedToken != null && storedToken.isNotEmpty) {
-        hasTrialToken = true;
+    final isAuthenticated = user != null || hasTrialToken;
+
+    if (isAuthenticated) {
+      // User is already logged in — permanently cement onboarding flag
+      await prefs.setOnboardingCompleted(true);
+
+      // Refresh Firebase token silently in background to keep ApiClient primed
+      if (user != null) {
+        user.getIdToken().then((token) {
+          if (token != null && token.isNotEmpty) {
+            ref.read(secureStorageServiceProvider).setAuthToken(token);
+          }
+        }).catchError((err) {
+          debugPrint('Silent token refresh in splash error: $err');
+        });
       }
-    } catch (e) {
-      debugPrint('Could not read secure storage: $e');
-    }
 
-    if (!onboardingCompleted) {
-      context.go('/language');
-    } else {
-      if (user != null || hasTrialToken) {
+      // Si l'utilisateur est connecté avec un compte réel mais n'a pas encore choisi d'avatar,
+      // on lui propose l'écran des avatars
+      final avatarCompleted = prefs.isAvatarCompleted();
+      final localAvatar = prefs.getLocalAvatar();
+      final hasAvatar = (localAvatar != null && localAvatar.isNotEmpty) ||
+          (user?.photoURL != null && user!.photoURL!.contains('avatar'));
+
+      if (!mounted) return;
+
+      if (user != null && !hasTrialToken && (!avatarCompleted || !hasAvatar)) {
+        context.go('/choose-avatar');
+      } else {
         context.go('/home');
+      }
+    } else {
+      if (!mounted) return;
+      // User has no active session: check onboarding
+      final onboardingCompleted = prefs.isOnboardingCompleted();
+      if (!onboardingCompleted) {
+        context.go('/language');
       } else {
         context.go('/auth');
       }

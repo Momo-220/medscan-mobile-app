@@ -1,3 +1,4 @@
+import 'dart:io';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -6,6 +7,7 @@ import 'package:sign_in_with_apple/sign_in_with_apple.dart';
 
 import '../../../core/constants/colors.dart';
 import '../../../core/constants/text_styles.dart';
+import '../../../core/widgets/responsive_layout.dart';
 import '../../../shared/utils/localization.dart';
 import '../../../shared/widgets/button.dart';
 import '../../../shared/widgets/card.dart';
@@ -64,9 +66,15 @@ class _AuthPageState extends ConsumerState<AuthPage> {
     return 1;
   }
 
-  String _getAuthErrorMessage(dynamic err) {
+  String _getAuthErrorMessage(dynamic err, {bool isApple = false, bool isGoogle = false}) {
     if (err is FirebaseAuthException) {
       final code = err.code;
+      if (isApple && (code == 'invalid-credential' || code == 'invalid-user-token' || code == 'operation-not-allowed')) {
+        return ref.t('authErrorAppleFailed');
+      }
+      if (isGoogle && (code == 'invalid-credential' || code == 'operation-not-allowed')) {
+        return ref.t('authErrorGeneric');
+      }
       if (code == 'user-not-found' || code == 'wrong-password' || code == 'invalid-credential') {
         return ref.t('authErrorInvalid');
       }
@@ -224,7 +232,7 @@ class _AuthPageState extends ConsumerState<AuthPage> {
       if (_isLogin) {
         await ref.read(authProvider.notifier).signIn(emailOrUsername, password);
         if (mounted) {
-          context.go('/home');
+          context.go('/choose-avatar');
         }
       } else {
         await ref.read(authProvider.notifier).signUp(
@@ -254,10 +262,10 @@ class _AuthPageState extends ConsumerState<AuthPage> {
     try {
       await ref.read(authProvider.notifier).signInWithGoogle();
       if (mounted) {
-        // If logged in successfully, go home
+        // If logged in successfully, go to choose avatar
         final user = FirebaseAuth.instance.currentUser;
         if (user != null) {
-          context.go('/home');
+          context.go('/choose-avatar');
         } else {
           setState(() {
             _loading = false;
@@ -266,7 +274,7 @@ class _AuthPageState extends ConsumerState<AuthPage> {
       }
     } catch (err) {
       setState(() {
-        _error = _getAuthErrorMessage(err);
+        _error = _getAuthErrorMessage(err, isGoogle: true);
         _loading = false;
       });
     }
@@ -283,14 +291,7 @@ class _AuthPageState extends ConsumerState<AuthPage> {
       if (mounted) {
         final user = FirebaseAuth.instance.currentUser;
         if (user != null) {
-          // Si pas de nom ou nom générique → demander le nom
-          final name = user.displayName ?? '';
-          final needsName = name.isEmpty || name.toLowerCase() == 'user';
-          if (needsName) {
-            context.go('/ask-name');
-          } else {
-            context.go('/home');
-          }
+          context.go('/choose-avatar');
         } else {
           setState(() { _loading = false; });
         }
@@ -305,7 +306,7 @@ class _AuthPageState extends ConsumerState<AuthPage> {
       }
       debugPrint('Apple Sign-In error details: $err');
       setState(() {
-        _error = _getAuthErrorMessage(err);
+        _error = _getAuthErrorMessage(err, isApple: true);
         _loading = false;
       });
     }
@@ -361,11 +362,13 @@ class _AuthPageState extends ConsumerState<AuthPage> {
             child: Center(
               child: SingleChildScrollView(
                 padding: const EdgeInsets.symmetric(horizontal: 24.0, vertical: 16.0),
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  crossAxisAlignment: CrossAxisAlignment.center,
-                  children: [
-                    // Main Form Card
+                child: ResponsiveContainer(
+                  maxWidth: 480,
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    crossAxisAlignment: CrossAxisAlignment.center,
+                    children: [
+                      // Main Form Card
                     AppCard(
                       padding: const EdgeInsets.all(28.0),
                       children: Column(
@@ -692,40 +695,53 @@ class _AuthPageState extends ConsumerState<AuthPage> {
                             ),
                           ),
 
-                          // ── Social Sign-In Row (Apple & Google Side-by-Side) ──
+                          // ── Social Sign-In Row (Apple iOS-only + Google) ──
                           Row(
                             mainAxisAlignment: MainAxisAlignment.center,
                             children: [
-                              // Apple Button
-                              GestureDetector(
-                                onTap: _loading ? null : _handleAppleSignIn,
-                                child: Container(
-                                  width: 56,
-                                  height: 56,
-                                  decoration: BoxDecoration(
-                                    color: isDark ? Colors.white : Colors.black,
-                                    borderRadius: BorderRadius.circular(50),
-                                    boxShadow: isDark
-                                        ? null
-                                        : [
-                                            BoxShadow(
-                                              color: Colors.black.withOpacity(0.08),
-                                              blurRadius: 6,
-                                              offset: const Offset(0, 2),
+                              // Apple Button — iOS only (Apple guideline 4.8)
+                              if (Platform.isIOS) ...[
+                                FutureBuilder<bool>(
+                                  future: SignInWithApple.isAvailable(),
+                                  builder: (context, snapshot) {
+                                    final available = snapshot.data == true;
+                                    if (!available) return const SizedBox.shrink();
+                                    return Row(
+                                      children: [
+                                        GestureDetector(
+                                          onTap: _loading ? null : _handleAppleSignIn,
+                                          child: Container(
+                                            width: 56,
+                                            height: 56,
+                                            decoration: BoxDecoration(
+                                              color: isDark ? Colors.white : Colors.black,
+                                              borderRadius: BorderRadius.circular(50),
+                                              boxShadow: isDark
+                                                  ? null
+                                                  : [
+                                                      BoxShadow(
+                                                        color: Colors.black.withOpacity(0.08),
+                                                        blurRadius: 6,
+                                                        offset: const Offset(0, 2),
+                                                      ),
+                                                    ],
                                             ),
-                                          ],
-                                  ),
-                                  child: Center(
-                                    child: Icon(
-                                      Icons.apple,
-                                      color: isDark ? Colors.black : Colors.white,
-                                      size: 26,
-                                    ),
-                                  ),
+                                            child: Center(
+                                              child: Icon(
+                                                Icons.apple,
+                                                color: isDark ? Colors.black : Colors.white,
+                                                size: 26,
+                                              ),
+                                            ),
+                                          ),
+                                        ),
+                                        const SizedBox(width: 20),
+                                      ],
+                                    );
+                                  },
                                 ),
-                              ),
-                              const SizedBox(width: 20),
-                              // Google Button
+                              ],
+                              // Google Button — all platforms
                               GestureDetector(
                                 onTap: _loading ? null : _handleGoogleSignIn,
                                 child: Container(
@@ -765,6 +781,7 @@ class _AuthPageState extends ConsumerState<AuthPage> {
               ),
             ),
           ),
+        ),
         ],
       ),
     );

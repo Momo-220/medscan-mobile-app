@@ -19,20 +19,26 @@ class RemindersNotifier extends StateNotifier<AsyncValue<List<Reminder>>> {
   RemindersNotifier(this._ref) : super(const AsyncValue.loading()) {
     _ref.listen(firebaseAuthStateProvider, (previous, next) {
       final user = next.value;
-      final userId = user?.uid ?? 'local_user';
-      // Load cached reminders so we sync name + reminders together
-      List<Reminder>? cachedList;
-      try {
-        final prefs = _ref.read(sharedPrefsServiceProvider);
-        final cacheJson = prefs.getRemindersCache(userId);
-        if (cacheJson != null) {
-          final List<dynamic> decoded = json.decode(cacheJson);
-          cachedList = decoded.map((e) => Reminder.fromJson(e)).toList();
-        }
-      } catch (_) {}
-      // Sync widget with BOTH user name and reminders in one atomic call
-      WidgetService.syncWidget(reminders: cachedList, langCode: _ref.read(languageProvider));
-      _loadCacheAndFetch(userId);
+      if (user != null) {
+        final userId = user.uid;
+        // Load cached reminders so we sync name + reminders together
+        List<Reminder>? cachedList;
+        try {
+          final prefs = _ref.read(sharedPrefsServiceProvider);
+          final cacheJson = prefs.getRemindersCache(userId);
+          if (cacheJson != null) {
+            final List<dynamic> decoded = json.decode(cacheJson);
+            cachedList = decoded.map((e) => Reminder.fromJson(e)).toList();
+          }
+        } catch (_) {}
+        // Sync widget with BOTH user name and reminders in one atomic call
+        WidgetService.syncWidget(reminders: cachedList, langCode: _ref.read(languageProvider));
+        _loadCacheAndFetch(userId);
+      } else {
+        NotificationService.cancelAll();
+        WidgetService.clearWidget();
+        state = const AsyncValue.data([]);
+      }
     }, fireImmediately: true);
   }
 

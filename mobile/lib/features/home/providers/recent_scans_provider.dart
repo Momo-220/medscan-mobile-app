@@ -20,15 +20,20 @@ class RecentScansNotifier extends StateNotifier<AsyncValue<List<RecentScan>>> {
       : _client = _ref.read(apiClientProvider),
         _storage = _ref.read(secureStorageServiceProvider),
         super(const AsyncValue.loading()) {
-    _syncAuthState();
+    _ref.listen(firebaseAuthStateProvider, (previous, next) {
+      final user = next.value;
+      if (user != null) {
+        fetchRecentScans();
+      } else {
+        _syncUnauthenticatedState();
+      }
+    }, fireImmediately: true);
   }
 
-  void _syncAuthState() async {
-    final user = _ref.read(firebaseAuthStateProvider).value;
+  void _syncUnauthenticatedState() async {
     final token = await _storage.getAuthToken();
     if (!mounted) return;
-    
-    if (user != null || (token != null && token.isNotEmpty)) {
+    if (token != null && token.isNotEmpty) {
       fetchRecentScans();
     } else {
       state = const AsyncValue.data([]);
@@ -68,6 +73,23 @@ class RecentScansNotifier extends StateNotifier<AsyncValue<List<RecentScan>>> {
         }
         return scan;
       }).toList();
+
+      if (resolvedScans.isEmpty) {
+        // If backend returned empty, check local cache strictly for this user
+        final prefs = _ref.read(sharedPrefsServiceProvider);
+        final user = _ref.read(firebaseAuthStateProvider).value;
+        final cacheJson = prefs.getPharmacyCache(user?.uid ?? 'trial');
+        if (cacheJson != null && cacheJson.isNotEmpty) {
+          try {
+            final List<dynamic> decoded = json.decode(cacheJson);
+            final cachedScans = decoded.map((e) => RecentScan.fromJson(e)).take(3).toList();
+            if (cachedScans.isNotEmpty && mounted) {
+              state = AsyncValue.data(cachedScans);
+              return;
+            }
+          } catch (_) {}
+        }
+      }
 
       if (mounted) {
         state = AsyncValue.data(resolvedScans);

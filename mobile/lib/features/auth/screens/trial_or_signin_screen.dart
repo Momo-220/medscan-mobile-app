@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 
 import '../../../core/constants/colors.dart';
 import '../../../core/constants/text_styles.dart';
+import '../../../core/widgets/responsive_layout.dart';
 import '../../../core/di/providers.dart';
 import '../../../shared/utils/localization.dart';
 import '../../../shared/widgets/button.dart';
@@ -85,11 +86,13 @@ class _TrialOrSignInPageState extends ConsumerState<TrialOrSignInPage> {
         child: Center(
           child: SingleChildScrollView(
             padding: const EdgeInsets.symmetric(horizontal: 32.0, vertical: 24.0),
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              crossAxisAlignment: CrossAxisAlignment.center,
-              children: [
-                // Logo inside modern card frame
+            child: ResponsiveContainer(
+              maxWidth: 480,
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                crossAxisAlignment: CrossAxisAlignment.center,
+                children: [
+                  // Logo inside modern card frame
                 Container(
                   width: 96,
                   height: 96,
@@ -191,6 +194,7 @@ class _TrialOrSignInPageState extends ConsumerState<TrialOrSignInPage> {
           ),
         ),
       ),
-    );
+    ),
+  );
   }
 }

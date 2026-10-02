@@ -6,9 +6,12 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cached_network_image/cached_network_image.dart';
+import 'package:http/http.dart' as http;
 
+import '../../../core/constants/api_constants.dart';
 import '../../../core/constants/colors.dart';
 import '../../../core/constants/text_styles.dart';
+import '../../../core/widgets/responsive_layout.dart';
 import '../../../data/models/chat_message.dart';
 import '../../../shared/utils/localization.dart';
 import '../../../shared/widgets/button.dart';
@@ -31,6 +34,8 @@ class _ChatPageState extends ConsumerState<ChatPage>
     with SingleTickerProviderStateMixin {
   final TextEditingController _messageController = TextEditingController();
   final ScrollController _scrollController = ScrollController();
+  final FocusNode _focusNode = FocusNode();
+  double _inputDragDelta = 0;
   bool _sending = false;
   bool _autoScrollEnabled = true;
   String? _lastInjectedMedication;
@@ -48,11 +53,21 @@ class _ChatPageState extends ConsumerState<ChatPage>
       duration: const Duration(milliseconds: 250),
     );
 
+    // Warm up backend in background to prevent Render cold-start latency
+    _warmUpBackend();
+
     // Inject medication context if navigated from scan result
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _checkMedicationContext();
       _scrollToBottom(animated: false);
     });
+  }
+
+  void _warmUpBackend() {
+    try {
+      final healthUri = Uri.parse(ApiConstants.baseUrl.replaceAll('/api/v1', '') + '/health');
+      http.get(healthUri).timeout(const Duration(seconds: 5)).then((_) {}).catchError((_) {});
+    } catch (_) {}
   }
 
   @override
@@ -89,6 +104,7 @@ class _ChatPageState extends ConsumerState<ChatPage>
 
   @override
   void dispose() {
+    _focusNode.dispose();
     _scrollController.removeListener(_onScroll);
     _messageController.dispose();
     _scrollController.dispose();
@@ -230,6 +246,10 @@ class _ChatPageState extends ConsumerState<ChatPage>
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final chatState = ref.watch(chatProvider);
     final isConsultation = _currentMode() == 'consultation';
+    final isKeyboardOpen = MediaQuery.viewInsetsOf(context).bottom > 0;
+    // Clearance: Nav bar height (85) + central FAB protrusion (24) + generous breathing room (16) = 125.
+    // When keyboard is open, the floating nav bar is automatically hidden by AppShell, so we only need clean padding.
+    final double bottomSpacing = isKeyboardOpen ? 8.0 : 125.0;
 
     // Auto scroll when new streaming chunks arrive
     ref.listen<String>(chatStreamingProvider, (previous, next) {
@@ -245,40 +265,48 @@ class _ChatPageState extends ConsumerState<ChatPage>
         child: Column(
           children: [
             // ── Mode Pill Toggle ─────────────────────────────────────────
-            _buildModeToggle(isDark, isConsultation),
+            ResponsiveContainer(
+              child: _buildModeToggle(isDark, isConsultation),
+            ),
 
             // ── Medical Disclaimer Banner ────────────────────────────────
-            _buildDisclaimerBanner(isDark, isConsultation),
+            ResponsiveContainer(
+              child: _buildDisclaimerBanner(isDark, isConsultation),
+            ),
 
             // ── Messages Area ────────────────────────────────────────────
             Expanded(
-              child: chatState.when(
-                loading: () => isConsultation
-                    ? _buildConsultationWelcome(isDark)
-                    : _buildChatWelcome(isDark),
-                error: (err, stack) => Center(
-                  child: Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 32.0),
-                    child: Text(ref.t('chatError'),
-                        style: AppTextStyles.small(isDark: isDark),
-                        textAlign: TextAlign.center),
+              child: ResponsiveContainer(
+                child: chatState.when(
+                  loading: () => isConsultation
+                      ? _buildConsultationWelcome(isDark)
+                      : _buildChatWelcome(isDark),
+                  error: (err, stack) => Center(
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 32.0),
+                      child: Text(ref.t('chatError'),
+                          style: AppTextStyles.small(isDark: isDark),
+                          textAlign: TextAlign.center),
+                    ),
                   ),
+                  data: (messages) {
+                    if (messages.isEmpty) {
+                      return isConsultation
+                          ? _buildConsultationWelcome(isDark)
+                          : _buildChatWelcome(isDark);
+                    }
+                    return _buildMessageList(isDark, messages);
+                  },
                 ),
-                data: (messages) {
-                  if (messages.isEmpty) {
-                    return isConsultation
-                        ? _buildConsultationWelcome(isDark)
-                        : _buildChatWelcome(isDark);
-                  }
-                  return _buildMessageList(isDark, messages);
-                },
               ),
             ),
 
             // ── Input Bar ────────────────────────────────────────────────
-            _buildInputBar(isDark, isConsultation),
+            ResponsiveContainer(
+              child: _buildInputBar(isDark, isConsultation),
+            ),
 
-            const SizedBox(height: 90),
+            SizedBox(height: bottomSpacing),
           ],
         ),
       ),
@@ -1024,6 +1052,7 @@ class _ChatPageState extends ConsumerState<ChatPage>
   Widget _buildMessageList(bool isDark, List<ChatMessage> messages) {
     return ListView.builder(
       controller: _scrollController,
+      keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
       itemCount: messages.length,
       itemBuilder: (context, index) {
@@ -1187,7 +1216,20 @@ class _ChatPageState extends ConsumerState<ChatPage>
                       final currentUser = FirebaseAuth.instance.currentUser;
                       final avatarPath = currentUser?.photoURL;
                       if (avatarPath != null && avatarPath.isNotEmpty) {
-                        return Image.asset(avatarPath, fit: BoxFit.cover);
+                        if (avatarPath.startsWith('http')) {
+                          return CachedNetworkImage(
+                            imageUrl: avatarPath,
+                            fit: BoxFit.cover,
+                            errorWidget: (_, __, ___) => const Icon(Icons.person,
+                                color: AppColors.primary, size: 18),
+                          );
+                        }
+                        return Image.asset(
+                          avatarPath,
+                          fit: BoxFit.cover,
+                          errorBuilder: (_, __, ___) => const Icon(Icons.person,
+                              color: AppColors.primary, size: 18),
+                        );
                       }
                       return const Icon(Icons.person,
                           color: AppColors.primary, size: 18);
@@ -1210,119 +1252,133 @@ class _ChatPageState extends ConsumerState<ChatPage>
     final hintKey =
         isConsultation ? 'consultationPlaceholder' : 'chatPlaceholder';
 
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 12.0),
-      child: Row(
-        children: [
-          Expanded(
-            child: Container(
-              decoration: BoxDecoration(
-                color: isDark ? AppColors.cardDark : Colors.white,
-                borderRadius: BorderRadius.circular(28),
-                border: Border.all(
-                  color: isDark
-                      ? const Color(0x33FFFFFF)
-                      : const Color(0xFFE2E8F0),
-                  width: 1.5,
+    return GestureDetector(
+      behavior: HitTestBehavior.translucent,
+      onVerticalDragStart: (_) {
+        _inputDragDelta = 0;
+      },
+      onVerticalDragUpdate: (details) {
+        _inputDragDelta += details.delta.dy;
+      },
+      onVerticalDragEnd: (details) {
+        final velocity = details.primaryVelocity ?? 0;
+        // Glisser vers le haut (tirer l'input vers le haut -> ouvrir clavier)
+        if (_inputDragDelta < -15 || velocity < -120) {
+          if (!_focusNode.hasFocus) {
+            _focusNode.requestFocus();
+          }
+        }
+        // Glisser vers le bas (rabaisser l'input -> fermer clavier et montrer navbar)
+        else if (_inputDragDelta > 15 || velocity > 120) {
+          if (_focusNode.hasFocus) {
+            _focusNode.unfocus();
+          }
+        }
+        _inputDragDelta = 0;
+      },
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 6.0),
+        child: Row(
+          children: [
+            Expanded(
+              child: Container(
+                decoration: BoxDecoration(
+                  color: isDark ? AppColors.cardDark : Colors.white,
+                  borderRadius: BorderRadius.circular(28),
+                  border: Border.all(
+                    color: isDark
+                        ? const Color(0x33FFFFFF)
+                        : const Color(0xFFE2E8F0),
+                    width: 1.5,
+                  ),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withOpacity(0.04),
+                      blurRadius: 10,
+                      offset: const Offset(0, 3),
+                    ),
+                  ],
                 ),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withOpacity(0.03),
-                    blurRadius: 10,
-                    offset: const Offset(0, 4),
-                  ),
-                ],
-              ),
-              padding: const EdgeInsets.only(left: 20, right: 8),
-              child: Row(
-                // Pin icon + send button to the BOTTOM as the text grows
-                crossAxisAlignment: CrossAxisAlignment.end,
-                children: [
-                  // Icon stays vertically centered relative to the bottom row
-                  Padding(
-                    padding: const EdgeInsets.only(bottom: 14),
-                    child: Icon(
-                      isConsultation
-                          ? Icons.medical_services_outlined
-                          : Icons.chat_bubble_outline_rounded,
-                      color: accentColor,
-                      size: 20,
-                    ),
-                  ),
-                  const SizedBox(width: 10),
-                  Expanded(
-                    child: TextField(
-                      controller: _messageController,
-                      // ── Auto-expanding: starts at 1 line, grows as needed ──
-                      minLines: 1,
-                      maxLines: 5, // max 5 lines, then scrolls
-                      keyboardType: TextInputType.multiline,
-                      textInputAction: TextInputAction.newline,
-                      style: AppTextStyles.body(
-                              isDark: isDark, fontWeight: FontWeight.w400)
-                          .copyWith(fontSize: 15),
-                      cursorColor: accentColor,
-                      decoration: InputDecoration(
-                        hintText: ref.t(hintKey),
-                        hintStyle: AppTextStyles.small(isDark: isDark).copyWith(
-                          color: isDark
-                              ? AppColors.textMutedDark
-                              : const Color(0xFF94A3B8),
-                        ),
-                        filled: false,
-                        border: InputBorder.none,
-                        enabledBorder: InputBorder.none,
-                        focusedBorder: InputBorder.none,
-                        contentPadding:
-                            const EdgeInsets.symmetric(vertical: 14),
-                      ),
-                      // onSubmitted removed: multiline uses the send button
-                    ),
-                  ),
-                  if (_sending)
+                padding: const EdgeInsets.only(left: 18, right: 6),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.end,
+                  children: [
                     Padding(
-                      padding: const EdgeInsets.only(bottom: 8, left: 4),
-                      child: SizedBox(
-                        width: 24,
-                        height: 24,
-                        child: CircularProgressIndicator(
-                            strokeWidth: 2, color: accentColor),
+                      padding: const EdgeInsets.only(bottom: 12),
+                      child: Icon(
+                        isConsultation
+                            ? Icons.medical_services_outlined
+                            : Icons.chat_bubble_outline_rounded,
+                        color: accentColor,
+                        size: 20,
                       ),
-                    )
-                  else
-                    GestureDetector(
-                      onTap: _handleSend,
-                      child: Container(
-                        margin: const EdgeInsets.only(bottom: 6, top: 6),
-                        padding: const EdgeInsets.all(8),
-                        decoration: BoxDecoration(
-                          gradient: LinearGradient(
-                            colors: isConsultation
-                                ? [
-                                    const Color(0xFF10B981),
-                                    const Color(0xFF059669),
-                                  ]
-                                : [
-                                    const Color(0xFF3B82F6),
-                                    const Color(0xFF6366F1),
-                                  ],
-                            begin: Alignment.topLeft,
-                            end: Alignment.bottomRight,
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: TextField(
+                        controller: _messageController,
+                        focusNode: _focusNode,
+                        minLines: 1,
+                        maxLines: 5,
+                        keyboardType: TextInputType.multiline,
+                        textInputAction: TextInputAction.newline,
+                        style: AppTextStyles.body(
+                                isDark: isDark, fontWeight: FontWeight.w400)
+                            .copyWith(fontSize: 15),
+                        cursorColor: accentColor,
+                        decoration: InputDecoration(
+                          hintText: ref.t(hintKey),
+                          hintStyle: AppTextStyles.small(isDark: isDark).copyWith(
+                            color: isDark
+                                ? AppColors.textMutedDark
+                                : const Color(0xFF94A3B8),
                           ),
-                          shape: BoxShape.circle,
-                        ),
-                        child: const Icon(
-                          Icons.arrow_upward_rounded,
-                          color: Colors.white,
-                          size: 20,
+                          filled: false,
+                          border: InputBorder.none,
+                          enabledBorder: InputBorder.none,
+                          focusedBorder: InputBorder.none,
+                          contentPadding:
+                              const EdgeInsets.symmetric(vertical: 12),
                         ),
                       ),
                     ),
-                ],
+                    Opacity(
+                      opacity: _sending ? 0.4 : 1.0,
+                      child: GestureDetector(
+                        onTap: _sending ? null : _handleSend,
+                        child: Container(
+                          margin: const EdgeInsets.only(bottom: 5, top: 5),
+                          padding: const EdgeInsets.all(8),
+                          decoration: BoxDecoration(
+                            gradient: LinearGradient(
+                              colors: isConsultation
+                                  ? [
+                                      const Color(0xFF10B981),
+                                      const Color(0xFF059669),
+                                    ]
+                                  : [
+                                      const Color(0xFF3B82F6),
+                                      const Color(0xFF6366F1),
+                                    ],
+                              begin: Alignment.topLeft,
+                              end: Alignment.bottomRight,
+                            ),
+                            shape: BoxShape.circle,
+                          ),
+                          child: const Icon(
+                            Icons.arrow_upward_rounded,
+                            color: Colors.white,
+                            size: 18,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
               ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }

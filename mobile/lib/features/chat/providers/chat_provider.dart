@@ -46,14 +46,13 @@ class ChatNotifier extends StateNotifier<AsyncValue<List<ChatMessage>>> {
   static AsyncValue<List<ChatMessage>> _getInitialMessages(Ref ref) {
     try {
       final user = FirebaseAuth.instance.currentUser;
-      if (user != null) {
-        final prefs = ref.read(sharedPrefsServiceProvider);
-        final cacheJson = prefs.getChatCache(user.uid);
-        if (cacheJson != null && cacheJson.isNotEmpty) {
-          final List<dynamic> list = json.decode(cacheJson);
-          final cachedMessages = list.map((e) => ChatMessage.fromJson(e)).toList();
-          return AsyncValue.data(cachedMessages);
-        }
+      final cacheKey = user?.uid ?? 'trial';
+      final prefs = ref.read(sharedPrefsServiceProvider);
+      final cacheJson = prefs.getChatCache(cacheKey);
+      if (cacheJson != null && cacheJson.isNotEmpty) {
+        final List<dynamic> list = json.decode(cacheJson);
+        final cachedMessages = list.map((e) => ChatMessage.fromJson(e)).toList();
+        return AsyncValue.data(cachedMessages);
       }
     } catch (_) {}
     return const AsyncValue.data([]);
@@ -83,14 +82,13 @@ class ChatNotifier extends StateNotifier<AsyncValue<List<ChatMessage>>> {
     _medicationImageUrl = null;
     // Clear streaming state
     _ref.read(chatStreamingProvider.notifier).state = '';
-    // Clear cache for the current user
+    // Clear cache for the current user or trial session
     final user = FirebaseAuth.instance.currentUser;
-    if (user != null) {
-      try {
-        final prefs = _ref.read(sharedPrefsServiceProvider);
-        prefs.setChatCache(user.uid, '[]');
-      } catch (_) {}
-    }
+    final cacheKey = user?.uid ?? 'trial';
+    try {
+      final prefs = _ref.read(sharedPrefsServiceProvider);
+      prefs.setChatCache(cacheKey, '[]');
+    } catch (_) {}
   }
 
   /// Explicitly reload history from backend.
@@ -168,7 +166,9 @@ class ChatNotifier extends StateNotifier<AsyncValue<List<ChatMessage>>> {
 
   Future<void> sendMessage(String text, String languageCode) async {
     final user = FirebaseAuth.instance.currentUser;
-    if (user == null) return;
+    final token = await user?.getIdToken() ??
+        await _ref.read(secureStorageServiceProvider).getAuthToken();
+    if (user == null && (token == null || token.isEmpty)) return;
 
     final currentMessages = state.value ?? [];
     
@@ -188,8 +188,6 @@ class ChatNotifier extends StateNotifier<AsyncValue<List<ChatMessage>>> {
     _ref.read(chatStreamingProvider.notifier).state = '';
 
     try {
-      final token = await user.getIdToken() ?? await _ref.read(secureStorageServiceProvider).getAuthToken();
-      
       final request = http.Request('POST', Uri.parse('${ApiConstants.baseUrl}/assistant/chat/stream'));
       request.headers.addAll({
         'Content-Type': 'application/json',
@@ -219,7 +217,7 @@ class ChatNotifier extends StateNotifier<AsyncValue<List<ChatMessage>>> {
       final response = await client.send(request);
 
       if (response.statusCode != 200) {
-        if (response.statusCode == 402) {
+        if (response.statusCode == 402 || response.statusCode == 403) {
           throw InsufficientCreditsException('INSUFFICIENT_CREDITS');
         }
         throw Exception('Server error: ${response.statusCode}');
@@ -272,7 +270,8 @@ class ChatNotifier extends StateNotifier<AsyncValue<List<ChatMessage>>> {
           timestamp: list[assistantIndex].timestamp,
         );
         state = AsyncValue.data(list);
-        _saveCache(user.uid, list);
+        final cacheKey = user?.uid ?? 'trial';
+        _saveCache(cacheKey, list);
       }
       
       // Clear streaming state

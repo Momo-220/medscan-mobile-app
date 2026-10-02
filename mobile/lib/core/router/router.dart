@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import 'package:firebase_auth/firebase_auth.dart';
 
 import '../../features/auth/screens/ask_name_screen.dart';
 import '../../features/auth/screens/auth_screen.dart';
@@ -29,16 +28,10 @@ final GoRouter _router = GoRouter(
   // Handle deep links from the home screen widget (medscan://home → /home)
   redirect: (context, state) {
     final uri = state.uri;
-    // When opened via medscan:// scheme from the widget, redirect to /home
+    // When opened via medscan:// scheme from the widget, redirect to target path
     if (uri.scheme == 'medscan') {
-      final user = FirebaseAuth.instance.currentUser;
-      if (user == null) {
-        // If the user is logged out, force them to the login screen
-        return '/trial-or-signin';
-      }
-      
       final path = uri.host; // e.g. 'home' from medscan://home
-      return '/$path';
+      return path.isNotEmpty ? '/$path' : '/home';
     }
     return null; // no redirect otherwise
   },
@@ -124,16 +117,19 @@ class AppShell extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isKeyboardOpen = MediaQuery.viewInsetsOf(context).bottom > 0;
     return Scaffold(
+      resizeToAvoidBottomInset: false,
       body: Stack(
         children: [
           Positioned.fill(child: child),
-          Positioned(
-            left: 0,
-            right: 0,
-            bottom: 0,
-            child: CustomNavigationBar(currentPath: currentPath),
-          ),
+          if (!isKeyboardOpen)
+            Positioned(
+              left: 0,
+              right: 0,
+              bottom: 0,
+              child: CustomNavigationBar(currentPath: currentPath),
+            ),
         ],
       ),
     );

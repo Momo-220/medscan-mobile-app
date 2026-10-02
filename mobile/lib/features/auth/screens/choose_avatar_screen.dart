@@ -6,8 +6,9 @@ import 'package:google_fonts/google_fonts.dart';
 
 import '../../../core/constants/colors.dart';
 import '../../../core/constants/text_styles.dart';
+import '../../../core/di/providers.dart';
+import '../../../core/widgets/responsive_layout.dart';
 import '../../../shared/utils/localization.dart';
-import '../../../shared/utils/pill_notification.dart';
 import '../../../shared/services/widget_service.dart';
 import '../../../shared/widgets/button.dart';
 import '../../../shared/widgets/card.dart';
@@ -38,28 +39,60 @@ class _ChooseAvatarPageState extends ConsumerState<ChooseAvatarPage> {
 
   bool _loading = false;
 
+  @override
+  void initState() {
+    super.initState();
+    final prefs = ref.read(sharedPrefsServiceProvider);
+    final localAvatar = prefs.getLocalAvatar();
+    final currentPhoto = FirebaseAuth.instance.currentUser?.photoURL;
+
+    if (localAvatar != null && _avatarPaths.contains(localAvatar)) {
+      _selectedAvatar = localAvatar;
+    } else if (currentPhoto != null && _avatarPaths.contains(currentPhoto)) {
+      _selectedAvatar = currentPhoto;
+    } else {
+      // Pre-select 1st avatar by default so the user is never stuck
+      _selectedAvatar = _avatarPaths.first;
+    }
+  }
+
   Future<void> _handleConfirm() async {
-    if (_selectedAvatar == null) return;
+    final avatarToUse = _selectedAvatar ?? _avatarPaths.first;
 
     setState(() {
       _loading = true;
     });
 
+    // 1. Immediately persist locally (instant and guaranteed)
     try {
-      await ref.read(authProvider.notifier).updateProfile(photoURL: _selectedAvatar);
-      final avatarId = WidgetService.extractAvatarId(_selectedAvatar);
+      final prefs = ref.read(sharedPrefsServiceProvider);
+      await prefs.setLocalAvatar(avatarToUse);
+      await prefs.setAvatarCompleted(true);
+    } catch (e) {
+      debugPrint('Local avatar save error: $e');
+    }
+
+    // 2. Update Firebase Auth / Firestore profile non-blockingly
+    try {
+      await ref.read(authProvider.notifier).updateProfile(photoURL: avatarToUse);
+    } catch (e) {
+      debugPrint('Firebase profile avatar update non-blocking: $e');
+    }
+
+    // 3. Sync home widget non-blockingly
+    try {
+      final avatarId = WidgetService.extractAvatarId(avatarToUse);
       await WidgetService.syncWidget(
         avatarId: avatarId,
         langCode: ref.read(languageProvider),
       );
-      if (mounted) {
-        context.go('/home');
-      }
     } catch (e) {
-      setState(() {
-        _loading = false;
-      });
-      showPillError(context, e.toString());
+      debugPrint('Widget sync non-blocking: $e');
+    }
+
+    // 4. Always navigate to /home smoothly
+    if (mounted) {
+      context.go('/home');
     }
   }
 
@@ -101,11 +134,13 @@ class _ChooseAvatarPageState extends ConsumerState<ChooseAvatarPage> {
             child: Center(
               child: SingleChildScrollView(
                 padding: const EdgeInsets.symmetric(horizontal: 24.0, vertical: 16.0),
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  crossAxisAlignment: CrossAxisAlignment.center,
-                  children: [
-                    AppCard(
+                child: ResponsiveContainer(
+                  maxWidth: 520,
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    crossAxisAlignment: CrossAxisAlignment.center,
+                    children: [
+                      AppCard(
                       padding: const EdgeInsets.all(28.0),
                       children: Column(
                         children: [
@@ -196,7 +231,7 @@ class _ChooseAvatarPageState extends ConsumerState<ChooseAvatarPage> {
                           // Validate Button
                           Button(
                             loading: _loading,
-                            disabled: _selectedAvatar == null,
+                            disabled: false,
                             width: double.infinity,
                             onTap: _handleConfirm,
                             child: Text(ref.t('continue')),
@@ -209,6 +244,7 @@ class _ChooseAvatarPageState extends ConsumerState<ChooseAvatarPage> {
               ),
             ),
           ),
+        ),
         ],
       ),
     );
