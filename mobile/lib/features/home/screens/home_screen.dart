@@ -26,6 +26,7 @@ class HomePage extends ConsumerWidget {
   const HomePage({super.key});
 
   static bool _hasShownVersionDialog = false;
+  static String? _lastSyncedKey;
 
 
   String _getGreeting(String tMorning, String tEvening) {
@@ -202,25 +203,29 @@ class HomePage extends ConsumerWidget {
         ? (localUsername.startsWith('@') ? localUsername : '@$localUsername')
         : (user?.displayName ?? prefs.getLocalName() ?? ref.t('user'));
 
-    WidgetsBinding.instance.addPostFrameCallback((_) async {
-      final remindersList = ref.read(remindersProvider).value;
-      WidgetService.syncWidget(
-        reminders: remindersList,
-        userName: greetingName,
-        avatarId: WidgetService.extractAvatarId(activeAvatar),
-        langCode: ref.read(languageProvider),
-      );
+    final syncKey = '$greetingName-$activeAvatar-${user?.uid}';
+    if (_lastSyncedKey != syncKey) {
+      _lastSyncedKey = syncKey;
+      WidgetsBinding.instance.addPostFrameCallback((_) async {
+        final remindersList = ref.read(remindersProvider).value;
+        WidgetService.syncWidget(
+          reminders: remindersList,
+          userName: greetingName,
+          avatarId: WidgetService.extractAvatarId(activeAvatar),
+          langCode: ref.read(languageProvider),
+        );
 
-      // Asynchronously load username from Firestore if missing locally
-      if ((prefs.getLocalUsername() == null || prefs.getLocalUsername()!.isEmpty) &&
-          user != null &&
-          !user.isAnonymous) {
-        final fetched = await UsernameService().lookupUsernameByUid(user.uid);
-        if (fetched != null && fetched.isNotEmpty) {
-          await prefs.setLocalUsername(fetched);
+        // Asynchronously load username from Firestore if missing locally
+        if ((prefs.getLocalUsername() == null || prefs.getLocalUsername()!.isEmpty) &&
+            user != null &&
+            !user.isAnonymous) {
+          final fetched = await UsernameService().lookupUsernameByUid(user.uid);
+          if (fetched != null && fetched.isNotEmpty) {
+            await prefs.setLocalUsername(fetched);
+          }
         }
-      }
-    });
+      });
+    }
 
     final String greeting = _getGreeting(ref.t('goodMorning'), ref.t('goodEvening'));
     final creditsAsync = ref.watch(creditsProvider);

@@ -198,11 +198,23 @@ void main() async {
     debugPrint('GoogleSignIn initialization failed: $e');
   }
 
-  // Lock device orientation to portrait
-  await SystemChrome.setPreferredOrientations([
-    DeviceOrientation.portraitUp,
-    DeviceOrientation.portraitDown,
-  ]);
+  // Lock device orientation to portrait on phones, allow all orientations on tablets (iPad)
+  final view = WidgetsBinding.instance.platformDispatcher.views.firstOrNull;
+  final isTablet = view != null &&
+      (MediaQueryData.fromView(view).size.shortestSide >= 600);
+  if (!isTablet) {
+    await SystemChrome.setPreferredOrientations([
+      DeviceOrientation.portraitUp,
+      DeviceOrientation.portraitDown,
+    ]);
+  } else {
+    await SystemChrome.setPreferredOrientations([
+      DeviceOrientation.portraitUp,
+      DeviceOrientation.portraitDown,
+      DeviceOrientation.landscapeLeft,
+      DeviceOrientation.landscapeRight,
+    ]);
+  }
 
   runApp(
     ProviderScope(
