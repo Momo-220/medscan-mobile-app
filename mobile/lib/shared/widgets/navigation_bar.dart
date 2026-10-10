@@ -4,10 +4,12 @@ import '../../core/constants/colors.dart';
 
 class CustomNavigationBar extends StatelessWidget {
   final String currentPath;
+  final Widget? mascot;
 
   const CustomNavigationBar({
     super.key,
     required this.currentPath,
+    this.mascot,
   });
 
   @override
@@ -115,6 +117,16 @@ class CustomNavigationBar extends StatelessWidget {
                   ),
                 ),
               ),
+
+              // Mascot (e.g. Cat sitting on top of the navbar pill)
+              if (mascot != null)
+                Positioned(
+                  left: 8,
+                  bottom: 58,
+                  child: IgnorePointer(
+                    child: mascot!,
+                  ),
+                ),
             ],
           ),
         ),

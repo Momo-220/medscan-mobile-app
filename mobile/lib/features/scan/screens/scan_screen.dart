@@ -608,41 +608,28 @@ class _ScanPageState extends ConsumerState<ScanPage> with SingleTickerProviderSt
           ),
         ),
 
-          // 🐱 Cat Lottie Animation Sitting on top of the Navigation Bar
-          Builder(
-            builder: (context) {
-              final safeAreaBottom = MediaQuery.of(context).padding.bottom;
-              final double bottomMargin = safeAreaBottom > 0 ? safeAreaBottom : 20.0;
-
-              return Positioned(
-                left: 24,
-                bottom: 58 + bottomMargin,
-                child: IgnorePointer(
-                  child: AnimatedOpacity(
-                    opacity: scanState.loading ? 1.0 : 0.0,
-                    duration: const Duration(milliseconds: 300),
-                    child: SizedBox(
-                      width: 145,
-                      height: 145,
-                      child: Lottie.asset(
-                        'assets/animations/cat_scan.json',
-                        repeat: true,
-                        animate: scanState.loading,
-                        fit: BoxFit.contain,
-                      ),
-                    ),
-                  ),
-                ),
-              );
-            },
-          ),
-
-          // Docked Bottom Navigation Bar
+          // Docked Bottom Navigation Bar with Mascot Support (Cat sitting on the navbar)
           Positioned(
             left: 0,
             right: 0,
             bottom: 0,
-            child: CustomNavigationBar(currentPath: '/scan'),
+            child: CustomNavigationBar(
+              currentPath: '/scan',
+              mascot: AnimatedOpacity(
+                opacity: scanState.loading ? 1.0 : 0.0,
+                duration: const Duration(milliseconds: 300),
+                child: SizedBox(
+                  width: 145,
+                  height: 145,
+                  child: Lottie.asset(
+                    'assets/animations/cat_scan.json',
+                    repeat: true,
+                    animate: scanState.loading,
+                    fit: BoxFit.contain,
+                  ),
+                ),
+              ),
+            ),
           ),
         ],
       ),
