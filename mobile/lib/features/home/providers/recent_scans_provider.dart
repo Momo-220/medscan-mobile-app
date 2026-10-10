@@ -84,7 +84,6 @@ class RecentScansNotifier extends StateNotifier<AsyncValue<List<RecentScan>>> {
       final prefs = _ref.read(sharedPrefsServiceProvider);
       final user = _ref.read(firebaseAuthStateProvider).value;
       final cacheJson = prefs.getPharmacyCache(user?.uid ?? 'trial');
-      final appDir = await getApplicationDocumentsDirectory();
 
       Map<String, RecentScan> localCacheMap = {};
       if (cacheJson != null && cacheJson.isNotEmpty) {
