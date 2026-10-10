@@ -61,38 +61,68 @@ class RecentScansNotifier extends StateNotifier<AsyncValue<List<RecentScan>>> {
       final List<dynamic> listJson = response.data['scans'] ?? response.data['history'] ?? [];
       final List<RecentScan> list = listJson.map((e) => RecentScan.fromJson(e)).toList();
 
+      final appDir = await getApplicationDocumentsDirectory();
+      if (!mounted) return;
+
       final resolvedScans = list.map<RecentScan>((scan) {
-        if (scan.imageUrl != null) {
-          String imgUrl = scan.imageUrl!;
-          // Resolve dev localhost addresses to actual dev IP so physical device can load it
-          if (imgUrl.contains('localhost:8888') || imgUrl.contains('127.0.0.1:8888')) {
-            final base = ApiConstants.baseUrl.replaceAll('/api/v1', '');
-            imgUrl = imgUrl.replaceAll(RegExp(r'https?://(localhost|127\.0\.0\.1):8888'), base);
+        if (scan.imageUrl != null && scan.imageUrl!.isNotEmpty) {
+          final imgUrl = scan.imageUrl!;
+          if (!imgUrl.startsWith('http')) {
+            final fileName = imgUrl.split('/').last;
+            final resolvedFile = File('${appDir.path}/scanned_images/$fileName');
+            if (resolvedFile.existsSync()) {
+              return scan.copyWith(imageUrl: resolvedFile.path, localImagePath: resolvedFile.path);
+            }
           }
-          return scan.copyWith(imageUrl: imgUrl);
+          final resolvedNetworkUrl = ApiConstants.resolveImageUrl(imgUrl);
+          return scan.copyWith(imageUrl: resolvedNetworkUrl);
         }
         return scan;
       }).toList();
 
-      if (resolvedScans.isEmpty) {
-        // If backend returned empty, check local cache strictly for this user
-        final prefs = _ref.read(sharedPrefsServiceProvider);
-        final user = _ref.read(firebaseAuthStateProvider).value;
-        final cacheJson = prefs.getPharmacyCache(user?.uid ?? 'trial');
-        if (cacheJson != null && cacheJson.isNotEmpty) {
-          try {
-            final List<dynamic> decoded = json.decode(cacheJson);
-            final cachedScans = decoded.map((e) => RecentScan.fromJson(e)).take(3).toList();
-            if (cachedScans.isNotEmpty && mounted) {
-              state = AsyncValue.data(cachedScans);
-              return;
-            }
-          } catch (_) {}
+      // Merge with local cache so localImagePath and offline photos are never lost
+      final prefs = _ref.read(sharedPrefsServiceProvider);
+      final user = _ref.read(firebaseAuthStateProvider).value;
+      final cacheJson = prefs.getPharmacyCache(user?.uid ?? 'trial');
+      final appDir = await getApplicationDocumentsDirectory();
+
+      Map<String, RecentScan> localCacheMap = {};
+      if (cacheJson != null && cacheJson.isNotEmpty) {
+        try {
+          final List<dynamic> decoded = json.decode(cacheJson);
+          for (var item in decoded) {
+            final localScan = RecentScan.fromJson(item);
+            localCacheMap[localScan.scanId] = localScan;
+          }
+        } catch (_) {}
+      }
+
+      final mergedScans = resolvedScans.map<RecentScan>((scan) {
+        final local = localCacheMap[scan.scanId];
+        String? finalLocalPath = local?.localImagePath;
+        if (finalLocalPath == null && scan.imageUrl != null && !scan.imageUrl!.startsWith('http')) {
+          final fileName = scan.imageUrl!.split('/').last;
+          final resolvedFile = File('${appDir.path}/scanned_images/$fileName');
+          if (resolvedFile.existsSync()) {
+            finalLocalPath = resolvedFile.path;
+          }
+        }
+        return scan.copyWith(
+          localImagePath: finalLocalPath,
+          imageUrl: (scan.imageUrl != null && scan.imageUrl!.isNotEmpty) ? scan.imageUrl : local?.imageUrl,
+        );
+      }).toList();
+
+      if (mergedScans.isEmpty && localCacheMap.isNotEmpty) {
+        final cachedList = localCacheMap.values.take(3).toList();
+        if (mounted) {
+          state = AsyncValue.data(cachedList);
+          return;
         }
       }
 
       if (mounted) {
-        state = AsyncValue.data(resolvedScans);
+        state = AsyncValue.data(mergedScans);
       }
     } catch (e, stack) {
       debugPrint('Failed to fetch recent scans from backend, falling back to cache: $e');
@@ -111,7 +141,10 @@ class RecentScansNotifier extends StateNotifier<AsyncValue<List<RecentScan>>> {
             if (scan.imageUrl != null && !scan.imageUrl!.startsWith('http')) {
               final fileName = scan.imageUrl!.split('/').last;
               final resolvedFile = File('${appDir.path}/scanned_images/$fileName');
-              return scan.copyWith(imageUrl: resolvedFile.path);
+              if (resolvedFile.existsSync()) {
+                return scan.copyWith(imageUrl: resolvedFile.path);
+              }
+              return scan.copyWith(imageUrl: ApiConstants.resolveImageUrl(scan.imageUrl));
             }
             return scan;
           }).toList();

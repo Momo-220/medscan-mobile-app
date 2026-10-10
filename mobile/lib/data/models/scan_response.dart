@@ -23,6 +23,7 @@ class ScanResponse {
   final String? expiryDate;
   final String packagingLanguage;
   final String? imageUrl;
+  final String? localImagePath;
   final String confidence;
   final String? disclaimer;
   final List<String> warnings;
@@ -56,6 +57,7 @@ class ScanResponse {
     this.expiryDate,
     required this.packagingLanguage,
     this.imageUrl,
+    this.localImagePath,
     required this.confidence,
     this.disclaimer,
     required this.warnings,
@@ -108,6 +110,7 @@ class ScanResponse {
       expiryDate: _parseStringOrList(json['expiry_date']),
       packagingLanguage: json['packaging_language'] as String? ?? 'fr',
       imageUrl: json['image_url'] as String?,
+      localImagePath: json['local_image_path'] as String?,
       confidence: json['confidence'] as String? ?? 'high',
       disclaimer: json['disclaimer'] as String? ?? '⚕️ Ceci est uniquement à titre informatif.',
       warnings: _parseList(json['warnings']),
@@ -146,6 +149,7 @@ class ScanResponse {
       'expiry_date': expiryDate,
       'packaging_language': packagingLanguage,
       'image_url': imageUrl,
+      'local_image_path': localImagePath,
       'confidence': confidence,
       'disclaimer': disclaimer,
       'warnings': warnings,

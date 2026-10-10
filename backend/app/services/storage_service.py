@@ -94,7 +94,7 @@ class StorageService:
                 ext = "jpg"
 
             # 1. Primary: Cloudflare R2
-            if self._r2_client and self._r2_bucket and self._r2_public_url:
+            if self._r2_client and self._r2_bucket:
                 filename = f"scans/{user_id}/{uuid.uuid4()}.{ext}"
                 self._r2_client.put_object(
                     Bucket=self._r2_bucket,
@@ -103,7 +103,8 @@ class StorageService:
                     ContentType=content_type,
                     CacheControl="public, max-age=31536000, immutable",
                 )
-                image_url = f"{self._r2_public_url}/{filename}"
+                base_url = (settings.API_PUBLIC_URL or os.getenv("API_PUBLIC_URL") or "https://medscan-app-xx6a.onrender.com").rstrip("/")
+                image_url = f"{base_url}/api/v1/images/{filename}"
                 logger.info(
                     "Image uploaded to Cloudflare R2",
                     key=filename,
@@ -120,11 +121,8 @@ class StorageService:
                     content_type=content_type,
                     metadata={"user_id": user_id},
                 )
-                base_url = (settings.API_PUBLIC_URL or os.getenv("API_PUBLIC_URL") or "").rstrip("/")
-                if base_url:
-                    image_url = f"{base_url}/api/v1/images/{str(file_id)}"
-                else:
-                    image_url = f"/api/v1/images/{str(file_id)}"
+                base_url = (settings.API_PUBLIC_URL or os.getenv("API_PUBLIC_URL") or "https://medscan-app-xx6a.onrender.com").rstrip("/")
+                image_url = f"{base_url}/api/v1/images/{str(file_id)}"
                 logger.info("Image uploaded to GridFS (fallback)", file_id=str(file_id), user_id=user_id)
                 return image_url
 

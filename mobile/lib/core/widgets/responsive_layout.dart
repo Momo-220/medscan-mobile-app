@@ -10,7 +10,7 @@ class AppResponsive {
   static const double desktopBreakpoint = 900.0;
 
   /// Optimal maximum width for content on tablets/desktops to prevent horizontal stretching
-  static const double maxContentWidth = 680.0;
+  static const double maxContentWidth = 720.0;
 
   /// Maximum width for floating navigation bars or bottom sheets on tablets
   static const double maxNavWidth = 520.0;
@@ -23,6 +23,17 @@ class AppResponsive {
   /// Returns true if the screen is compact (e.g., iPhone SE, small Android < 375px)
   static bool isCompact(BuildContext context) {
     return MediaQuery.sizeOf(context).width < 375.0;
+  }
+
+  /// Returns true if the screen is an ultra-small device (< 340px)
+  static bool isSmallPhone(BuildContext context) {
+    return MediaQuery.sizeOf(context).width < 340.0;
+  }
+
+  /// Calculates dynamic column count based on available container width
+  static int calculateColumns(double width, {double itemMaxWidth = 200.0, int minColumns = 1, int maxColumns = 6}) {
+    final count = (width / itemMaxWidth).ceil();
+    return count.clamp(minColumns, maxColumns);
   }
 
   /// Adaptive horizontal padding based on screen size
@@ -80,6 +91,57 @@ class ResponsiveContainer extends StatelessWidget {
           child: child,
         ),
       ),
+    );
+  }
+}
+
+/// A flexible, automatically adaptable Grid widget that responds to parent
+/// constraints on any screen size (small phones, foldables, tablets, desktop).
+class AdaptiveGrid extends StatelessWidget {
+  final int itemCount;
+  final Widget Function(BuildContext context, int index) itemBuilder;
+  final double maxCrossAxisExtent;
+  final double? mainAxisExtent;
+  final double childAspectRatio;
+  final double crossAxisSpacing;
+  final double mainAxisSpacing;
+  final bool shrinkWrap;
+  final ScrollPhysics? physics;
+  final EdgeInsetsGeometry? padding;
+
+  const AdaptiveGrid({
+    super.key,
+    required this.itemCount,
+    required this.itemBuilder,
+    this.maxCrossAxisExtent = 220.0,
+    this.mainAxisExtent,
+    this.childAspectRatio = 1.0,
+    this.crossAxisSpacing = 12.0,
+    this.mainAxisSpacing = 12.0,
+    this.shrinkWrap = true,
+    this.physics = const NeverScrollableScrollPhysics(),
+    this.padding,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        return GridView.builder(
+          padding: padding,
+          shrinkWrap: shrinkWrap,
+          physics: physics,
+          itemCount: itemCount,
+          gridDelegate: SliverGridDelegateWithMaxCrossAxisExtent(
+            maxCrossAxisExtent: maxCrossAxisExtent,
+            mainAxisExtent: mainAxisExtent,
+            childAspectRatio: childAspectRatio,
+            crossAxisSpacing: crossAxisSpacing,
+            mainAxisSpacing: mainAxisSpacing,
+          ),
+          itemBuilder: itemBuilder,
+        );
+      },
     );
   }
 }

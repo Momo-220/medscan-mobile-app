@@ -26,8 +26,8 @@ class AppVersionModel {
       forceUpdate: json['forceUpdate'] as bool? ?? false,
       maintenance: json['maintenance'] as bool? ?? false,
       maintenanceMessage: json['maintenanceMessage'] as String? ?? '',
-      appStoreUrl: json['appStoreUrl'] as String? ?? '',
-      playStoreUrl: json['playStoreUrl'] as String? ?? '',
+      appStoreUrl: json['appStoreUrl'] as String? ?? json['updateUrl'] as String? ?? json['update_url'] as String? ?? '',
+      playStoreUrl: json['playStoreUrl'] as String? ?? json['updateUrl'] as String? ?? json['update_url'] as String? ?? '',
       releaseNotes: json['releaseNotes'] as String? ?? '',
     );
   }

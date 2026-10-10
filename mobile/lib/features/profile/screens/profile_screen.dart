@@ -158,10 +158,11 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
                       shrinkWrap: true,
                       physics: const NeverScrollableScrollPhysics(),
                       itemCount: _avatarPaths.length,
-                      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                        crossAxisCount: 4,
+                      gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
+                        maxCrossAxisExtent: 68,
                         crossAxisSpacing: 10,
                         mainAxisSpacing: 10,
+                        childAspectRatio: 1.0,
                       ),
                       itemBuilder: (context, index) {
                         final path = _avatarPaths[index];

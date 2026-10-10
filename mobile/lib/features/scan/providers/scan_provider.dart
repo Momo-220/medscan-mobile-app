@@ -9,6 +9,7 @@ import 'package:image/image.dart' as img;
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/foundation.dart';
 
+import '../../../core/constants/api_constants.dart';
 import '../../../core/di/providers.dart';
 import '../../../data/models/scan_response.dart';
 import '../../../data/models/recent_scan.dart';
@@ -218,11 +219,22 @@ class ScanNotifier extends StateNotifier<ScanState> {
 
       final scanResponseRaw = response.data;
       final serverImageUrl = scanResponseRaw['image_url'];
-      // Prioritize persistent server image URL so images are never lost on updates or reinstallation
-      final String persistentImageUrl = (serverImageUrl != null && serverImageUrl.toString().isNotEmpty)
-          ? serverImageUrl.toString()
+      String resolvedServerUrl = '';
+      if (serverImageUrl != null && serverImageUrl.toString().isNotEmpty) {
+        final rawStr = serverImageUrl.toString();
+        if (rawStr.startsWith('/')) {
+          resolvedServerUrl = '${ApiConstants.baseUrl.replaceAll('/api/v1', '')}$rawStr';
+        } else {
+          resolvedServerUrl = rawStr;
+        }
+      }
+
+      // Prioritize persistent server image URL, while preserving local image path for instant local rendering
+      final String persistentImageUrl = resolvedServerUrl.isNotEmpty
+          ? resolvedServerUrl
           : finalLocalImagePath;
       scanResponseRaw['image_url'] = persistentImageUrl;
+      scanResponseRaw['local_image_path'] = finalLocalImagePath;
 
       final scanResponse = ScanResponse.fromJson(scanResponseRaw);
       
@@ -250,6 +262,7 @@ class ScanNotifier extends StateNotifier<ScanState> {
           manufacturer: scanResponse.manufacturer,
           packagingLanguage: scanResponse.packagingLanguage,
           imageUrl: persistentImageUrl,
+          localImagePath: finalLocalImagePath,
           confidence: scanResponse.confidence,
           scannedAt: DateTime.now(),
           analysisData: scanResponse.toJson(), // save full scan response to JSON analysisData

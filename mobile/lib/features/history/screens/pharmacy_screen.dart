@@ -14,6 +14,7 @@ import '../../../shared/widgets/card.dart';
 import '../../../shared/widgets/input.dart';
 import '../../../shared/widgets/skeleton.dart';
 import '../../../shared/widgets/button.dart';
+import '../../../core/constants/api_constants.dart';
 import '../../../data/models/recent_scan.dart';
 import '../providers/pharmacy_provider.dart';
 
@@ -226,233 +227,272 @@ class _PharmacyPageState extends ConsumerState<PharmacyPage> {
   }
 
   Widget _buildScansGrid(BuildContext context, List<RecentScan> scans, bool isDark) {
-    return ListView.builder(
-      padding: EdgeInsets.only(
-        left: 16.0,
-        right: 16.0,
-        top: 8.0,
-        bottom: AppResponsive.bottomBarSpacing(context),
-      ),
-      itemCount: scans.length,
-      itemBuilder: (context, index) {
-        final scan = scans[index];
-        final scannedDate = DateFormat.yMMMd().format(scan.scannedAt);
-        
-        final subtitleParts = <String>[];
-        if (scan.dosage != null && scan.dosage!.isNotEmpty) {
-          subtitleParts.add(scan.dosage!);
-        }
-        if (scan.form != null && scan.form!.isNotEmpty) {
-          subtitleParts.add(scan.form!);
-        }
-        final subtitleText = subtitleParts.join(' • ');
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final bool isWide = constraints.maxWidth >= 560;
+        final bottomPadding = AppResponsive.bottomBarSpacing(context);
 
-        return Padding(
-          padding: const EdgeInsets.only(bottom: 12.0),
-          child: AppCard(
-            hover: true,
-            padding: const EdgeInsets.all(16),
-            onTap: () {
-              context.push('/scan-result', extra: scan.toJson());
+        if (isWide) {
+          return GridView.builder(
+            padding: EdgeInsets.only(
+              left: 16.0,
+              right: 16.0,
+              top: 8.0,
+              bottom: bottomPadding,
+            ),
+            itemCount: scans.length,
+            gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
+              maxCrossAxisExtent: 400,
+              mainAxisExtent: 120,
+              crossAxisSpacing: 12,
+              mainAxisSpacing: 12,
+            ),
+            itemBuilder: (context, index) {
+              return _buildPharmacyCard(context, scans[index], isDark);
             },
-            children: Row(
-              children: [
-                // Image Thumbnail (matching RecentScansWidget)
-                ClipRRect(
-                  borderRadius: BorderRadius.circular(12),
-                  child: Container(
-                    width: 60,
-                    height: 60,
-                    color: isDark ? const Color(0xFF1E293B) : AppColors.backgroundSecondary,
-                    child: scan.imageUrl != null && scan.imageUrl!.isNotEmpty
-                        ? (scan.imageUrl!.startsWith('http')
-                            ? CachedNetworkImage(
-                                imageUrl: scan.imageUrl!,
-                                fit: BoxFit.cover,
-                                placeholder: (context, url) => const Skeleton(width: 60, height: 60),
-                                errorWidget: (context, url, error) => const Icon(
-                                  Icons.image_not_supported_outlined,
-                                  size: 24,
-                                  color: AppColors.primary,
-                                ),
-                              )
-                            : Image.file(
-                                File(scan.imageUrl!),
-                                fit: BoxFit.cover,
-                                errorBuilder: (context, error, stackTrace) => const Icon(
-                                  Icons.image_not_supported_outlined,
-                                  size: 24,
-                                  color: AppColors.primary,
-                                ),
-                              ))
-                        : const Icon(
-                            Icons.medication_outlined,
-                            size: 28,
-                            color: AppColors.primary,
-                          ),
-                  ),
-                ),
-                const SizedBox(width: 16),
+          );
+        }
 
-                // Details Column
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Expanded(
-                            child: Text(
-                              scan.medicationName,
-                              style: AppTextStyles.bodyBold(isDark: isDark).copyWith(fontSize: 16),
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                          ),
-                          const SizedBox(width: 8),
-                          Text(
-                            scannedDate,
-                            style: AppTextStyles.micro(isDark: isDark).copyWith(
-                              color: isDark ? AppColors.textMutedDark : AppColors.textSecondary,
-                            ),
-                          ),
-                        ],
+        return ListView.builder(
+          padding: EdgeInsets.only(
+            left: 16.0,
+            right: 16.0,
+            top: 8.0,
+            bottom: bottomPadding,
+          ),
+          itemCount: scans.length,
+          itemBuilder: (context, index) {
+            return Padding(
+              padding: const EdgeInsets.only(bottom: 12.0),
+              child: _buildPharmacyCard(context, scans[index], isDark),
+            );
+          },
+        );
+      },
+    );
+  }
+
+  Widget _buildPharmacyCard(BuildContext context, RecentScan scan, bool isDark) {
+    final scannedDate = DateFormat.yMMMd().format(scan.scannedAt);
+    
+    final subtitleParts = <String>[];
+    if (scan.dosage != null && scan.dosage!.isNotEmpty) {
+      subtitleParts.add(scan.dosage!);
+    }
+    if (scan.form != null && scan.form!.isNotEmpty) {
+      subtitleParts.add(scan.form!);
+    }
+    final subtitleText = subtitleParts.join(' • ');
+
+    return AppCard(
+      hover: true,
+      padding: const EdgeInsets.all(14),
+      onTap: () {
+        context.push('/scan-result', extra: scan.toJson());
+      },
+      children: Row(
+        children: [
+          // Image Thumbnail
+          ClipRRect(
+            borderRadius: BorderRadius.circular(12),
+            child: Container(
+              width: 56,
+              height: 56,
+              color: isDark ? const Color(0xFF1E293B) : AppColors.backgroundSecondary,
+              child: _buildThumbnail(scan, isDark),
+            ),
+          ),
+          const SizedBox(width: 14),
+
+          // Details Column
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Expanded(
+                      child: Text(
+                        scan.medicationName,
+                        style: AppTextStyles.bodyBold(isDark: isDark).copyWith(fontSize: 15),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
                       ),
-                      if (subtitleText.isNotEmpty) ...[
-                        const SizedBox(height: 4),
-                        Text(
-                          subtitleText,
-                          style: AppTextStyles.small(
-                            color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondary,
-                          ),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                      ],
-                      const SizedBox(height: 8),
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                        decoration: BoxDecoration(
-                          color: isDark 
-                              ? const Color(0xFF1E3A8A).withOpacity(0.3) 
-                              : const Color(0xFFEFF6FF),
-                          borderRadius: BorderRadius.circular(10),
-                          border: Border.all(
-                            color: isDark 
-                                ? const Color(0xFF1E40AF).withOpacity(0.4) 
-                                : const Color(0xFFDBEAFE),
-                            width: 1,
-                          ),
-                        ),
-                        child: Text(
-                          scan.category,
-                          style: AppTextStyles.micro(isDark: isDark).copyWith(
-                            color: isDark ? const Color(0xFF60A5FA) : const Color(0xFF2563EB),
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
+                    ),
+                    const SizedBox(width: 8),
+                    Text(
+                      scannedDate,
+                      style: AppTextStyles.micro(isDark: isDark).copyWith(
+                        color: isDark ? AppColors.textMutedDark : AppColors.textSecondary,
                       ),
-                    ],
-                  ),
+                    ),
+                  ],
                 ),
-                const SizedBox(width: 8),
-                Icon(
-                  Icons.chevron_right,
-                  color: isDark ? AppColors.textMutedDark : AppColors.textMuted,
-                  size: 20,
+                if (subtitleText.isNotEmpty) ...[
+                  const SizedBox(height: 2),
+                  Text(
+                    subtitleText,
+                    style: AppTextStyles.small(
+                      color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondary,
+                    ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ],
+                const SizedBox(height: 6),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                  decoration: BoxDecoration(
+                    color: isDark 
+                        ? const Color(0xFF1E3A8A).withOpacity(0.3) 
+                        : const Color(0xFFEFF6FF),
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(
+                      color: isDark 
+                          ? const Color(0xFF1E40AF).withOpacity(0.4) 
+                          : const Color(0xFFDBEAFE),
+                      width: 1,
+                    ),
+                  ),
+                  child: Text(
+                    scan.category,
+                    style: AppTextStyles.micro(isDark: isDark).copyWith(
+                      color: isDark ? const Color(0xFF60A5FA) : const Color(0xFF2563EB),
+                      fontWeight: FontWeight.bold,
+                      fontSize: 10,
+                    ),
+                  ),
                 ),
               ],
             ),
           ),
-        );
-      },
+          const SizedBox(width: 6),
+          Icon(
+            Icons.chevron_right,
+            color: isDark ? AppColors.textMutedDark : AppColors.textMuted,
+            size: 20,
+          ),
+        ],
+      ),
     );
   }
 
   Widget _buildSkeletonList(BuildContext context) {
-    return ListView.builder(
-      padding: EdgeInsets.only(
-        left: 16.0,
-        right: 16.0,
-        top: 8.0,
-        bottom: AppResponsive.bottomBarSpacing(context),
-      ),
-      itemCount: 4,
-      itemBuilder: (context, index) {
-        return const Padding(
-          padding: const EdgeInsets.only(bottom: 12.0),
-          child: AppCard(
-            padding: EdgeInsets.all(16),
-            children: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Skeleton(width: 120, height: 18),
-                    Skeleton(width: 80, height: 14),
-                  ],
-                ),
-                SizedBox(height: 8),
-                Skeleton(width: 180, height: 14),
-                SizedBox(height: 16),
-                Skeleton(width: 90, height: 22, borderRadius: 10),
-              ],
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final bool isWide = constraints.maxWidth >= 560;
+        final bottomPadding = AppResponsive.bottomBarSpacing(context);
+
+        if (isWide) {
+          return GridView.builder(
+            padding: EdgeInsets.only(
+              left: 16.0,
+              right: 16.0,
+              top: 8.0,
+              bottom: bottomPadding,
             ),
+            itemCount: 4,
+            gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
+              maxCrossAxisExtent: 400,
+              mainAxisExtent: 120,
+              crossAxisSpacing: 12,
+              mainAxisSpacing: 12,
+            ),
+            itemBuilder: (context, index) => _buildSkeletonItem(),
+          );
+        }
+
+        return ListView.builder(
+          padding: EdgeInsets.only(
+            left: 16.0,
+            right: 16.0,
+            top: 8.0,
+            bottom: bottomPadding,
+          ),
+          itemCount: 4,
+          itemBuilder: (context, index) => Padding(
+            padding: const EdgeInsets.only(bottom: 12.0),
+            child: _buildSkeletonItem(),
           ),
         );
       },
     );
   }
 
+  Widget _buildSkeletonItem() {
+    return const AppCard(
+      padding: EdgeInsets.all(14),
+      children: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Skeleton(width: 120, height: 18),
+              Skeleton(width: 70, height: 12),
+            ],
+          ),
+          SizedBox(height: 6),
+          Skeleton(width: 160, height: 12),
+          SizedBox(height: 10),
+          Skeleton(width: 80, height: 20, borderRadius: 8),
+        ],
+      ),
+    );
+  }
+
   Widget _buildStatBoxesRow(BuildContext context, PharmacyState state) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    
     final totalCount = state.allScans.length;
-    
     final now = DateTime.now();
     final startOfMonth = DateTime(now.year, now.month, 1);
     final thisMonthCount = state.allScans.where((s) => s.scannedAt.isAfter(startOfMonth)).length;
-    
-    // Fallback: 0 to renew as shown in reference screenshots
     const toRenewCount = 0;
 
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 12.0),
-      child: Row(
-        children: [
-          Expanded(
-            child: _buildStatBox(
-              context: context,
-              value: totalCount.toString(),
-              label: ref.t('total'),
-              icon: Icons.inventory_2_outlined,
-              iconColor: const Color(0xFF3B82F6),
-            ),
-          ),
-          const SizedBox(width: 10),
-          Expanded(
-            child: _buildStatBox(
-              context: context,
-              value: toRenewCount.toString(),
-              label: ref.t('toRenew'),
-              icon: Icons.warning_amber_rounded,
-              iconColor: const Color(0xFFF59E0B),
-            ),
-          ),
-          const SizedBox(width: 10),
-          Expanded(
-            child: _buildStatBox(
-              context: context,
-              value: thisMonthCount.toString(),
-              label: ref.t('thisMonth'),
-              icon: Icons.calendar_today_outlined,
-              iconColor: const Color(0xFF10B981),
-            ),
-          ),
-        ],
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          final isCompact = constraints.maxWidth < 360;
+          return Row(
+            children: [
+              Expanded(
+                child: _buildStatBox(
+                  context: context,
+                  value: totalCount.toString(),
+                  label: ref.t('total'),
+                  icon: Icons.inventory_2_outlined,
+                  iconColor: const Color(0xFF3B82F6),
+                  isCompact: isCompact,
+                ),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: _buildStatBox(
+                  context: context,
+                  value: toRenewCount.toString(),
+                  label: ref.t('toRenew'),
+                  icon: Icons.warning_amber_rounded,
+                  iconColor: const Color(0xFFF59E0B),
+                  isCompact: isCompact,
+                ),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: _buildStatBox(
+                  context: context,
+                  value: thisMonthCount.toString(),
+                  label: ref.t('thisMonth'),
+                  icon: Icons.calendar_today_outlined,
+                  iconColor: const Color(0xFF10B981),
+                  isCompact: isCompact,
+                ),
+              ),
+            ],
+          );
+        },
       ),
     );
   }
@@ -463,14 +503,15 @@ class _PharmacyPageState extends ConsumerState<PharmacyPage> {
     required String label,
     required IconData icon,
     required Color iconColor,
+    bool isCompact = false,
   }) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
     return Container(
-      padding: const EdgeInsets.all(12),
+      padding: EdgeInsets.symmetric(horizontal: isCompact ? 8 : 12, vertical: 10),
       decoration: BoxDecoration(
         color: isDark ? AppColors.cardDark : Colors.white,
-        borderRadius: BorderRadius.circular(20),
+        borderRadius: BorderRadius.circular(18),
         border: Border.all(
           color: isDark ? const Color(0x1AFFFFFF) : const Color(0xFFE2E8F0),
           width: 1,
@@ -489,33 +530,92 @@ class _PharmacyPageState extends ConsumerState<PharmacyPage> {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Text(
-                value,
-                style: AppTextStyles.h3(isDark: isDark).copyWith(
-                  fontWeight: FontWeight.bold,
-                  fontSize: 22,
+              Flexible(
+                child: Text(
+                  value,
+                  style: AppTextStyles.h3(isDark: isDark).copyWith(
+                    fontWeight: FontWeight.bold,
+                    fontSize: isCompact ? 18 : 22,
+                  ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
                 ),
               ),
               Container(
-                padding: const EdgeInsets.all(6),
+                padding: const EdgeInsets.all(5),
                 decoration: BoxDecoration(
                   color: iconColor.withOpacity(0.1),
                   shape: BoxShape.circle,
                 ),
-                child: Icon(icon, color: iconColor, size: 16),
+                child: Icon(icon, color: iconColor, size: isCompact ? 14 : 16),
               ),
             ],
           ),
-          const SizedBox(height: 8),
+          const SizedBox(height: 6),
           Text(
             label,
             style: AppTextStyles.micro(isDark: isDark).copyWith(
               color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondary,
               fontWeight: FontWeight.w600,
+              fontSize: isCompact ? 10 : 11,
             ),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
           ),
         ],
       ),
+    );
+  }
+
+  Widget _buildThumbnail(RecentScan scan, bool isDark) {
+    // 1. Direct local file if available on this device
+    final String? localPath = scan.localImagePath ??
+        (scan.imageUrl != null && !scan.imageUrl!.startsWith('http') && !scan.imageUrl!.startsWith('/api')
+            ? scan.imageUrl
+            : null);
+    if (localPath != null && File(localPath).existsSync()) {
+      return Image.file(
+        File(localPath),
+        fit: BoxFit.cover,
+        errorBuilder: (context, error, stackTrace) => _buildNetworkOrIcon(scan, isDark),
+      );
+    }
+    return _buildNetworkOrIcon(scan, isDark);
+  }
+
+  Widget _buildNetworkOrIcon(RecentScan scan, bool isDark) {
+    if (scan.imageUrl != null && scan.imageUrl!.isNotEmpty) {
+      final String resolved = ApiConstants.resolveImageUrl(scan.imageUrl);
+      if (resolved.isNotEmpty) {
+        return CachedNetworkImage(
+          imageUrl: resolved,
+          fit: BoxFit.cover,
+          placeholder: (context, url) => const Skeleton(width: 60, height: 60),
+          errorWidget: (context, url, error) {
+            if (scan.localImagePath != null && File(scan.localImagePath!).existsSync()) {
+              return Image.file(
+                File(scan.localImagePath!),
+                fit: BoxFit.cover,
+                errorBuilder: (c, e, s) => const Icon(
+                  Icons.medication_outlined,
+                  size: 28,
+                  color: AppColors.primary,
+                ),
+              );
+            }
+            return const Icon(
+              Icons.medication_outlined,
+              size: 28,
+              color: AppColors.primary,
+            );
+          },
+        );
+      }
+    }
+    return const Icon(
+      Icons.medication_outlined,
+      size: 28,
+      color: AppColors.primary,
     );
   }
 }

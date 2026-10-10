@@ -1124,9 +1124,9 @@ class _ChatPageState extends ConsumerState<ChatPage>
                                 if (msg.imageUrl != null && msg.imageUrl!.isNotEmpty) ...[
                                   ClipRRect(
                                     borderRadius: BorderRadius.circular(12),
-                                    child: msg.imageUrl!.startsWith('http')
+                                    child: (msg.imageUrl!.startsWith('http') || !File(msg.imageUrl!).existsSync())
                                         ? CachedNetworkImage(
-                                            imageUrl: msg.imageUrl!,
+                                            imageUrl: ApiConstants.resolveImageUrl(msg.imageUrl!),
                                             width: 180,
                                             height: 120,
                                             fit: BoxFit.cover,

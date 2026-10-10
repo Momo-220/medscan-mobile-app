@@ -165,26 +165,28 @@ class _ChooseAvatarPageState extends ConsumerState<ChooseAvatarPage> {
                           const SizedBox(height: 32),
 
                           // Grid
-                          GridView.builder(
-                            shrinkWrap: true,
-                            physics: const NeverScrollableScrollPhysics(),
-                            gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                              crossAxisCount: 3,
-                              crossAxisSpacing: 16,
-                              mainAxisSpacing: 16,
-                              childAspectRatio: 1.0,
-                            ),
-                            itemCount: _avatarPaths.length,
-                            itemBuilder: (context, index) {
-                              final path = _avatarPaths[index];
-                              final isSelected = _selectedAvatar == path;
+                          LayoutBuilder(
+                            builder: (context, gridConstraints) {
+                              return GridView.builder(
+                                shrinkWrap: true,
+                                physics: const NeverScrollableScrollPhysics(),
+                                gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
+                                  maxCrossAxisExtent: 110,
+                                  crossAxisSpacing: 16,
+                                  mainAxisSpacing: 16,
+                                  childAspectRatio: 1.0,
+                                ),
+                                itemCount: _avatarPaths.length,
+                                itemBuilder: (context, index) {
+                                  final path = _avatarPaths[index];
+                                  final isSelected = _selectedAvatar == path;
 
-                              return GestureDetector(
-                                onTap: () {
-                                  setState(() {
-                                    _selectedAvatar = path;
-                                  });
-                                },
+                                  return GestureDetector(
+                                    onTap: () {
+                                      setState(() {
+                                        _selectedAvatar = path;
+                                      });
+                                    },
                                 child: AnimatedContainer(
                                   duration: const Duration(milliseconds: 200),
                                   curve: Curves.easeInOut,
@@ -225,8 +227,10 @@ class _ChooseAvatarPageState extends ConsumerState<ChooseAvatarPage> {
                                 ),
                               );
                             },
-                          ),
-                          const SizedBox(height: 36),
+                          );
+                        },
+                      ),
+                        const SizedBox(height: 36),
 
                           // Validate Button
                           Button(

@@ -1,3 +1,4 @@
+import 'dart:math' as math;
 import 'package:camera/camera.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
@@ -169,16 +170,21 @@ class _CustomCameraPageState extends State<CustomCameraPage> with WidgetsBinding
           // ── Header controls (Back + Flash) ────────────────────────────────
           Positioned(
             top: topPadding + 12,
-            left: 16,
-            right: 16,
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                // Back Button
-                IconButton(
-                  icon: const Icon(Icons.arrow_back_ios_new, color: Colors.white, size: 22),
-                  onPressed: () => Navigator.pop(context),
-                ),
+            left: 0,
+            right: 0,
+            child: Center(
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 600),
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 16),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      // Back Button
+                      IconButton(
+                        icon: const Icon(Icons.arrow_back_ios_new, color: Colors.white, size: 22),
+                        onPressed: () => Navigator.pop(context),
+                      ),
                 // Custom alignment hint
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
@@ -198,9 +204,12 @@ class _CustomCameraPageState extends State<CustomCameraPage> with WidgetsBinding
                     color: _isFlashOn ? Colors.yellow[600] : Colors.white,
                     size: 24,
                   ),
-                  onPressed: _toggleFlash,
+                        onPressed: _toggleFlash,
+                      ),
+                    ],
+                  ),
                 ),
-              ],
+              ),
             ),
           ),
 
@@ -230,13 +239,16 @@ class _CustomCameraPageState extends State<CustomCameraPage> with WidgetsBinding
             bottom: MediaQuery.of(context).padding.bottom + 28,
             left: 0,
             right: 0,
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 40.0),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  // Import Gallery Button
-                  GestureDetector(
+            child: Center(
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 500),
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 40.0),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      // Import Gallery Button
+                      GestureDetector(
                     onTap: _pickFromGallery,
                     child: Container(
                       width: 52,
@@ -290,9 +302,11 @@ class _CustomCameraPageState extends State<CustomCameraPage> with WidgetsBinding
               ),
             ),
           ),
-        ],
+        ),
       ),
-    );
+    ],
+  ),
+);
   }
 }
 
@@ -306,8 +320,9 @@ class CameraOverlayPainter extends CustomPainter {
       ..style = PaintingStyle.fill;
 
     // Define the scanning rectangle container shape
-    final double rectWidth = size.width * 0.82;
-    final double rectHeight = size.height * 0.36;
+    // On tablet / iPad, limit rectWidth to max 440 and keep realistic box aspect ratio (approx 1.5 : 1)
+    final double rectWidth = math.min(size.width * 0.82, 440.0);
+    final double rectHeight = math.min(rectWidth * 0.65, size.height * 0.38);
     final double left = (size.width - rectWidth) / 2;
     final double top = (size.height - rectHeight) / 2;
 

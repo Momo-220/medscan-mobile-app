@@ -8,6 +8,7 @@ import 'package:lottie/lottie.dart';
 
 import '../../../core/constants/colors.dart';
 import '../../../core/constants/text_styles.dart';
+import '../../../core/widgets/responsive_layout.dart';
 import '../../../shared/utils/localization.dart';
 import '../../../shared/widgets/button.dart';
 import '../../../shared/widgets/navigation_bar.dart';
@@ -90,9 +91,11 @@ class _ScanPageState extends ConsumerState<ScanPage> with SingleTickerProviderSt
           );
 
       if (result != null && mounted) {
-        // Stop animation and go to results
-        _scanLineController.stop();
-        context.pushReplacement('/scan-result', extra: result.toJson());
+        final resultMap = result.toJson();
+        if (_selectedImage != null && _selectedImage!.existsSync()) {
+          resultMap['local_image_path'] = _selectedImage!.path;
+        }
+        context.pushReplacement('/scan-result', extra: resultMap);
       }
     } catch (e) {
       _scanLineController.stop();
@@ -126,10 +129,12 @@ class _ScanPageState extends ConsumerState<ScanPage> with SingleTickerProviderSt
         return Dialog(
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
           backgroundColor: isDark ? AppColors.cardDark : AppColors.card,
-          child: Padding(
-            padding: const EdgeInsets.all(24.0),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 420),
+            child: Padding(
+              padding: const EdgeInsets.all(24.0),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
               children: [
                 Container(
                   width: 64,
@@ -177,7 +182,8 @@ class _ScanPageState extends ConsumerState<ScanPage> with SingleTickerProviderSt
               ],
             ),
           ),
-        );
+        ),
+      );
       },
     );
   }
@@ -216,10 +222,12 @@ class _ScanPageState extends ConsumerState<ScanPage> with SingleTickerProviderSt
                 constraints: BoxConstraints(
                   minHeight: constraints.maxHeight,
                 ),
-                child: IntrinsicHeight(
-                  child: Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 24.0, vertical: 24.0),
-                    child: Column(
+                child: ResponsiveContainer(
+                  maxWidth: 580,
+                  child: IntrinsicHeight(
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 24.0, vertical: 24.0),
+                      child: Column(
                       mainAxisAlignment: MainAxisAlignment.center,
                       crossAxisAlignment: CrossAxisAlignment.center,
                       children: [
@@ -317,7 +325,8 @@ class _ScanPageState extends ConsumerState<ScanPage> with SingleTickerProviderSt
                   ),
                 ),
               ),
-            );
+            ),
+          );
           },
         ),
       ),
@@ -334,10 +343,12 @@ class _ScanPageState extends ConsumerState<ScanPage> with SingleTickerProviderSt
           SafeArea(
             child: SingleChildScrollView(
               padding: const EdgeInsets.symmetric(horizontal: 24.0, vertical: 24.0),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.center,
-                children: [
-                  const SizedBox(height: 24),
+              child: ResponsiveContainer(
+                maxWidth: 580,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.center,
+                  children: [
+                    const SizedBox(height: 24),
                   
                   // Back button or Cancel Analysis text button at top
                   Row(
@@ -595,6 +606,7 @@ class _ScanPageState extends ConsumerState<ScanPage> with SingleTickerProviderSt
               ),
             ),
           ),
+        ),
 
           // 🐱 Cat Lottie Animation Sitting on top of the Navigation Bar
           Builder(

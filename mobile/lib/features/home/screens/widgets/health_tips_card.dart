@@ -6,7 +6,6 @@ import 'package:firebase_auth/firebase_auth.dart';
 import '../../../../core/constants/colors.dart';
 import '../../../../core/constants/text_styles.dart';
 import '../../../../shared/utils/localization.dart';
-import '../../../../shared/widgets/card.dart';
 import '../../../../shared/widgets/skeleton.dart';
 import '../../../../shared/widgets/reminder_countdown_widget.dart';
 import '../../../reminders/providers/reminders_provider.dart';
@@ -185,252 +184,276 @@ class _HealthTipsCardWidgetState extends ConsumerState<HealthTipsCardWidget> {
 
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16.0),
-      child: Column(
-        children: [
-          // 1. Next Reminder Section (Pill Blue Theme Card)
-          Container(
-            width: double.infinity,
-            padding: const EdgeInsets.all(20),
-            decoration: BoxDecoration(
-              gradient: LinearGradient(
-                colors: isDark 
-                    ? [const Color(0xFF1E3A8A).withOpacity(0.2), const Color(0xFF1E40AF).withOpacity(0.1)]
-                    : [AppColors.primary.withOpacity(0.12), AppColors.primary.withOpacity(0.06)],
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-              ),
-              borderRadius: BorderRadius.circular(28),
-              border: Border.all(
-                color: isDark ? const Color(0xFF1E40AF).withOpacity(0.3) : AppColors.primary.withOpacity(0.2),
-                width: 1,
-              ),
-            ),
-            child: Row(
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          final bool isWide = constraints.maxWidth >= 600;
+          final reminderCard = _buildReminderCard(context, isDark);
+          final tipCard = _buildTipCard(context, isDark, tipIcon, tipTitle, tipDesc);
+
+          if (isWide) {
+            return Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Container(
-                  width: 44,
-                  height: 44,
-                  decoration: BoxDecoration(
-                    color: isDark ? const Color(0xFF1E3A8A).withOpacity(0.4) : AppColors.primary.withOpacity(0.2),
-                    borderRadius: BorderRadius.circular(16),
-                  ),
-                  child: Icon(
-                    Icons.notifications_none_outlined,
-                    color: isDark ? const Color(0xFF60A5FA) : AppColors.primary,
-                    size: 24,
+                Expanded(child: reminderCard),
+                const SizedBox(width: 16),
+                Expanded(child: tipCard),
+              ],
+            );
+          }
+
+          return Column(
+            children: [
+              reminderCard,
+              const SizedBox(height: 16),
+              tipCard,
+            ],
+          );
+        },
+      ),
+    );
+  }
+
+  Widget _buildReminderCard(BuildContext context, bool isDark) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          colors: isDark 
+              ? [const Color(0xFF1E3A8A).withOpacity(0.2), const Color(0xFF1E40AF).withOpacity(0.1)]
+              : [AppColors.primary.withOpacity(0.12), AppColors.primary.withOpacity(0.06)],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+        borderRadius: BorderRadius.circular(28),
+        border: Border.all(
+          color: isDark ? const Color(0xFF1E40AF).withOpacity(0.3) : AppColors.primary.withOpacity(0.2),
+          width: 1,
+        ),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Container(
+            width: 44,
+            height: 44,
+            decoration: BoxDecoration(
+              color: isDark ? const Color(0xFF1E3A8A).withOpacity(0.4) : AppColors.primary.withOpacity(0.2),
+              borderRadius: BorderRadius.circular(16),
+            ),
+            child: Icon(
+              Icons.notifications_none_outlined,
+              color: isDark ? const Color(0xFF60A5FA) : AppColors.primary,
+              size: 24,
+            ),
+          ),
+          const SizedBox(width: 16),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  ref.t('nextReminderTitle'),
+                  style: AppTextStyles.bodyBold(isDark: isDark).copyWith(
+                    fontSize: 14,
                   ),
                 ),
-                const SizedBox(width: 16),
-                Expanded(
-                  child: Column(
+                const SizedBox(height: 4),
+                if (_loadingReminder)
+                  const Skeleton(height: 16, width: 120)
+                else if (_nextReminder != null)
+                  Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        ref.t('nextReminderTitle'),
-                        style: AppTextStyles.bodyBold(isDark: isDark).copyWith(
-                          fontSize: 14,
-                        ),
+                        _nextReminder!.medicationName,
+                        style: AppTextStyles.bodyBold(isDark: isDark).copyWith(fontSize: 16),
                       ),
-                      const SizedBox(height: 4),
-                      if (_loadingReminder)
-                        const Skeleton(height: 16, width: 120)
-                      else if (_nextReminder != null)
-                        Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              _nextReminder!.medicationName,
-                              style: AppTextStyles.bodyBold(isDark: isDark).copyWith(fontSize: 16),
+                      const SizedBox(height: 8),
+                      Row(
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                            decoration: BoxDecoration(
+                              color: isDark ? Colors.white10 : Colors.white.withOpacity(0.6),
+                              borderRadius: BorderRadius.circular(8),
                             ),
-                            const SizedBox(height: 8),
-                            Row(
+                            child: Row(
                               children: [
-                                Container(
-                                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                                  decoration: BoxDecoration(
-                                    color: isDark ? Colors.white10 : Colors.white.withOpacity(0.6),
-                                    borderRadius: BorderRadius.circular(8),
-                                  ),
-                                  child: Row(
-                                    children: [
-                                      const Icon(Icons.access_time, size: 12, color: AppColors.primary),
-                                      const SizedBox(width: 4),
-                                      Text(
-                                        _nextReminder!.time,
-                                        style: AppTextStyles.micro(isDark: isDark).copyWith(fontWeight: FontWeight.bold),
-                                      ),
-                                    ],
-                                  ),
+                                const Icon(Icons.access_time, size: 12, color: AppColors.primary),
+                                const SizedBox(width: 4),
+                                Text(
+                                  _nextReminder!.time,
+                                  style: AppTextStyles.micro(isDark: isDark).copyWith(fontWeight: FontWeight.bold),
                                 ),
-                                if (_nextReminder!.dosage.isNotEmpty) ...[
-                                  const SizedBox(width: 8),
-                                  Flexible(
-                                    child: Container(
-                                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                                      decoration: BoxDecoration(
-                                        color: isDark ? Colors.white10 : Colors.white.withOpacity(0.6),
-                                        borderRadius: BorderRadius.circular(8),
-                                      ),
-                                      child: Row(
-                                        mainAxisSize: MainAxisSize.min,
-                                        children: [
-                                          const Icon(Icons.medication_outlined, size: 12, color: AppColors.primary),
-                                          const SizedBox(width: 4),
-                                          Flexible(
-                                            child: Text(
-                                              _nextReminder!.dosage,
-                                              style: AppTextStyles.micro(isDark: isDark).copyWith(
-                                                fontWeight: FontWeight.bold,
-                                              ),
-                                              overflow: TextOverflow.ellipsis,
-                                              maxLines: 1,
-                                            ),
-                                          ),
-                                        ],
-                                      ),
-                                    ),
-                                  ),
-                                ],
                               ],
                             ),
-                            ReminderCountdownWidget(
-                              nextDose: _nextReminder!.nextDose,
-                              active: _nextReminder!.active,
-                              status: _nextReminder!.status,
-                              dosesTaken: _nextReminder!.dosesTakenToday,
-                              totalDoses: _nextReminder!.totalDosesToday,
+                          ),
+                          if (_nextReminder!.dosage.isNotEmpty) ...[
+                            const SizedBox(width: 8),
+                            Flexible(
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                decoration: BoxDecoration(
+                                  color: isDark ? Colors.white10 : Colors.white.withOpacity(0.6),
+                                  borderRadius: BorderRadius.circular(8),
+                                ),
+                                child: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    const Icon(Icons.medication_outlined, size: 12, color: AppColors.primary),
+                                    const SizedBox(width: 4),
+                                    Flexible(
+                                      child: Text(
+                                        _nextReminder!.dosage,
+                                        style: AppTextStyles.micro(isDark: isDark).copyWith(
+                                          fontWeight: FontWeight.bold,
+                                        ),
+                                        overflow: TextOverflow.ellipsis,
+                                        maxLines: 1,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
                             ),
                           ],
-                        )
-                      else
-                        Text(
-                          ref.t('noReminderScheduled'),
-                          style: AppTextStyles.small(
-                            color: isDark ? AppColors.textMutedDark : AppColors.textSecondary,
-                          ),
-                        ),
+                        ],
+                      ),
+                      ReminderCountdownWidget(
+                        nextDose: _nextReminder!.nextDose,
+                        active: _nextReminder!.active,
+                        status: _nextReminder!.status,
+                        dosesTaken: _nextReminder!.dosesTakenToday,
+                        totalDoses: _nextReminder!.totalDosesToday,
+                      ),
                     ],
+                  )
+                else
+                  Text(
+                    ref.t('noReminderScheduled'),
+                    style: AppTextStyles.small(
+                      color: isDark ? AppColors.textMutedDark : AppColors.textSecondary,
+                    ),
                   ),
-                ),
               ],
             ),
           ),
-          const SizedBox(height: 16),
+        ],
+      ),
+    );
+  }
 
-          // 2. Health Tip Section (Emerald Green Card)
-          Container(
-            width: double.infinity,
-            padding: const EdgeInsets.all(20),
-            decoration: BoxDecoration(
-              gradient: LinearGradient(
-                colors: isDark
-                    ? [const Color(0xFF065F46).withOpacity(0.2), const Color(0xFF064E3B).withOpacity(0.1)]
-                    : [const Color(0xFFECFDF5), const Color(0xFFD1FAE5).withOpacity(0.5)],
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
+  Widget _buildTipCard(BuildContext context, bool isDark, String tipIcon, String tipTitle, String tipDesc) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          colors: isDark
+              ? [const Color(0xFF065F46).withOpacity(0.2), const Color(0xFF064E3B).withOpacity(0.1)]
+              : [const Color(0xFFECFDF5), const Color(0xFFD1FAE5).withOpacity(0.5)],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+        borderRadius: BorderRadius.circular(28),
+        border: Border.all(
+          color: isDark ? const Color(0xFF047857).withOpacity(0.3) : const Color(0xFFA7F3D0).withOpacity(0.5),
+          width: 1,
+        ),
+      ),
+      child: Column(
+        children: [
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Container(
+                width: 44,
+                height: 44,
+                decoration: BoxDecoration(
+                  color: isDark ? const Color(0xFF065F46).withOpacity(0.4) : const Color(0xFFD1FAE5),
+                  borderRadius: BorderRadius.circular(16),
+                ),
+                alignment: Alignment.center,
+                child: Text(
+                  tipIcon,
+                  style: const TextStyle(fontSize: 22),
+                ),
               ),
-              borderRadius: BorderRadius.circular(28),
-              border: Border.all(
-                color: isDark ? const Color(0xFF047857).withOpacity(0.3) : const Color(0xFFA7F3D0).withOpacity(0.5),
-                width: 1,
-              ),
-            ),
-            child: Column(
-              children: [
-                Row(
+              const SizedBox(width: 16),
+              Expanded(
+                child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Container(
-                      width: 44,
-                      height: 44,
-                      decoration: BoxDecoration(
-                        color: isDark ? const Color(0xFF065F46).withOpacity(0.4) : const Color(0xFFD1FAE5),
-                        borderRadius: BorderRadius.circular(16),
-                      ),
-                      alignment: Alignment.center,
-                      child: Text(
-                        tipIcon,
-                        style: const TextStyle(fontSize: 22),
-                      ),
+                    Row(
+                      children: [
+                        const Icon(Icons.lightbulb_outline, size: 16, color: Color(0xFF059669)),
+                        const SizedBox(width: 6),
+                        Text(
+                          ref.t('healthTip'),
+                          style: AppTextStyles.bodyBold(isDark: isDark).copyWith(
+                            fontSize: 14,
+                            color: isDark ? const Color(0xFF34D399) : const Color(0xFF059669),
+                          ),
+                        ),
+                      ],
                     ),
-                    const SizedBox(width: 16),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Row(
-                            children: [
-                              const Icon(Icons.lightbulb_outline, size: 16, color: Color(0xFF059669)),
-                              const SizedBox(width: 6),
-                              Text(
-                                ref.t('healthTip'),
-                                style: AppTextStyles.bodyBold(isDark: isDark).copyWith(
-                                  fontSize: 14,
-                                  color: isDark ? const Color(0xFF34D399) : const Color(0xFF059669),
-                                ),
-                              ),
-                            ],
-                          ),
-                          const SizedBox(height: 6),
-                          Text(
-                            tipTitle,
-                            style: AppTextStyles.bodyBold(isDark: isDark).copyWith(fontSize: 16),
-                          ),
-                          const SizedBox(height: 4),
-                          Text(
-                            tipDesc,
-                            style: AppTextStyles.small(
-                              color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondary,
-                            ).copyWith(height: 1.4),
-                          ),
-                        ],
-                      ),
+                    const SizedBox(height: 6),
+                    Text(
+                      tipTitle,
+                      style: AppTextStyles.bodyBold(isDark: isDark).copyWith(fontSize: 16),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      tipDesc,
+                      style: AppTextStyles.small(
+                        color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondary,
+                      ).copyWith(height: 1.4),
                     ),
                   ],
                 ),
-                const SizedBox(height: 16),
-                // Divider and page progress indicator
-                Container(
-                  padding: const EdgeInsets.only(top: 12),
-                  decoration: BoxDecoration(
-                    border: Border(
-                      top: BorderSide(
-                        color: isDark ? const Color(0xFF047857).withOpacity(0.2) : const Color(0xFFA7F3D0).withOpacity(0.4),
-                        width: 1,
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+          // Divider and page progress indicator
+          Container(
+            padding: const EdgeInsets.only(top: 12),
+            decoration: BoxDecoration(
+              border: Border(
+                top: BorderSide(
+                  color: isDark ? const Color(0xFF047857).withOpacity(0.2) : const Color(0xFFA7F3D0).withOpacity(0.4),
+                  width: 1,
+                ),
+              ),
+            ),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                // Dots
+                Row(
+                  children: List.generate(_allTips.length, (idx) {
+                    final isActive = idx == _currentTipIndex;
+                    return AnimatedContainer(
+                      duration: const Duration(milliseconds: 300),
+                      margin: const EdgeInsets.only(right: 4),
+                      height: 5,
+                      width: isActive ? 20 : 5,
+                      decoration: BoxDecoration(
+                        color: isActive 
+                            ? (isDark ? const Color(0xFF34D399) : const Color(0xFF10B981))
+                            : (isDark ? const Color(0xFF064E3B) : const Color(0xFFA7F3D0)),
+                        borderRadius: BorderRadius.circular(5),
                       ),
-                    ),
-                  ),
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      // Dots
-                      Row(
-                        children: List.generate(_allTips.length, (idx) {
-                          final isActive = idx == _currentTipIndex;
-                          return AnimatedContainer(
-                            duration: const Duration(milliseconds: 300),
-                            margin: const EdgeInsets.only(right: 4),
-                            height: 5,
-                            width: isActive ? 20 : 5,
-                            decoration: BoxDecoration(
-                              color: isActive 
-                                  ? (isDark ? const Color(0xFF34D399) : const Color(0xFF10B981))
-                                  : (isDark ? const Color(0xFF064E3B) : const Color(0xFFA7F3D0)),
-                              borderRadius: BorderRadius.circular(5),
-                            ),
-                          );
-                        }),
-                      ),
-                      // Fraction text
-                      Text(
-                        '${_currentTipIndex + 1}/${_allTips.length}',
-                        style: AppTextStyles.micro(isDark: isDark).copyWith(
-                          color: isDark ? const Color(0xFF34D399) : const Color(0xFF059669),
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                    ],
+                    );
+                  }),
+                ),
+                // Fraction text
+                Text(
+                  '${_currentTipIndex + 1}/${_allTips.length}',
+                  style: AppTextStyles.micro(isDark: isDark).copyWith(
+                    color: isDark ? const Color(0xFF34D399) : const Color(0xFF059669),
+                    fontWeight: FontWeight.bold,
                   ),
                 ),
               ],

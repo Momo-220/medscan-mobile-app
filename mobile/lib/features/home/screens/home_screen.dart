@@ -25,6 +25,8 @@ import 'widgets/health_tips_card.dart';
 class HomePage extends ConsumerWidget {
   const HomePage({super.key});
 
+  static bool _hasShownVersionDialog = false;
+
 
   String _getGreeting(String tMorning, String tEvening) {
     final hour = DateTime.now().hour;
@@ -48,15 +50,17 @@ class HomePage extends ConsumerWidget {
             borderRadius: BorderRadius.circular(24),
           ),
           backgroundColor: isDark ? AppColors.cardDark : AppColors.card,
-          child: Padding(
-            padding: const EdgeInsets.all(24.0),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                // Diamond Icon
-                Container(
-                  width: 64,
-                  height: 64,
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 420),
+            child: Padding(
+              padding: const EdgeInsets.all(24.0),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  // Diamond Icon
+                  Container(
+                    width: 64,
+                    height: 64,
                   decoration: BoxDecoration(
                     color: Colors.yellow[600]!.withOpacity(0.15),
                     shape: BoxShape.circle,
@@ -130,9 +134,43 @@ class HomePage extends ConsumerWidget {
               ],
             ),
           ),
+        ),
+      );
+    },
+  );
+  }
+
+  void _handleVersionStatus(BuildContext context, AppVersionStatus status) {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!context.mounted) return;
+      if (status is MaintenanceStatus) {
+        showDialog(
+          context: context,
+          barrierDismissible: false,
+          builder: (context) => MaintenanceDialog(message: status.message),
         );
-      },
-    );
+      } else if (status is UpdateRequiredStatus) {
+        showDialog(
+          context: context,
+          barrierDismissible: false,
+          builder: (context) => VersionUpdateDialog(
+            config: status.config,
+            isForceUpdate: true,
+          ),
+        );
+      } else if (status is UpdateAvailableStatus) {
+        if (_hasShownVersionDialog) return;
+        _hasShownVersionDialog = true;
+        showDialog(
+          context: context,
+          barrierDismissible: true,
+          builder: (context) => VersionUpdateDialog(
+            config: status.config,
+            isForceUpdate: false,
+          ),
+        );
+      }
+    });
   }
 
   @override
@@ -142,35 +180,15 @@ class HomePage extends ConsumerWidget {
     // Listen to remote version checking status
     ref.listen<AsyncValue<AppVersionStatus>>(versionCheckProvider, (previous, next) {
       next.whenOrNull(
-        data: (status) {
-          if (status is MaintenanceStatus) {
-            showDialog(
-              context: context,
-              barrierDismissible: false,
-              builder: (context) => MaintenanceDialog(message: status.message),
-            );
-          } else if (status is UpdateRequiredStatus) {
-            showDialog(
-              context: context,
-              barrierDismissible: false,
-              builder: (context) => VersionUpdateDialog(
-                config: status.config,
-                isForceUpdate: true,
-              ),
-            );
-          } else if (status is UpdateAvailableStatus) {
-            showDialog(
-              context: context,
-              barrierDismissible: true,
-              builder: (context) => VersionUpdateDialog(
-                config: status.config,
-                isForceUpdate: false,
-              ),
-            );
-          }
-        },
+        data: (status) => _handleVersionStatus(context, status),
       );
     });
+
+    // Also verify if version was already resolved before this screen mounted
+    final versionAsync = ref.watch(versionCheckProvider);
+    versionAsync.whenOrNull(
+      data: (status) => _handleVersionStatus(context, status),
+    );
     
     // Auth & local name / username extraction
     final user = FirebaseAuth.instance.currentUser;

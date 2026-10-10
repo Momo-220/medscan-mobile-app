@@ -9,6 +9,7 @@ class RecentScan {
   final String? manufacturer;
   final String? packagingLanguage;
   final String? imageUrl;
+  final String? localImagePath;
   final String? confidence;
   final DateTime scannedAt;
   final Map<String, dynamic>? analysisData;
@@ -29,6 +30,7 @@ class RecentScan {
     this.manufacturer,
     this.packagingLanguage,
     this.imageUrl,
+    this.localImagePath,
     this.confidence,
     required this.scannedAt,
     this.analysisData,
@@ -71,6 +73,7 @@ class RecentScan {
       manufacturer: _parseStringOrList(json['manufacturer']),
       packagingLanguage: _parseStringOrList(json['packaging_language']),
       imageUrl: json['image_url'] as String?,
+      localImagePath: json['local_image_path'] as String?,
       confidence: _parseStringOrList(json['confidence']) ?? 'medium',
       scannedAt: json['scanned_at'] != null 
           ? (DateTime.tryParse(json['scanned_at'].toString()) ?? DateTime.now())
@@ -100,6 +103,7 @@ class RecentScan {
       'manufacturer': manufacturer,
       'packaging_language': packagingLanguage,
       'image_url': imageUrl,
+      'local_image_path': localImagePath,
       'confidence': confidence,
       'scanned_at': scannedAt.toIso8601String(),
       'analysis_data': analysisData,
@@ -122,6 +126,7 @@ class RecentScan {
     String? manufacturer,
     String? packagingLanguage,
     String? imageUrl,
+    String? localImagePath,
     String? confidence,
     DateTime? scannedAt,
     Map<String, dynamic>? analysisData,
@@ -142,6 +147,7 @@ class RecentScan {
       manufacturer: manufacturer ?? this.manufacturer,
       packagingLanguage: packagingLanguage ?? this.packagingLanguage,
       imageUrl: imageUrl ?? this.imageUrl,
+      localImagePath: localImagePath ?? this.localImagePath,
       confidence: confidence ?? this.confidence,
       scannedAt: scannedAt ?? this.scannedAt,
       analysisData: analysisData ?? this.analysisData,

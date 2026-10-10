@@ -50,4 +50,15 @@ post_install do |installer|
       config.build_settings['IPHONEOS_DEPLOYMENT_TARGET'] = '15.0'
     end
   end
+
+  # Inject Flutter version/build settings into MedScanWidgetExtension pod configs
+  ['debug', 'release', 'profile'].each do |cfg|
+    path = File.join('Pods', 'Target Support Files', 'Pods-MedScanWidgetExtension', "Pods-MedScanWidgetExtension.#{cfg}.xcconfig")
+    if File.exist?(path)
+      content = File.read(path)
+      unless content.include?('Generated.xcconfig')
+        File.open(path, 'a') { |f| f.puts "\n#include? \"../../../Flutter/Generated.xcconfig\"\n" }
+      end
+    end
+  end
 end

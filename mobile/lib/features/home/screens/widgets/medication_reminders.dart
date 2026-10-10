@@ -387,14 +387,37 @@ class _MedicationRemindersWidgetState extends ConsumerState<MedicationRemindersW
                   return _buildEmptyCard(isDark);
                 }
 
-                return ListView.separated(
-                  shrinkWrap: true,
-                  physics: const NeverScrollableScrollPhysics(),
-                  itemCount: reminders.length,
-                  separatorBuilder: (context, index) => const SizedBox(height: 10),
-                  itemBuilder: (context, index) {
-                    final r = reminders[index];
-                    return _buildReminderTile(context, r, isDark);
+                return LayoutBuilder(
+                  builder: (context, constraints) {
+                    final bool isWide = constraints.maxWidth >= 540;
+                    if (isWide) {
+                      return GridView.builder(
+                        shrinkWrap: true,
+                        physics: const NeverScrollableScrollPhysics(),
+                        itemCount: reminders.length,
+                        gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
+                          maxCrossAxisExtent: 380,
+                          mainAxisExtent: 140,
+                          crossAxisSpacing: 12,
+                          mainAxisSpacing: 12,
+                        ),
+                        itemBuilder: (context, index) {
+                          final r = reminders[index];
+                          return _buildReminderTile(context, r, isDark);
+                        },
+                      );
+                    }
+
+                    return ListView.separated(
+                      shrinkWrap: true,
+                      physics: const NeverScrollableScrollPhysics(),
+                      itemCount: reminders.length,
+                      separatorBuilder: (context, index) => const SizedBox(height: 10),
+                      itemBuilder: (context, index) {
+                        final r = reminders[index];
+                        return _buildReminderTile(context, r, isDark);
+                      },
+                    );
                   },
                 );
               },
@@ -617,33 +640,55 @@ class _MedicationRemindersWidgetState extends ConsumerState<MedicationRemindersW
   }
 
   Widget _buildSkeletonList() {
-    return Column(
-      children: List.generate(2, (index) {
-        return const Padding(
-          padding: EdgeInsets.only(bottom: 10.0),
-          child: AppCard(
-            padding: EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-            children: Row(
-              children: [
-                Skeleton(width: 28, height: 28, borderRadius: 14),
-                SizedBox(width: 14),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Skeleton(width: 80, height: 16),
-                      SizedBox(height: 6),
-                      Skeleton(width: 120, height: 14),
-                    ],
-                  ),
-                ),
-                SizedBox(width: 12),
-                Skeleton(width: 40, height: 20, borderRadius: 10),
-              ],
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final bool isWide = constraints.maxWidth >= 540;
+        if (isWide) {
+          return GridView.builder(
+            shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(),
+            itemCount: 2,
+            gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
+              maxCrossAxisExtent: 380,
+              mainAxisExtent: 140,
+              crossAxisSpacing: 12,
+              mainAxisSpacing: 12,
             ),
-          ),
+            itemBuilder: (context, index) => _buildSkeletonItem(),
+          );
+        }
+
+        return Column(
+          children: List.generate(2, (index) => _buildSkeletonItem()),
         );
-      }),
+      },
+    );
+  }
+
+  Widget _buildSkeletonItem() {
+    return const Padding(
+      padding: EdgeInsets.only(bottom: 10.0),
+      child: AppCard(
+        padding: EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+        children: Row(
+          children: [
+            Skeleton(width: 28, height: 28, borderRadius: 14),
+            SizedBox(width: 14),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Skeleton(width: 80, height: 16),
+                  SizedBox(height: 6),
+                  Skeleton(width: 120, height: 14),
+                ],
+              ),
+            ),
+            SizedBox(width: 12),
+            Skeleton(width: 40, height: 20, borderRadius: 10),
+          ],
+        ),
+      ),
     );
   }
 }

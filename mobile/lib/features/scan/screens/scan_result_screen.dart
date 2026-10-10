@@ -114,34 +114,46 @@ class _ScanResultPageState extends ConsumerState<ScanResultPage> {
   }
 
   Future<void> _resolveImagePath() async {
+    // 1. Explicit local path passed from scanner
+    final explicitLocalPath = widget.scanData['local_image_path'] as String?;
+    if (explicitLocalPath != null && explicitLocalPath.isNotEmpty && File(explicitLocalPath).existsSync()) {
+      if (mounted) {
+        setState(() {
+          _resolvedLocalImagePath = explicitLocalPath;
+        });
+      }
+      return;
+    }
+
+    // 2. Local file path in image_url
     final rawUrl = widget.scanData['image_url'] as String?;
-    if (rawUrl != null && rawUrl.isNotEmpty && !rawUrl.startsWith('http')) {
+    if (rawUrl != null && rawUrl.isNotEmpty && !rawUrl.startsWith('http') && !rawUrl.startsWith('/api')) {
+      if (File(rawUrl).existsSync()) {
+        if (mounted) {
+          setState(() {
+            _resolvedLocalImagePath = rawUrl;
+          });
+        }
+        return;
+      }
       try {
         final fileName = rawUrl.split('/').last;
         final appDir = await getApplicationDocumentsDirectory();
         final resolvedFile = File('${appDir.path}/scanned_images/$fileName');
-        if (mounted) {
-          setState(() {
-            _resolvedLocalImagePath = resolvedFile.path;
-          });
+        if (resolvedFile.existsSync()) {
+          if (mounted) {
+            setState(() {
+              _resolvedLocalImagePath = resolvedFile.path;
+            });
+          }
+          return;
         }
       } catch (_) {}
     }
   }
 
   String _getResolvedImageUrl(String? url) {
-    if (url == null || url.trim().isEmpty) return '';
-    
-    // Replace localhost or 127.0.0.1 with the actual configured IP address of the server
-    final serverBase = ApiConstants.baseUrl.replaceAll('/api/v1', '');
-    
-    if (url.startsWith('http://localhost:8888')) {
-      return url.replaceAll('http://localhost:8888', serverBase);
-    }
-    if (url.startsWith('http://127.0.0.1:8888')) {
-      return url.replaceAll('http://127.0.0.1:8888', serverBase);
-    }
-    return url;
+    return ApiConstants.resolveImageUrl(url);
   }
 
   Color _getConfidenceColor(String confidence) {
@@ -402,20 +414,7 @@ class _ScanResultPageState extends ConsumerState<ScanResultPage> {
                   padding: const EdgeInsets.all(12),
                   child: ClipRRect(
                     borderRadius: BorderRadius.circular(16),
-                    child: scan.imageUrl != null && scan.imageUrl!.isNotEmpty
-                        ? (scan.imageUrl!.startsWith('http')
-                            ? CachedNetworkImage(
-                                imageUrl: _getResolvedImageUrl(scan.imageUrl) ?? '',
-                                fit: BoxFit.cover,
-                                placeholder: (context, url) => const Skeleton(width: double.infinity, height: 250),
-                                errorWidget: (context, url, error) => _buildNoImagePlaceholder(isDark),
-                              )
-                            : Image.file(
-                                File(_resolvedLocalImagePath ?? scan.imageUrl!),
-                                fit: BoxFit.cover,
-                                errorBuilder: (context, error, stackTrace) => _buildNoImagePlaceholder(isDark),
-                              ))
-                        : _buildNoImagePlaceholder(isDark),
+                    child: _buildMedicationImage(scan, isDark),
                   ),
                 ),
               ),
@@ -832,6 +831,61 @@ class _ScanResultPageState extends ConsumerState<ScanResultPage> {
       ),
     ),
   );
+}
+
+  Widget _buildMedicationImage(ScanResponse scan, bool isDark) {
+    // 1. Identify local file candidates
+    String? localPath = widget.scanData['local_image_path'] as String? ?? scan.localImagePath ?? _resolvedLocalImagePath;
+    if (localPath == null && scan.imageUrl != null && !scan.imageUrl!.startsWith('http') && !scan.imageUrl!.startsWith('/api')) {
+      localPath = scan.imageUrl;
+    }
+
+    final bool hasValidLocalFile = localPath != null && localPath.isNotEmpty && File(localPath).existsSync();
+
+    // 2. Identify network URL candidate
+    String? networkUrl;
+    if (scan.imageUrl != null && scan.imageUrl!.isNotEmpty) {
+      networkUrl = _getResolvedImageUrl(scan.imageUrl);
+    }
+
+    // 3. Instant local display if image file is present on disk (camera/gallery pick)
+    if (hasValidLocalFile) {
+      return Image.file(
+        File(localPath!),
+        fit: BoxFit.cover,
+        errorBuilder: (context, error, stackTrace) {
+          if (networkUrl != null && networkUrl.isNotEmpty) {
+            return _buildNetworkImage(networkUrl, isDark, fallbackPath: localPath);
+          }
+          return _buildNoImagePlaceholder(isDark);
+        },
+      );
+    }
+
+    // 4. Remote image with local fallback
+    if (networkUrl != null && networkUrl.isNotEmpty) {
+      return _buildNetworkImage(networkUrl, isDark, fallbackPath: localPath);
+    }
+
+    return _buildNoImagePlaceholder(isDark);
+  }
+
+  Widget _buildNetworkImage(String networkUrl, bool isDark, {String? fallbackPath}) {
+    return CachedNetworkImage(
+      imageUrl: networkUrl,
+      fit: BoxFit.cover,
+      placeholder: (context, url) => const Skeleton(width: double.infinity, height: 250),
+      errorWidget: (context, url, error) {
+        if (fallbackPath != null && File(fallbackPath).existsSync()) {
+          return Image.file(
+            File(fallbackPath),
+            fit: BoxFit.cover,
+            errorBuilder: (context, error, stackTrace) => _buildNoImagePlaceholder(isDark),
+          );
+        }
+        return _buildNoImagePlaceholder(isDark);
+      },
+    );
   }
 
   Widget _buildNoImagePlaceholder(bool isDark) {

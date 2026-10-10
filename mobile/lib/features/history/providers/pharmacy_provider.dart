@@ -163,7 +163,10 @@ class PharmacyNotifier extends StateNotifier<PharmacyState> {
           if (scan.imageUrl != null && !scan.imageUrl!.startsWith('http')) {
             final fileName = scan.imageUrl!.split('/').last;
             final resolvedFile = File('${appDir.path}/scanned_images/$fileName');
-            return scan.copyWith(imageUrl: resolvedFile.path);
+            if (resolvedFile.existsSync()) {
+              return scan.copyWith(imageUrl: resolvedFile.path);
+            }
+            return scan.copyWith(imageUrl: ApiConstants.resolveImageUrl(scan.imageUrl));
           }
           return scan;
         }).toList();
@@ -207,20 +210,17 @@ class PharmacyNotifier extends StateNotifier<PharmacyState> {
       final appDir = await getApplicationDocumentsDirectory();
       if (!mounted) return;
       final resolvedScans = list.map<RecentScan>((scan) {
-        if (scan.imageUrl != null) {
-          String imgUrl = scan.imageUrl!;
+        if (scan.imageUrl != null && scan.imageUrl!.isNotEmpty) {
+          final imgUrl = scan.imageUrl!;
           if (!imgUrl.startsWith('http')) {
             final fileName = imgUrl.split('/').last;
             final resolvedFile = File('${appDir.path}/scanned_images/$fileName');
-            return scan.copyWith(imageUrl: resolvedFile.path);
-          } else {
-            // Resolve dev localhost addresses to actual dev IP so physical device can load it
-            if (imgUrl.contains('localhost:8888') || imgUrl.contains('127.0.0.1:8888')) {
-              final base = ApiConstants.baseUrl.replaceAll('/api/v1', '');
-              imgUrl = imgUrl.replaceAll(RegExp(r'https?://(localhost|127\.0\.0\.1):8888'), base);
+            if (resolvedFile.existsSync()) {
+              return scan.copyWith(imageUrl: resolvedFile.path, localImagePath: resolvedFile.path);
             }
-            return scan.copyWith(imageUrl: imgUrl);
           }
+          final resolvedNetworkUrl = ApiConstants.resolveImageUrl(imgUrl);
+          return scan.copyWith(imageUrl: resolvedNetworkUrl);
         }
         return scan;
       }).toList();
@@ -246,7 +246,10 @@ class PharmacyNotifier extends StateNotifier<PharmacyState> {
           final earliestScannedAt = local.scannedAt.isBefore(backendScan.scannedAt)
               ? local.scannedAt
               : backendScan.scannedAt;
-          mergedMap[backendScan.scanId] = backendScan.copyWith(scannedAt: earliestScannedAt);
+          mergedMap[backendScan.scanId] = backendScan.copyWith(
+            scannedAt: earliestScannedAt,
+            localImagePath: local.localImagePath ?? backendScan.localImagePath,
+          );
         } else {
           mergedMap[backendScan.scanId] = backendScan;
         }
