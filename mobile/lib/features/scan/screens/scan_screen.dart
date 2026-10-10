@@ -214,20 +214,17 @@ class _ScanPageState extends ConsumerState<ScanPage> with SingleTickerProviderSt
         centerTitle: false,
       ),
       body: SafeArea(
-        child: LayoutBuilder(
-          builder: (context, constraints) {
-            return SingleChildScrollView(
+        child: Center(
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 580),
+            child: CustomScrollView(
               physics: const AlwaysScrollableScrollPhysics(),
-              child: ConstrainedBox(
-                constraints: BoxConstraints(
-                  minHeight: constraints.maxHeight,
-                ),
-                child: ResponsiveContainer(
-                  maxWidth: 580,
-                  child: IntrinsicHeight(
-                    child: Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 24.0, vertical: 24.0),
-                      child: Column(
+              slivers: [
+                SliverFillRemaining(
+                  hasScrollBody: false,
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 24.0, vertical: 24.0),
+                    child: Column(
                       mainAxisAlignment: MainAxisAlignment.center,
                       crossAxisAlignment: CrossAxisAlignment.center,
                       children: [
@@ -308,9 +305,9 @@ class _ScanPageState extends ConsumerState<ScanPage> with SingleTickerProviderSt
                             ),
                           ],
                         ),
-                        
+
                         const Spacer(),
-                        
+
                         // Bottom Disclaimer
                         const SizedBox(height: 32),
                         Center(
@@ -324,10 +321,9 @@ class _ScanPageState extends ConsumerState<ScanPage> with SingleTickerProviderSt
                     ),
                   ),
                 ),
-              ),
+              ],
             ),
-          );
-          },
+          ),
         ),
       ),
     );
@@ -549,11 +545,11 @@ class _ScanPageState extends ConsumerState<ScanPage> with SingleTickerProviderSt
                         ),
                         const SizedBox(height: 12),
                         TweenAnimationBuilder<double>(
-                          duration: const Duration(milliseconds: 1000),
-                          curve: Curves.easeInOutCubic,
+                          duration: const Duration(milliseconds: 600),
+                          curve: Curves.easeOutCubic,
                           tween: Tween<double>(
                             begin: 0,
-                            end: scanState.progressPercent / 100.0,
+                            end: (scanState.progressPercent / 100.0).clamp(0.0, 1.0),
                           ),
                           builder: (context, value, child) {
                             return Container(
@@ -563,37 +559,30 @@ class _ScanPageState extends ConsumerState<ScanPage> with SingleTickerProviderSt
                                 color: isDark ? const Color(0xFF1E293B) : const Color(0xFFF1F5F9),
                                 borderRadius: BorderRadius.circular(5),
                               ),
-                              child: LayoutBuilder(
-                                builder: (context, constraints) {
-                                  final currentWidth = constraints.maxWidth * value;
-                                  return Align(
-                                    alignment: Alignment.centerLeft,
-                                    child: AnimatedContainer(
-                                      duration: const Duration(milliseconds: 150),
-                                      curve: Curves.easeOutQuad,
-                                      width: currentWidth,
-                                      height: 10,
-                                      decoration: BoxDecoration(
-                                        gradient: const LinearGradient(
-                                          colors: [
-                                            Color(0xFF3B82F6),
-                                            Color(0xFF60A5FA),
-                                            Color(0xFF00F5D4),
-                                          ],
-                                        ),
-                                        borderRadius: BorderRadius.circular(5),
-                                        boxShadow: [
-                                          BoxShadow(
-                                            color: const Color(0xFF3B82F6).withOpacity(0.35),
-                                            blurRadius: 6,
-                                            spreadRadius: 1,
-                                            offset: const Offset(0, 1),
-                                          ),
-                                        ],
-                                      ),
+                              child: FractionallySizedBox(
+                                alignment: Alignment.centerLeft,
+                                widthFactor: value.clamp(0.0, 1.0),
+                                child: Container(
+                                  height: 10,
+                                  decoration: BoxDecoration(
+                                    gradient: const LinearGradient(
+                                      colors: [
+                                        Color(0xFF3B82F6),
+                                        Color(0xFF60A5FA),
+                                        Color(0xFF00F5D4),
+                                      ],
                                     ),
-                                  );
-                                },
+                                    borderRadius: BorderRadius.circular(5),
+                                    boxShadow: [
+                                      BoxShadow(
+                                        color: const Color(0xFF3B82F6).withOpacity(0.35),
+                                        blurRadius: 6,
+                                        spreadRadius: 1,
+                                        offset: const Offset(0, 1),
+                                      ),
+                                    ],
+                                  ),
+                                ),
                               ),
                             );
                           },
