@@ -112,6 +112,22 @@ class AuthNotifier extends Notifier<AsyncValue<User?>> {
         if (credential.user!.displayName != null) {
           await prefs.setLocalName(credential.user!.displayName!);
         }
+
+        // Restore existing avatar from Firebase Auth or Firestore
+        final photoUrl = credential.user!.photoURL;
+        if (photoUrl != null && photoUrl.isNotEmpty) {
+          await prefs.setLocalAvatar(photoUrl);
+          await prefs.setAvatarCompleted(true);
+        } else {
+          try {
+            final doc = await FirebaseFirestore.instance.collection('users').doc(credential.user!.uid).get();
+            final firestorePhoto = doc.data()?['photo_url'] as String?;
+            if (firestorePhoto != null && firestorePhoto.isNotEmpty) {
+              await prefs.setLocalAvatar(firestorePhoto);
+              await prefs.setAvatarCompleted(true);
+            }
+          } catch (_) {}
+        }
       }
 
       await _saveToken();
@@ -267,6 +283,31 @@ class AuthNotifier extends Notifier<AsyncValue<User?>> {
       );
 
       final userCredential = await _auth!.signInWithCredential(credential);
+      final gUser = userCredential.user;
+      if (gUser != null) {
+        final prefs = ref.read(sharedPrefsServiceProvider);
+        if (gUser.displayName != null && gUser.displayName!.isNotEmpty) {
+          await prefs.setLocalName(gUser.displayName!);
+        }
+        final existingUsername = await usernameService.lookupUsernameByUid(gUser.uid);
+        if (existingUsername != null && existingUsername.isNotEmpty) {
+          await prefs.setLocalUsername(existingUsername);
+        }
+        final photoUrl = gUser.photoURL;
+        if (photoUrl != null && photoUrl.isNotEmpty) {
+          await prefs.setLocalAvatar(photoUrl);
+          await prefs.setAvatarCompleted(true);
+        } else {
+          try {
+            final doc = await FirebaseFirestore.instance.collection('users').doc(gUser.uid).get();
+            final firestorePhoto = doc.data()?['photo_url'] as String?;
+            if (firestorePhoto != null && firestorePhoto.isNotEmpty) {
+              await prefs.setLocalAvatar(firestorePhoto);
+              await prefs.setAvatarCompleted(true);
+            }
+          } catch (_) {}
+        }
+      }
       await _saveToken();
       state = AsyncValue.data(userCredential.user);
     } catch (e, stack) {
@@ -410,6 +451,22 @@ class AuthNotifier extends Notifier<AsyncValue<User?>> {
         final existingUsername = await usernameService.lookupUsernameByUid(firebaseUser.uid);
         if (existingUsername != null && existingUsername.isNotEmpty) {
           await prefs.setLocalUsername(existingUsername);
+        }
+
+        // Restaurer l'avatar existant
+        final photoUrl = firebaseUser.photoURL;
+        if (photoUrl != null && photoUrl.isNotEmpty) {
+          await prefs.setLocalAvatar(photoUrl);
+          await prefs.setAvatarCompleted(true);
+        } else {
+          try {
+            final doc = await FirebaseFirestore.instance.collection('users').doc(firebaseUser.uid).get();
+            final firestorePhoto = doc.data()?['photo_url'] as String?;
+            if (firestorePhoto != null && firestorePhoto.isNotEmpty) {
+              await prefs.setLocalAvatar(firestorePhoto);
+              await prefs.setAvatarCompleted(true);
+            }
+          } catch (_) {}
         }
 
         // 7. Sauvegarde locale des identifiants Apple (sub & transfer_sub)

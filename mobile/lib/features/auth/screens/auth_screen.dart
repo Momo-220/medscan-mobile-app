@@ -1,10 +1,12 @@
 import 'dart:io';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:sign_in_with_apple/sign_in_with_apple.dart';
 
+import '../../../core/di/providers.dart';
 import '../../../core/constants/colors.dart';
 import '../../../core/constants/text_styles.dart';
 import '../../../core/widgets/responsive_layout.dart';
@@ -232,7 +234,7 @@ class _AuthPageState extends ConsumerState<AuthPage> {
       if (_isLogin) {
         await ref.read(authProvider.notifier).signIn(emailOrUsername, password);
         if (mounted) {
-          context.go('/choose-avatar');
+          await _navigateAfterAuth(isNewRegistration: false);
         }
       } else {
         await ref.read(authProvider.notifier).signUp(
@@ -242,7 +244,7 @@ class _AuthPageState extends ConsumerState<AuthPage> {
           username: cleanUsername.isEmpty ? null : cleanUsername,
         );
         if (mounted) {
-          context.go('/choose-avatar');
+          await _navigateAfterAuth(isNewRegistration: true);
         }
       }
     } catch (err) {
@@ -250,6 +252,46 @@ class _AuthPageState extends ConsumerState<AuthPage> {
         _error = _getAuthErrorMessage(err);
         _loading = false;
       });
+    }
+  }
+
+  Future<void> _navigateAfterAuth({required bool isNewRegistration}) async {
+    final user = FirebaseAuth.instance.currentUser;
+    final prefs = ref.read(sharedPrefsServiceProvider);
+
+    // 1. Check if user already has an avatar (locally or in Firebase Auth)
+    final localAvatar = prefs.getLocalAvatar();
+    final firebaseAvatar = user?.photoURL;
+    String? existingAvatar = (localAvatar != null && localAvatar.isNotEmpty)
+        ? localAvatar
+        : (firebaseAvatar != null && firebaseAvatar.isNotEmpty ? firebaseAvatar : null);
+
+    // 2. If missing, look up from Firestore user document
+    if ((existingAvatar == null || existingAvatar.isEmpty) && user != null) {
+      try {
+        final doc = await FirebaseFirestore.instance.collection('users').doc(user.uid).get();
+        final firestoreAvatar = doc.data()?['photo_url'] as String?;
+        if (firestoreAvatar != null && firestoreAvatar.isNotEmpty) {
+          existingAvatar = firestoreAvatar;
+        }
+      } catch (_) {}
+    }
+
+    if (existingAvatar != null && existingAvatar.isNotEmpty) {
+      await prefs.setLocalAvatar(existingAvatar);
+      await prefs.setAvatarCompleted(true);
+      if (mounted) {
+        context.go('/home');
+      }
+    } else if (isNewRegistration) {
+      if (mounted) {
+        context.go('/choose-avatar');
+      }
+    } else {
+      // User logged in but has no avatar chosen yet
+      if (mounted) {
+        context.go('/choose-avatar');
+      }
     }
   }
 
@@ -262,10 +304,9 @@ class _AuthPageState extends ConsumerState<AuthPage> {
     try {
       await ref.read(authProvider.notifier).signInWithGoogle();
       if (mounted) {
-        // If logged in successfully, go to choose avatar
         final user = FirebaseAuth.instance.currentUser;
         if (user != null) {
-          context.go('/choose-avatar');
+          await _navigateAfterAuth(isNewRegistration: false);
         } else {
           setState(() {
             _loading = false;
@@ -291,7 +332,7 @@ class _AuthPageState extends ConsumerState<AuthPage> {
       if (mounted) {
         final user = FirebaseAuth.instance.currentUser;
         if (user != null) {
-          context.go('/choose-avatar');
+          await _navigateAfterAuth(isNewRegistration: false);
         } else {
           setState(() { _loading = false; });
         }
