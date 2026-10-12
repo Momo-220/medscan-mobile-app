@@ -383,20 +383,31 @@ class GeminiService:
         self._initialized = False
         self._active_key = settings.GEMINI_API_KEY or ""
 
+    def _get_configured_keys(self) -> List[str]:
+        """Return list of valid, non-placeholder configured Gemini API keys"""
+        keys = []
+        for k in [
+            getattr(settings, "GEMINI_API_KEY", None),
+            getattr(settings, "GEMINI_API_KEY_2", None),
+            getattr(settings, "GEMINI_API_KEY_3", None),
+        ]:
+            if k and len(k) > 20 and "PLACEHOLDER" not in k.upper():
+                keys.append(k)
+        return keys
+
     async def _rotate_api_key(self) -> bool:
         """
-        Bascule circulairement à chaud entre GEMINI_API_KEY et GEMINI_API_KEY_2.
+        Bascule circulairement à chaud entre toutes les clés configurées (Key 1, Key 2, Key 3).
         Retourne True si le basculement a réussi.
         """
-        if not settings.GEMINI_API_KEY_2:
+        keys = self._get_configured_keys()
+        if len(keys) <= 1:
             return False
             
-        if self._active_key == settings.GEMINI_API_KEY:
-            self._active_key = settings.GEMINI_API_KEY_2
-            logger.info("Switching to GEMINI_API_KEY_2 (secondary key)")
-        else:
-            self._active_key = settings.GEMINI_API_KEY
-            logger.info("Switching back to GEMINI_API_KEY (primary key)")
+        current_idx = keys.index(self._active_key) if self._active_key in keys else -1
+        next_idx = (current_idx + 1) % len(keys)
+        self._active_key = keys[next_idx]
+        logger.info(f"Rotating to Gemini API key index {next_idx + 1}/{len(keys)}")
             
         try:
             await asyncio.to_thread(genai.configure, api_key=self._active_key, transport="rest")
@@ -438,9 +449,12 @@ class GeminiService:
                        key_preview=self._active_key[:10] + "..." if len(api_key) > 10 else "N/A")
             genai.configure(api_key=self._active_key, transport="rest")
             
-            if self._active_key == settings.GEMINI_API_KEY_2:
-                vision_model_name = getattr(settings, "GEMINI_MODEL_VISION_2", "gemini-flash-latest")
-                chat_model_name = getattr(settings, "GEMINI_MODEL_CHAT_2", "gemini-flash-latest")
+            if self._active_key == getattr(settings, "GEMINI_API_KEY_3", None):
+                vision_model_name = getattr(settings, "GEMINI_MODEL_VISION_3", "gemini-3.5-flash-lite")
+                chat_model_name = getattr(settings, "GEMINI_MODEL_CHAT_3", "gemini-3.5-flash-lite")
+            elif self._active_key == getattr(settings, "GEMINI_API_KEY_2", None):
+                vision_model_name = getattr(settings, "GEMINI_MODEL_VISION_2", "gemini-3.5-flash-lite")
+                chat_model_name = getattr(settings, "GEMINI_MODEL_CHAT_2", "gemini-3.5-flash-lite")
             else:
                 vision_model_name = settings.GEMINI_MODEL_VISION
                 chat_model_name = settings.GEMINI_MODEL_CHAT
@@ -532,7 +546,7 @@ Analyze this medication image. Return ONLY a valid JSON object - no explanations
             except (asyncio.TimeoutError, Exception) as e:
                 error_str = str(e)
                 is_timeout = isinstance(e, asyncio.TimeoutError) or "timeout" in error_str.lower() or "deadline" in error_str.lower()
-                if settings.GEMINI_API_KEY_2 and ("quota" in error_str.lower() or "429" in error_str or "404" in error_str or "not found" in error_str.lower() or "surchargé" in error_str.lower() or is_timeout):
+                if len(self._get_configured_keys()) > 1 and ("quota" in error_str.lower() or "429" in error_str or "404" in error_str or "not found" in error_str.lower() or "surchargé" in error_str.lower() or is_timeout):
                     rotated = await self._rotate_api_key()
                     if rotated:
                         logger.info("Retrying vision analysis with rotated API key and strict timeout")
@@ -746,7 +760,7 @@ Analyze this medication image. Return ONLY a valid JSON object - no explanations
             except (asyncio.TimeoutError, Exception) as e:
                 error_str = str(e)
                 is_timeout = isinstance(e, asyncio.TimeoutError) or "timeout" in error_str.lower() or "deadline" in error_str.lower()
-                if settings.GEMINI_API_KEY_2 and ("quota" in error_str.lower() or "429" in error_str or "surchargé" in error_str.lower() or is_timeout):
+                if len(self._get_configured_keys()) > 1 and ("quota" in error_str.lower() or "429" in error_str or "surchargé" in error_str.lower() or is_timeout):
                     rotated = await self._rotate_api_key()
                     if rotated and self.chat_model:
                         logger.info("Retrying chat send_message with rotated API key and strict timeout")
@@ -871,7 +885,7 @@ Analyze this medication image. Return ONLY a valid JSON object - no explanations
             except (asyncio.TimeoutError, Exception) as e:
                 error_str = str(e)
                 is_timeout = isinstance(e, asyncio.TimeoutError) or "timeout" in error_str.lower() or "deadline" in error_str.lower()
-                if settings.GEMINI_API_KEY_2 and ("quota" in error_str.lower() or "429" in error_str or "surchargé" in error_str.lower() or is_timeout):
+                if len(self._get_configured_keys()) > 1 and ("quota" in error_str.lower() or "429" in error_str or "surchargé" in error_str.lower() or is_timeout):
                     rotated = await self._rotate_api_key()
                     if rotated and self.chat_model:
                         logger.info("Retrying chat stream send_message with rotated API key and strict timeout")

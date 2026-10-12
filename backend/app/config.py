@@ -37,10 +37,13 @@ class Settings(BaseSettings):
     # Google Gemini AI
     GEMINI_API_KEY: str
     GEMINI_API_KEY_2: Optional[str] = None
+    GEMINI_API_KEY_3: Optional[str] = None
     GEMINI_MODEL_VISION: str = "gemini-3.5-flash-lite"  # Gemini 3.5 Flash Lite (Key 1)
     GEMINI_MODEL_CHAT: str = "gemini-3.5-flash-lite"  # Gemini 3.5 Flash Lite (Key 1)
     GEMINI_MODEL_VISION_2: str = "gemini-3.5-flash-lite"  # Gemini 3.5 Flash Lite (Key 2)
     GEMINI_MODEL_CHAT_2: str = "gemini-3.5-flash-lite"  # Gemini 3.5 Flash Lite (Key 2)
+    GEMINI_MODEL_VISION_3: str = "gemini-3.5-flash-lite"  # Gemini 3.5 Flash Lite (Key 3)
+    GEMINI_MODEL_CHAT_3: str = "gemini-3.5-flash-lite"  # Gemini 3.5 Flash Lite (Key 3)
     GEMINI_MAX_TOKENS: int = 4096  # Reduced for faster responses
     GEMINI_TEMPERATURE: float = 0.7
     
