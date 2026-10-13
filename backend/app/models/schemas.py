@@ -190,7 +190,7 @@ class ReminderCreate(BaseModel):
     dosage: str = Field(..., min_length=1, max_length=100)
     time: str = Field(..., pattern=r'^([0-1]?[0-9]|2[0-3]):[0-5][0-9]$')  # Format HH:MM
     frequency: Literal['daily', 'twice', 'three-times', 'custom']
-    days: Optional[List[int]] = Field(None, min_items=1, max_items=7)  # 0-6 (Lun-Dim)
+    days: Optional[List[int]] = Field(None, max_items=7)  # 0-6 (Lun-Dim), [] ou None si quotidien
     notes: Optional[str] = Field(None, max_length=500)
 
 
@@ -200,7 +200,7 @@ class ReminderUpdate(BaseModel):
     dosage: Optional[str] = Field(None, min_length=1, max_length=100)
     time: Optional[str] = Field(None, pattern=r'^([0-1]?[0-9]|2[0-3]):[0-5][0-9]$')
     frequency: Optional[Literal['daily', 'twice', 'three-times', 'custom']] = None
-    days: Optional[List[int]] = Field(None, min_items=1, max_items=7)
+    days: Optional[List[int]] = Field(None, max_items=7)
     notes: Optional[str] = Field(None, max_length=500)
     active: Optional[bool] = None
 

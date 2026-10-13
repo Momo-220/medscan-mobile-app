@@ -391,9 +391,33 @@ class GeminiService:
             getattr(settings, "GEMINI_API_KEY_2", None),
             getattr(settings, "GEMINI_API_KEY_3", None),
         ]:
-            if k and len(k) > 20 and "PLACEHOLDER" not in k.upper():
-                keys.append(k)
+            if k and isinstance(k, str):
+                cleaned = k.strip()
+                if len(cleaned) > 20 and "PLACEHOLDER" not in cleaned.upper():
+                    keys.append(cleaned)
         return keys
+
+    def _is_rotatable_error(self, error: Exception) -> bool:
+        """Determines if an error should trigger an immediate API key rotation."""
+        if len(self._get_configured_keys()) <= 1:
+            return False
+        err_str = str(error).lower()
+        is_timeout = isinstance(error, asyncio.TimeoutError) or "timeout" in err_str or "deadline" in err_str
+        return (
+            "quota" in err_str
+            or "429" in err_str
+            or "401" in err_str
+            or "403" in err_str
+            or "404" in err_str
+            or "unauthorized" in err_str
+            or "access_token" in err_str
+            or "denied" in err_str
+            or "invalid authentication" in err_str
+            or "api key" in err_str
+            or "not found" in err_str
+            or "surchargé" in err_str
+            or is_timeout
+        )
 
     async def _rotate_api_key(self) -> bool:
         """
@@ -545,8 +569,7 @@ Analyze this medication image. Return ONLY a valid JSON object - no explanations
                 )
             except (asyncio.TimeoutError, Exception) as e:
                 error_str = str(e)
-                is_timeout = isinstance(e, asyncio.TimeoutError) or "timeout" in error_str.lower() or "deadline" in error_str.lower()
-                if len(self._get_configured_keys()) > 1 and ("quota" in error_str.lower() or "429" in error_str or "404" in error_str or "not found" in error_str.lower() or "surchargé" in error_str.lower() or is_timeout):
+                if self._is_rotatable_error(e):
                     rotated = await self._rotate_api_key()
                     if rotated:
                         logger.info("Retrying vision analysis with rotated API key and strict timeout")
@@ -759,8 +782,7 @@ Analyze this medication image. Return ONLY a valid JSON object - no explanations
                 )
             except (asyncio.TimeoutError, Exception) as e:
                 error_str = str(e)
-                is_timeout = isinstance(e, asyncio.TimeoutError) or "timeout" in error_str.lower() or "deadline" in error_str.lower()
-                if len(self._get_configured_keys()) > 1 and ("quota" in error_str.lower() or "429" in error_str or "surchargé" in error_str.lower() or is_timeout):
+                if self._is_rotatable_error(e):
                     rotated = await self._rotate_api_key()
                     if rotated and self.chat_model:
                         logger.info("Retrying chat send_message with rotated API key and strict timeout")
@@ -884,8 +906,7 @@ Analyze this medication image. Return ONLY a valid JSON object - no explanations
                 )
             except (asyncio.TimeoutError, Exception) as e:
                 error_str = str(e)
-                is_timeout = isinstance(e, asyncio.TimeoutError) or "timeout" in error_str.lower() or "deadline" in error_str.lower()
-                if len(self._get_configured_keys()) > 1 and ("quota" in error_str.lower() or "429" in error_str or "surchargé" in error_str.lower() or is_timeout):
+                if self._is_rotatable_error(e):
                     rotated = await self._rotate_api_key()
                     if rotated and self.chat_model:
                         logger.info("Retrying chat stream send_message with rotated API key and strict timeout")
