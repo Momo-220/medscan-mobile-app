@@ -1,15 +1,18 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import '../di/providers.dart';
 
 import '../../features/auth/screens/ask_name_screen.dart';
 import '../../features/auth/screens/auth_screen.dart';
 import '../../features/auth/screens/choose_avatar_screen.dart';
+import '../../features/auth/screens/choose_doctor_screen.dart';
 import '../../features/auth/screens/language_selection_screen.dart';
 import '../../features/auth/screens/onboarding_screen.dart';
 import '../../features/auth/screens/splash_screen.dart';
 import '../../features/auth/screens/trial_or_signin_screen.dart';
 import '../../features/chat/screens/chat_screen.dart';
+import '../../features/chat/screens/voice_consultation_screen.dart';
 import '../../features/history/screens/pharmacy_screen.dart';
 import '../../features/home/screens/home_screen.dart';
 import '../../features/profile/screens/profile_screen.dart';
@@ -22,8 +25,36 @@ import '../../shared/widgets/navigation_bar.dart';
 final _rootNavigatorKey = GlobalKey<NavigatorState>(debugLabel: 'root');
 final _shellNavigatorKey = GlobalKey<NavigatorState>(debugLabel: 'shell');
 
+/// Route observer for listening to navigation events (e.g. for replaying gem animation on return)
+final RouteObserver<ModalRoute<void>> homeRouteObserver = RouteObserver<ModalRoute<void>>();
+
+/// Smooth fade transition builder (duration 220ms with easeInOutCubic curve)
+CustomTransitionPage<void> _buildSmoothPage({
+  required Widget child,
+  required GoRouterState state,
+}) {
+  return CustomTransitionPage<void>(
+    key: state.pageKey,
+    child: child,
+    transitionDuration: const Duration(milliseconds: 220),
+    reverseTransitionDuration: const Duration(milliseconds: 200),
+    transitionsBuilder: (context, animation, secondaryAnimation, child) {
+      final curvedAnimation = CurvedAnimation(
+        parent: animation,
+        curve: Curves.easeInOutCubic,
+        reverseCurve: Curves.easeInOutCubic,
+      );
+      return FadeTransition(
+        opacity: curvedAnimation,
+        child: child,
+      );
+    },
+  );
+}
+
 final GoRouter _router = GoRouter(
   navigatorKey: _rootNavigatorKey,
+  observers: [homeRouteObserver],
   initialLocation: '/splash',
   // Handle deep links from the home screen widget (medscan://home → /home)
   redirect: (context, state) {
@@ -36,30 +67,71 @@ final GoRouter _router = GoRouter(
     return null; // no redirect otherwise
   },
   routes: [
-    GoRoute(path: '/splash', builder: (_, __) => const SplashPage()),
-    GoRoute(path: '/language', builder: (_, __) => const LanguageSelectionPage()),
-    GoRoute(path: '/onboarding', builder: (_, __) => const OnboardingPage()),
-    GoRoute(path: '/trial-or-signin', builder: (_, __) => const TrialOrSignInPage()),
-    GoRoute(path: '/ask-name', builder: (_, __) => const AskNamePage()),
+    GoRoute(
+      path: '/splash',
+      pageBuilder: (context, state) => _buildSmoothPage(child: const SplashPage(), state: state),
+    ),
+    GoRoute(
+      path: '/language',
+      pageBuilder: (context, state) => _buildSmoothPage(child: const LanguageSelectionPage(), state: state),
+    ),
+    GoRoute(
+      path: '/onboarding',
+      pageBuilder: (context, state) => _buildSmoothPage(child: const OnboardingPage(), state: state),
+    ),
+    GoRoute(
+      path: '/trial-or-signin',
+      pageBuilder: (context, state) => _buildSmoothPage(child: const TrialOrSignInPage(), state: state),
+    ),
+    GoRoute(
+      path: '/ask-name',
+      pageBuilder: (context, state) => _buildSmoothPage(child: const AskNamePage(), state: state),
+    ),
     GoRoute(
       path: '/auth',
-      builder: (context, state) {
+      pageBuilder: (context, state) {
         final extra = state.extra as Map<String, dynamic>? ?? {};
-        return AuthPage(isLoginDefault: extra['isLogin'] ?? true);
+        return _buildSmoothPage(
+          child: AuthPage(isLoginDefault: extra['isLogin'] ?? true),
+          state: state,
+        );
       },
     ),
-    GoRoute(path: '/choose-avatar', builder: (_, __) => const ChooseAvatarPage()),
-    GoRoute(path: '/profile', builder: (_, __) => const ProfilePage()),
-    GoRoute(path: '/scan', builder: (_, __) => const ScanPage()),
+    GoRoute(
+      path: '/choose-avatar',
+      pageBuilder: (context, state) => _buildSmoothPage(child: const ChooseAvatarPage(), state: state),
+    ),
+    GoRoute(
+      path: '/choose-doctor',
+      pageBuilder: (context, state) => _buildSmoothPage(child: const ChooseDoctorPage(), state: state),
+    ),
+    GoRoute(
+      path: '/profile',
+      pageBuilder: (context, state) => _buildSmoothPage(child: const ProfilePage(), state: state),
+    ),
+    GoRoute(
+      path: '/scan',
+      pageBuilder: (context, state) => _buildSmoothPage(child: const ScanPage(), state: state),
+    ),
     GoRoute(
       path: '/scan-result',
-      builder: (context, state) {
+      pageBuilder: (context, state) {
         final extra = state.extra as Map<String, dynamic>? ?? {};
-        return ScanResultPage(scanData: extra);
+        return _buildSmoothPage(
+          child: ScanResultPage(scanData: extra),
+          state: state,
+        );
       },
     ),
+    GoRoute(
+      path: '/voice-consultation',
+      pageBuilder: (context, state) => _buildSmoothPage(
+        child: const VoiceConsultationScreen(),
+        state: state,
+      ),
+    ),
 
-    // ShellRoute for Bottom Nav Tabs
+    // ShellRoute for Bottom Nav Tabs (Fluid, smooth transitions without sliding)
     ShellRoute(
       navigatorKey: _shellNavigatorKey,
       builder: (context, state, child) => AppShell(
@@ -67,14 +139,13 @@ final GoRouter _router = GoRouter(
         child: child,
       ),
       routes: [
-        GoRoute(path: '/home', builder: (_, __) => const HomePage()),
+        GoRoute(
+          path: '/home',
+          pageBuilder: (context, state) => _buildSmoothPage(child: const HomePage(), state: state),
+        ),
         GoRoute(
           path: '/chat',
-          builder: (context, state) {
-            // extra can be:
-            //   - a medication name String (legacy scan-to-chat)
-            //   - a Map with 'name' and 'imageUrl' keys (scan-to-chat with image)
-            //   - null (normal chat)
+          pageBuilder: (context, state) {
             String? medicationContext;
             String? medicationImageUrl;
             if (state.extra is String) {
@@ -84,15 +155,24 @@ final GoRouter _router = GoRouter(
               medicationContext = map['name'] as String?;
               medicationImageUrl = map['imageUrl'] as String?;
             }
-            return ChatPage(
-              key: ValueKey('chat_${medicationContext ?? "default"}_${state.pageKey.value}'),
-              medicationContext: medicationContext,
-              medicationImageUrl: medicationImageUrl,
+            return _buildSmoothPage(
+              child: ChatPage(
+                key: ValueKey('chat_${medicationContext ?? "default"}_${state.pageKey.value}'),
+                medicationContext: medicationContext,
+                medicationImageUrl: medicationImageUrl,
+              ),
+              state: state,
             );
           },
         ),
-        GoRoute(path: '/pharmacy', builder: (_, __) => const PharmacyPage()),
-        GoRoute(path: '/settings', builder: (_, __) => const SettingsPage()),
+        GoRoute(
+          path: '/pharmacy',
+          pageBuilder: (context, state) => _buildSmoothPage(child: const PharmacyPage(), state: state),
+        ),
+        GoRoute(
+          path: '/settings',
+          pageBuilder: (context, state) => _buildSmoothPage(child: const SettingsPage(), state: state),
+        ),
       ],
     ),
   ],
@@ -105,7 +185,7 @@ final routerProvider = Provider<GoRouter>((ref) {
   return _router;
 });
 
-class AppShell extends StatelessWidget {
+class AppShell extends ConsumerWidget {
   final Widget child;
   final String currentPath;
 
@@ -116,20 +196,32 @@ class AppShell extends StatelessWidget {
   });
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final isKeyboardOpen = MediaQuery.viewInsetsOf(context).bottom > 0;
+    final isChatInputActive = currentPath == '/chat' && ref.watch(chatInputActiveProvider);
+    final hideNavBar = isKeyboardOpen || isChatInputActive;
+
     return Scaffold(
       resizeToAvoidBottomInset: false,
       body: Stack(
         children: [
           Positioned.fill(child: child),
-          if (!isKeyboardOpen)
-            Positioned(
-              left: 0,
-              right: 0,
-              bottom: 0,
-              child: CustomNavigationBar(currentPath: currentPath),
+          Positioned(
+            left: 0,
+            right: 0,
+            bottom: 0,
+            child: AnimatedSlide(
+              offset: hideNavBar ? const Offset(0, 1.8) : Offset.zero,
+              duration: const Duration(milliseconds: 320),
+              curve: Curves.easeInOutCubic,
+              child: AnimatedOpacity(
+                opacity: hideNavBar ? 0.0 : 1.0,
+                duration: const Duration(milliseconds: 240),
+                curve: Curves.easeInOut,
+                child: CustomNavigationBar(currentPath: currentPath),
+              ),
             ),
+          ),
         ],
       ),
     );

@@ -36,12 +36,17 @@ def get_staged_files():
     return result.stdout.splitlines()
 
 
+BINARY_EXTENSIONS = {'.png', '.jpg', '.jpeg', '.gif', '.ico', '.pdf', '.zip', '.jar', '.a', '.so', '.dylib', '.ttf', '.otf', '.woff', '.woff2'}
+
+
 def get_file_content(filepath):
+    if any(filepath.lower().endswith(ext) for ext in BINARY_EXTENSIONS):
+        return ""
     result = subprocess.run(
         ['git', 'show', f':{filepath}'],
-        capture_output=True, text=True
+        capture_output=True
     )
-    return result.stdout
+    return result.stdout.decode('utf-8', errors='ignore')
 
 
 def main():

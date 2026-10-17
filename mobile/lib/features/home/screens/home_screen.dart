@@ -1,7 +1,9 @@
+import 'dart:ui';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:google_fonts/google_fonts.dart';
 
 import '../../../core/constants/colors.dart';
 import '../../../core/constants/text_styles.dart';
@@ -13,21 +15,47 @@ import '../../../shared/services/username_service.dart';
 import '../../../shared/widgets/version_update_dialog.dart';
 import '../../../shared/utils/localization.dart';
 import '../../../shared/widgets/button.dart';
+import '../../../data/models/credits.dart';
 import '../providers/credits_provider.dart';
 import '../providers/health_stats_provider.dart';
 import '../providers/recent_scans_provider.dart';
 import '../../reminders/providers/reminders_provider.dart';
+import '../../chat/providers/doctor_provider.dart';
+import 'widgets/animated_gem_badge.dart';
 import 'widgets/health_dashboard.dart';
+import 'widgets/new_medication_scan_card.dart';
+import 'widgets/next_reminder_section.dart';
 import 'widgets/recent_scans.dart';
-import 'widgets/medication_reminders.dart';
-import 'widgets/health_tips_card.dart';
 
-class HomePage extends ConsumerWidget {
+class HomePage extends ConsumerStatefulWidget {
   const HomePage({super.key});
 
+  @override
+  ConsumerState<HomePage> createState() => _HomePageState();
+}
+
+class _HomePageState extends ConsumerState<HomePage> {
   static bool _hasShownVersionDialog = false;
   static String? _lastSyncedKey;
 
+  late final ScrollController _scrollController;
+  final ValueNotifier<double> _scrollOffset = ValueNotifier<double>(0.0);
+
+  @override
+  void initState() {
+    super.initState();
+    _scrollController = ScrollController();
+    _scrollController.addListener(() {
+      _scrollOffset.value = _scrollController.hasClients ? _scrollController.offset : 0.0;
+    });
+  }
+
+  @override
+  void dispose() {
+    _scrollController.dispose();
+    _scrollOffset.dispose();
+    super.dispose();
+  }
 
   String _getGreeting(String tMorning, String tEvening) {
     final hour = DateTime.now().hour;
@@ -62,83 +90,77 @@ class HomePage extends ConsumerWidget {
                   Container(
                     width: 64,
                     height: 64,
-                  decoration: BoxDecoration(
-                    color: Colors.yellow[600]!.withOpacity(0.15),
-                    shape: BoxShape.circle,
+                    decoration: BoxDecoration(
+                      color: Colors.yellow[600]!.withOpacity(0.15),
+                      shape: BoxShape.circle,
+                    ),
+                    child: const Center(child: Text('💎', style: TextStyle(fontSize: 32))),
                   ),
-                  child: const Center(child: Text('💎', style: TextStyle(fontSize: 32))),
-                ),
-                const SizedBox(height: 16),
+                  const SizedBox(height: 16),
 
-                // Title
-                Text(
-                  ref.t('credits'),
-                  style: AppTextStyles.h3(isDark: isDark),
-                ),
-                const SizedBox(height: 12),
+                  // Title
+                  Text(
+                    ref.t('credits'),
+                    style: AppTextStyles.h3(isDark: isDark),
+                  ),
+                  const SizedBox(height: 12),
 
-                // Balance
-                creditsAsync.when(
-                  loading: () => const CircularProgressIndicator(),
-                  error: (err, stack) => const Text('0'),
-                  data: (data) => Column(
-                    children: [
-                      Text(
-                        '${data.credits} ${ref.t('gems')}',
-                        style: AppTextStyles.displayHero(color: AppColors.primary),
-                      ),
-                      if (data.nextResetAt != null) ...[
-                        const SizedBox(height: 8),
+                  // Balance
+                  creditsAsync.when(
+                    loading: () => const CircularProgressIndicator(),
+                    error: (err, stack) => const Text('0'),
+                    data: (data) => Column(
+                      children: [
                         Text(
-                          ref.t('autoRenewMidnight'),
-                          style: AppTextStyles.micro(isDark: isDark),
+                          '${data.credits} ${ref.t('gems')}',
+                          style: AppTextStyles.displayHero(color: AppColors.primary),
                         ),
+                        if (data.nextResetAt != null) ...[
+                          const SizedBox(height: 8),
+                          Text(
+                            ref.t('autoRenewMidnight'),
+                            style: AppTextStyles.micro(isDark: isDark),
+                          ),
+                        ],
                       ],
-                    ],
+                    ),
                   ),
-                ),
-                const SizedBox(height: 24),
+                  const SizedBox(height: 24),
 
-                // Action content based on Anonymous or Registered
-                if (isAnonymous) ...[
-                  Text(
-                    ref.t('trialOrSignInTagline'),
-                    style: AppTextStyles.small(isDark: isDark),
-                    textAlign: TextAlign.center,
-                  ),
-                  const SizedBox(height: 20),
-                  Button(
-                    width: double.infinity,
-                    onTap: () {
-                      Navigator.pop(context);
-                      context.go('/auth');
-                    },
-                    child: Text(ref.t('signInOrRegister')),
-                  ),
-                ] else ...[
-                  Text(
-                    ref.t('trialGemsBenefit'),
-                    style: AppTextStyles.small(isDark: isDark),
-                    textAlign: TextAlign.center,
+                  // Sign-up / Upgrade prompt if anonymous
+                  if (isAnonymous) ...[
+                    Button(
+                      width: double.infinity,
+                      onTap: () {
+                        Navigator.pop(context);
+                        context.push('/auth');
+                      },
+                      child: Text(ref.t('signUpToKeepGems')),
+                    ),
+                    const SizedBox(height: 12),
+                    Text(
+                      ref.t('trialGemsBenefit'),
+                      style: AppTextStyles.small(isDark: isDark),
+                      textAlign: TextAlign.center,
+                    ),
+                  ],
+                  const SizedBox(height: 16),
+
+                  // Close Button
+                  TextButton(
+                    onPressed: () => Navigator.pop(context),
+                    child: Text(
+                      ref.t('close'),
+                      style: AppTextStyles.small(color: AppColors.textMuted),
+                    ),
                   ),
                 ],
-                const SizedBox(height: 16),
-
-                // Close Button
-                TextButton(
-                  onPressed: () => Navigator.pop(context),
-                  child: Text(
-                    ref.t('close'),
-                    style: AppTextStyles.small(color: AppColors.textMuted),
-                  ),
-                ),
-              ],
+              ),
             ),
           ),
-        ),
-      );
-    },
-  );
+        );
+      },
+    );
   }
 
   void _handleVersionStatus(BuildContext context, AppVersionStatus status) {
@@ -175,7 +197,7 @@ class HomePage extends ConsumerWidget {
   }
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
     // Listen to remote version checking status
@@ -185,12 +207,11 @@ class HomePage extends ConsumerWidget {
       );
     });
 
-    // Also verify if version was already resolved before this screen mounted
     final versionAsync = ref.watch(versionCheckProvider);
     versionAsync.whenOrNull(
       data: (status) => _handleVersionStatus(context, status),
     );
-    
+
     // Auth & local name / username extraction
     final user = FirebaseAuth.instance.currentUser;
     final prefs = ref.watch(sharedPrefsServiceProvider);
@@ -215,7 +236,6 @@ class HomePage extends ConsumerWidget {
           langCode: ref.read(languageProvider),
         );
 
-        // Asynchronously load username from Firestore if missing locally
         if ((prefs.getLocalUsername() == null || prefs.getLocalUsername()!.isEmpty) &&
             user != null &&
             !user.isAnonymous) {
@@ -231,146 +251,239 @@ class HomePage extends ConsumerWidget {
     final creditsAsync = ref.watch(creditsProvider);
 
     return Scaffold(
-      backgroundColor: isDark ? AppColors.backgroundDark : AppColors.background,
-      body: RefreshIndicator(
-        onRefresh: () async {
-          // Parallel pull refresh
-          await Future.wait([
-            ref.read(creditsProvider.notifier).fetchCredits(quietly: true),
-            ref.read(healthStatsProvider.notifier).fetchStats(quietly: true),
-            ref.read(recentScansProvider.notifier).fetchRecentScans(),
-          ]);
-        },
-        color: AppColors.primary,
-        child: SafeArea(
-          child: SingleChildScrollView(
-            physics: const AlwaysScrollableScrollPhysics(),
-            child: ResponsiveContainer(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  // Premium Header Section (User info + Gem badge)
-                  Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 20.0),
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      backgroundColor: isDark ? AppColors.backgroundDark : const Color(0xFFF1F6FB),
+      body: Column(
+        children: [
+          // 1. FIXED HEADER (Always pinned at top on all devices, GPU layer isolated)
+          RepaintBoundary(
+            child: _buildHeader(
+              context: context,
+              ref: ref,
+              isDark: isDark,
+              greeting: greeting,
+              greetingName: greetingName,
+              activeAvatar: activeAvatar,
+              creditsAsync: creditsAsync,
+            ),
+          ),
+
+          // 2. SCROLLABLE BODY (Cinematic smooth gradient fade out on scroll)
+          Expanded(
+            child: RefreshIndicator(
+              onRefresh: () async {
+                await Future.wait([
+                  ref.read(creditsProvider.notifier).fetchCredits(quietly: true),
+                  ref.read(healthStatsProvider.notifier).fetchStats(quietly: true),
+                  ref.read(recentScansProvider.notifier).fetchRecentScans(),
+                ]);
+              },
+              color: const Color(0xFF2563EB),
+              child: ValueListenableBuilder<double>(
+                valueListenable: _scrollOffset,
+                builder: (context, offset, child) {
+                  // Cinematic film dissolve: smooth gradient fade at top of scrolling body
+                  final double fadeStop = (offset / 32.0).clamp(0.0, 1.0) * 0.048;
+                  if (fadeStop <= 0.001) {
+                    return child!;
+                  }
+                  return ShaderMask(
+                    shaderCallback: (Rect bounds) {
+                      return LinearGradient(
+                        begin: Alignment.topCenter,
+                        end: Alignment.bottomCenter,
+                        colors: const [
+                          Colors.transparent,
+                          Colors.black,
+                        ],
+                        stops: [0.0, fadeStop],
+                      ).createShader(bounds);
+                    },
+                    blendMode: BlendMode.dstIn,
+                    child: child,
+                  );
+                },
+                child: SingleChildScrollView(
+                  controller: _scrollController,
+                  physics: const BouncingScrollPhysics(
+                    parent: AlwaysScrollableScrollPhysics(),
+                  ),
+                  child: ResponsiveContainer(
+                    child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        // User Info details (Left Side)
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                greeting,
-                                style: AppTextStyles.h1(isDark: isDark).copyWith(
-                                  fontSize: 30,
-                                  fontWeight: FontWeight.w800,
-                                  color: isDark ? Colors.white : const Color(0xFF1E293B),
-                                ),
+                        const SizedBox(height: 14),
+
+                        // 2b. QUICK SCAN PROMPT ("Un nouveau médicament ?")
+                        const NewMedicationScanCard(),
+
+                        const SizedBox(height: 14),
+
+                        // 3. HEALTH DASHBOARD (1 Tall card left + 2 stacked cards right)
+                        const HealthDashboardWidget(),
+
+                        const SizedBox(height: 14),
+
+                        // 4. NEXT REMINDER (Dedicated Section below dashboard)
+                        const NextReminderSectionWidget(),
+
+                        const SizedBox(height: 4), // Tight spacing above Recent Scans!
+
+                        // 5. RECENT SCANS (2-Column Grid)
+                        const RecentScansWidget(),
+
+                        // Bottom spacing margin for floating navigation bar
+                        SizedBox(height: AppResponsive.bottomBarSpacing(context) + 24),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildHeader({
+    required BuildContext context,
+    required WidgetRef ref,
+    required bool isDark,
+    required String greeting,
+    required String greetingName,
+    required String activeAvatar,
+    required AsyncValue<Credits> creditsAsync,
+  }) {
+    final topPadding = MediaQuery.paddingOf(context).top;
+    final screenWidth = MediaQuery.sizeOf(context).width;
+    final screenHeight = MediaQuery.sizeOf(context).height;
+    final double doctorWidth = (screenWidth * 0.42).clamp(130.0, 195.0);
+    final double doctorHeight = doctorWidth * 1.11;
+
+    return Container(
+      width: double.infinity,
+      decoration: BoxDecoration(
+        color: isDark ? const Color(0xFF1E293B) : const Color(0xFFD6EAFC),
+        gradient: LinearGradient(
+          begin: Alignment.topCenter,
+          end: Alignment.bottomCenter,
+          colors: isDark
+              ? [const Color(0xFF1E293B), AppColors.backgroundDark]
+              : [const Color(0xFFD4E8FC), const Color(0xFFF1F6FB)],
+        ),
+      ),
+      child: Center(
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 640),
+          child: Stack(
+            clipBehavior: Clip.none,
+            children: [
+              // 1. Doctor Portrait (Dynamic AI Doctor) - Adaptive responsive size
+              Positioned(
+                top: topPadding + 4,
+                right: 0,
+                width: doctorWidth,
+                height: doctorHeight,
+                child: GestureDetector(
+                  onTap: () => context.go('/chat'),
+                  behavior: HitTestBehavior.opaque,
+                  child: ShaderMask(
+                    shaderCallback: (rect) {
+                      return const LinearGradient(
+                        begin: Alignment.topCenter,
+                        end: Alignment.bottomCenter,
+                        colors: [Colors.black, Colors.black, Colors.transparent],
+                        stops: [0.0, 0.88, 1.0],
+                      ).createShader(rect);
+                    },
+                    blendMode: BlendMode.dstIn,
+                    child: Image.asset(
+                      ref.watch(doctorProvider).imagePath,
+                      fit: BoxFit.contain,
+                      alignment: Alignment.topRight,
+                      errorBuilder: (_, __, ___) => const SizedBox.shrink(),
+                    ),
+                  ),
+                ),
+              ),
+
+          // 2. Foreground Elements
+          Padding(
+            padding: EdgeInsets.only(
+              top: topPadding + (screenHeight < 700 ? 6 : 8),
+              left: 20,
+              right: 20,
+              bottom: screenHeight < 700 ? 12 : 16,
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // Top Row: Avatar & Greeting (Left) + Compact Gem Badge (Right)
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    // Avatar & Greeting
+                    Row(
+                      children: [
+                        GestureDetector(
+                          onTap: () => context.push('/profile'),
+                          child: Container(
+                            width: 44,
+                            height: 44,
+                            decoration: BoxDecoration(
+                              shape: BoxShape.circle,
+                              border: Border.all(
+                                color: isDark ? Colors.white.withOpacity(0.2) : Colors.white,
+                                width: 2,
                               ),
-                              const SizedBox(height: 4),
-                              GestureDetector(
-                                onTap: () => context.push('/profile'),
-                                child: Text(
-                                  greetingName,
-                                  style: AppTextStyles.h2(isDark: isDark).copyWith(
-                                    fontSize: 24,
-                                    fontWeight: FontWeight.bold,
-                                    color: const Color(0xFF9333EA), // Purple color!
-                                  ),
+                              boxShadow: [
+                                BoxShadow(
+                                  color: const Color(0xFF1A3B5D).withOpacity(0.08),
+                                  blurRadius: 10,
+                                  offset: const Offset(0, 3),
                                 ),
-                              ),
-                              const SizedBox(height: 6),
-                              Text(
-                                ref.t('howDoYouFeel'),
-                                style: AppTextStyles.small(isDark: isDark).copyWith(
-                                  fontSize: 14,
-                                  color: isDark ? AppColors.textMutedDark : AppColors.textSecondary,
-                                ),
-                              ),
-                            ],
+                              ],
+                            ),
+                            child: ClipOval(
+                              child: activeAvatar.isNotEmpty
+                                  ? (activeAvatar.startsWith('http')
+                                      ? Image.network(
+                                          activeAvatar,
+                                          fit: BoxFit.cover,
+                                          errorBuilder: (_, __, ___) => const Icon(Icons.person, color: Colors.white),
+                                        )
+                                      : Image.asset(
+                                          activeAvatar,
+                                          fit: BoxFit.cover,
+                                          errorBuilder: (_, __, ___) => const Icon(Icons.person, color: Colors.white),
+                                        ))
+                                  : const Icon(Icons.person, color: Colors.white),
+                            ),
                           ),
                         ),
-                        
-                        // Gem badge + Avatar (Right Side)
-                        Row(
-                          mainAxisSize: MainAxisSize.min,
+                        const SizedBox(width: 12),
+                        Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            // Credits Gemme Badge
-                            GestureDetector(
-                              onTap: () => _showCreditsDialog(context, ref),
-                              child: Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                                decoration: BoxDecoration(
-                                  gradient: AppColors.gemsBadgeGradient,
-                                  borderRadius: BorderRadius.circular(16),
-                                  border: Border.all(
-                                    color: Colors.yellow[600]!.withOpacity(0.2),
-                                    width: 1,
-                                  ),
-                                ),
-                                child: Row(
-                                  children: [
-                                    const Text('💎', style: TextStyle(fontSize: 16)),
-                                    const SizedBox(width: 6),
-                                    creditsAsync.when(
-                                      loading: () => const SizedBox(
-                                        width: 12,
-                                        height: 12,
-                                        child: CircularProgressIndicator(strokeWidth: 2),
-                                      ),
-                                      error: (_, __) => const Text('0'),
-                                      data: (data) => Text(
-                                        data.credits.toString(),
-                                        style: AppTextStyles.smallBold(
-                                          color: isDark ? AppColors.textPrimaryDark : AppColors.textPrimary,
-                                        ),
-                                      ),
-                                    ),
-                                  ],
-                                ),
+                            Text(
+                              greeting,
+                              style: TextStyle(
+                                fontSize: 13,
+                                fontWeight: FontWeight.w500,
+                                color: isDark ? AppColors.textMutedDark : const Color(0xFF64748B),
                               ),
                             ),
-                            const SizedBox(width: 12),
-                            
-                            // Circular Avatar Frame
                             GestureDetector(
                               onTap: () => context.push('/profile'),
-                              child: Container(
-                                width: 48,
-                                height: 48,
-                                decoration: BoxDecoration(
-                                  shape: BoxShape.circle,
-                                  gradient: AppColors.scanButtonGradient,
-                                  border: Border.all(
-                                    color: AppColors.primaryLight.withOpacity(0.5),
-                                    width: 2,
-                                  ),
-                                ),
-                                child: ClipOval(
-                                  child: activeAvatar.isNotEmpty
-                                      ? (activeAvatar.startsWith('http')
-                                          ? Image.network(
-                                              activeAvatar,
-                                              fit: BoxFit.cover,
-                                              errorBuilder: (_, __, ___) => const Icon(
-                                                Icons.person,
-                                                color: Colors.white,
-                                              ),
-                                            )
-                                          : Image.asset(
-                                              activeAvatar,
-                                              fit: BoxFit.cover,
-                                              errorBuilder: (_, __, ___) => const Icon(
-                                                Icons.person,
-                                                color: Colors.white,
-                                              ),
-                                            ))
-                                      : const Icon(
-                                          Icons.person,
-                                          color: Colors.white,
-                                        ),
+                              child: Text(
+                                greetingName,
+                                style: const TextStyle(
+                                  fontFamily: 'Inter',
+                                  fontSize: 18,
+                                  fontWeight: FontWeight.w800,
+                                  color: Color(0xFF8B5CF6), // Iconic Purple!
+                                  letterSpacing: -0.3,
                                 ),
                               ),
                             ),
@@ -378,32 +491,131 @@ class HomePage extends ConsumerWidget {
                         ),
                       ],
                     ),
+
+                    // Top-Right: Animated Gem Badge (shows count, then smoothly folds to circle with blue ring)
+                    AnimatedGemBadge(
+                      key: const ValueKey('home_gem_badge'),
+                      credits: creditsAsync.asData?.value.credits ?? 0,
+                      onTap: () => _showCreditsDialog(context, ref),
+                    ),
+                  ],
+                ),
+
+                SizedBox(height: screenHeight < 700 ? 10 : 14),
+
+                // Display Title "How do you feel?" - Adaptive width & responsive font
+                ConstrainedBox(
+                  constraints: BoxConstraints(maxWidth: (screenWidth - doctorWidth - 36).clamp(135.0, 240.0)),
+                  child: Text(
+                    ref.t('howDoYouFeel'),
+                    style: GoogleFonts.plusJakartaSans(
+                      fontSize: screenWidth < 360 ? 21 : 24,
+                      fontWeight: FontWeight.w800,
+                      height: 1.22,
+                      letterSpacing: -0.5,
+                      color: isDark ? Colors.white : const Color(0xFF0F172A),
+                    ),
                   ),
-                  const SizedBox(height: 12),
+                ),
 
-                  // Next Reminder & Health Tip Cards
-                  const HealthTipsCardWidget(),
-                  const SizedBox(height: 24),
+                SizedBox(height: screenHeight < 700 ? 12 : 16),
 
-                  // Health Stats Dashboard
-                  const HealthDashboardWidget(),
-                  const SizedBox(height: 32),
-
-                  // Medication Reminders List
-                  const MedicationRemindersWidget(),
-                  const SizedBox(height: 32),
-
-                  // Recent Scans List
-                  const RecentScansWidget(),
-                  
-                  // Bottom spacing margin for floating navigation bar
-                  SizedBox(height: AppResponsive.bottomBarSpacing(context)),
-                ],
-              ),
+                // Sleek Frosted Glass AI Pill Bar with blur
+                GestureDetector(
+                  onTap: () => context.go('/chat'),
+                  behavior: HitTestBehavior.opaque,
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(30),
+                    child: BackdropFilter(
+                      filter: ImageFilter.blur(sigmaX: 12, sigmaY: 12),
+                      child: Container(
+                        width: double.infinity,
+                        height: 48,
+                        padding: const EdgeInsets.fromLTRB(14, 4, 6, 4),
+                        decoration: BoxDecoration(
+                          color: (isDark ? const Color(0xFF1E293B) : Colors.white).withValues(alpha: 0.65),
+                          borderRadius: BorderRadius.circular(30),
+                          border: Border.all(
+                            color: isDark
+                                ? Colors.white.withValues(alpha: 0.15)
+                                : Colors.white.withValues(alpha: 0.8),
+                            width: 1.2,
+                          ),
+                          boxShadow: [
+                            BoxShadow(
+                              color: const Color(0xFF0F172A).withValues(alpha: 0.06),
+                              blurRadius: 16,
+                              offset: const Offset(0, 4),
+                            ),
+                          ],
+                        ),
+                        child: Row(
+                          children: [
+                            const Icon(
+                              Icons.auto_awesome,
+                              color: Color(0xFFF59E0B),
+                              size: 18,
+                            ),
+                            const SizedBox(width: 10),
+                            Expanded(
+                              child: Text(
+                                ref.watch(doctorProvider).id == 'dr_sarah'
+                                    ? '${ref.t('askDrSarah')}...'
+                                    : 'Poser une question à ${ref.watch(doctorProvider).shortName}...',
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: GoogleFonts.plusJakartaSans(
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.w500,
+                                  letterSpacing: -0.2,
+                                  color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF475569),
+                                ),
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                            // Small circular action button beside it
+                            Container(
+                              width: 36,
+                              height: 36,
+                              decoration: BoxDecoration(
+                                color: isDark ? const Color(0xFF334155) : Colors.white,
+                                shape: BoxShape.circle,
+                                border: Border.all(
+                                  color: isDark
+                                      ? Colors.white.withValues(alpha: 0.12)
+                                      : const Color(0xFFE2E8F0),
+                                  width: 1,
+                                ),
+                                boxShadow: [
+                                  BoxShadow(
+                                    color: const Color(0xFF0F172A).withValues(alpha: 0.08),
+                                    blurRadius: 8,
+                                    offset: const Offset(0, 2),
+                                  ),
+                                ],
+                              ),
+                              child: Center(
+                                child: Icon(
+                                  Icons.arrow_forward_rounded,
+                                  size: 18,
+                                  color: isDark ? Colors.white : const Color(0xFF2563EB),
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ],
             ),
           ),
-        ),
+        ],
       ),
-    );
+    ),
+  ),
+);
   }
 }
+

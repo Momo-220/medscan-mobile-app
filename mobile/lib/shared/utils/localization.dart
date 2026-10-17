@@ -65,6 +65,24 @@ extension TranslateExtension on WidgetRef {
   String t(String key) {
     return watch(translationsProvider)[key] ?? key;
   }
+
+  String formatMedicationName(String? name) {
+    if (name == null || name.trim().isEmpty) {
+      return t('medicationNotIdentified');
+    }
+    final lower = name.trim().toLowerCase();
+    if (lower == 'medication not identified' ||
+        lower == 'médicament non identifié' ||
+        lower == 'non identifié' ||
+        lower == 'not identified' ||
+        lower == 'unknown' ||
+        lower == 'inconnu' ||
+        lower == 'tanımlanamayan ilaç' ||
+        lower == 'دواء غير محدد') {
+      return t('medicationNotIdentified');
+    }
+    return name;
+  }
 }
 
 extension BuildContextTranslateExtension on BuildContext {
@@ -75,5 +93,23 @@ extension BuildContextTranslateExtension on BuildContext {
     } catch (_) {
       return key;
     }
+  }
+
+  String formatMedicationName(String? name) {
+    if (name == null || name.trim().isEmpty) {
+      return t('medicationNotIdentified');
+    }
+    final lower = name.trim().toLowerCase();
+    if (lower == 'medication not identified' ||
+        lower == 'médicament non identifié' ||
+        lower == 'non identifié' ||
+        lower == 'not identified' ||
+        lower == 'unknown' ||
+        lower == 'inconnu' ||
+        lower == 'tanımlanamayan ilaç' ||
+        lower == 'دواء غير محدد') {
+      return t('medicationNotIdentified');
+    }
+    return name;
   }
 }

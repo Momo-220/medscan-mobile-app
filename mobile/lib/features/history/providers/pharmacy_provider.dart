@@ -9,6 +9,8 @@ import '../../../core/constants/api_constants.dart';
 import '../../../core/di/providers.dart';
 import '../../../data/models/recent_scan.dart';
 import '../../auth/providers/auth_provider.dart';
+import '../../home/providers/health_stats_provider.dart';
+import '../../home/providers/recent_scans_provider.dart';
 import '../../../shared/utils/localization.dart';
 
 class PharmacyState {
@@ -18,6 +20,7 @@ class PharmacyState {
   final String? error;
   final String searchQuery;
   final String selectedCategory;
+  final String sortFilter; // 'all', 'date', 'name'
 
   PharmacyState({
     required this.allScans,
@@ -26,6 +29,7 @@ class PharmacyState {
     this.error,
     this.searchQuery = '',
     this.selectedCategory = '',
+    this.sortFilter = 'all',
   });
 
   PharmacyState copyWith({
@@ -35,6 +39,7 @@ class PharmacyState {
     String? error,
     String? searchQuery,
     String? selectedCategory,
+    String? sortFilter,
   }) {
     return PharmacyState(
       allScans: allScans ?? this.allScans,
@@ -43,6 +48,7 @@ class PharmacyState {
       error: error ?? this.error,
       searchQuery: searchQuery ?? this.searchQuery,
       selectedCategory: selectedCategory ?? this.selectedCategory,
+      sortFilter: sortFilter ?? this.sortFilter,
     );
   }
 }
@@ -257,9 +263,15 @@ class PharmacyNotifier extends StateNotifier<PharmacyState> {
       final mergedList = mergedMap.values.toList();
       mergedList.sort((a, b) => b.scannedAt.compareTo(a.scannedAt));
 
+      // Filter out permanently deleted scans from blacklist
+      final deletedIds = prefs.getDeletedScanIds();
+      final activeMergedList = mergedList
+          .where((s) => !deletedIds.contains(s.scanId) && !deletedIds.contains(s.id))
+          .toList();
+
       // Auto-sync any user local-only scans to MongoDB backend in background
       for (final scan in userLocalScans) {
-        if (!list.any((b) => (b.scanId == scan.scanId || b.id == scan.id))) {
+        if (!deletedIds.contains(scan.scanId) && !deletedIds.contains(scan.id) && !list.any((b) => (b.scanId == scan.scanId || b.id == scan.id))) {
           try {
             _client.post('/history/migrate', data: scan.toJson());
           } catch (_) {}
@@ -268,11 +280,11 @@ class PharmacyNotifier extends StateNotifier<PharmacyState> {
 
       if (mounted) {
         state = state.copyWith(
-          allScans: mergedList,
-          filteredScans: mergedList,
+          allScans: activeMergedList,
+          filteredScans: activeMergedList,
           loading: false,
         );
-        _saveCache(userId, mergedList);
+        _saveCache(userId, activeMergedList);
         _applyFilters();
       }
     } catch (e) {
@@ -305,6 +317,11 @@ class PharmacyNotifier extends StateNotifier<PharmacyState> {
     _applyFilters();
   }
 
+  void setSortFilter(String filter) {
+    state = state.copyWith(sortFilter: filter);
+    _applyFilters();
+  }
+
   void _applyFilters() {
     List<RecentScan> filtered = List<RecentScan>.from(state.allScans);
 
@@ -326,10 +343,77 @@ class PharmacyNotifier extends StateNotifier<PharmacyState> {
       }).toList();
     }
 
-    // STRICT SORTING: Always from most recent to oldest
-    filtered.sort((a, b) => b.scannedAt.compareTo(a.scannedAt));
+    // Apply sort filter: 'name' -> A-Z, 'date' / 'all' -> most recent first
+    if (state.sortFilter == 'name') {
+      filtered.sort((a, b) => a.medicationName.toLowerCase().compareTo(b.medicationName.toLowerCase()));
+    } else {
+      filtered.sort((a, b) => b.scannedAt.compareTo(a.scannedAt));
+    }
 
     state = state.copyWith(filteredScans: filtered);
+  }
+
+  Future<bool> deleteScan(String scanId, {String? secondaryId}) async {
+    try {
+      // 1. Add to persistent tombstone blacklist immediately
+      final prefs = _ref.read(sharedPrefsServiceProvider);
+      await prefs.addDeletedScanId(scanId);
+      if (secondaryId != null && secondaryId.isNotEmpty && secondaryId != scanId) {
+        await prefs.addDeletedScanId(secondaryId);
+      }
+
+      // 2. Remove optimistically from state
+      final updatedAll = state.allScans.where((s) {
+        final matchesPrimary = s.scanId == scanId || s.id == scanId;
+        final matchesSecondary = secondaryId != null && (s.scanId == secondaryId || s.id == secondaryId);
+        return !matchesPrimary && !matchesSecondary;
+      }).toList();
+
+      final updatedFiltered = state.filteredScans.where((s) {
+        final matchesPrimary = s.scanId == scanId || s.id == scanId;
+        final matchesSecondary = secondaryId != null && (s.scanId == secondaryId || s.id == secondaryId);
+        return !matchesPrimary && !matchesSecondary;
+      }).toList();
+
+      state = state.copyWith(allScans: updatedAll, filteredScans: updatedFiltered);
+
+      // 3. Persist updated cache
+      final user = _ref.read(firebaseAuthStateProvider).value;
+      final userId = user?.uid ?? 'trial';
+      _saveCache(userId, updatedAll);
+
+      // 4. Remove from trial scans in shared preferences if present
+      final trialScans = prefs.getTrialScans();
+      if (trialScans.isNotEmpty) {
+        final filteredTrial = trialScans.where((s) {
+          final id = (s['scanId'] ?? s['scan_id'] ?? s['id'])?.toString();
+          return id != scanId && (secondaryId == null || id != secondaryId);
+        }).toList();
+        await prefs.setPharmacyCache('trial', json.encode(filteredTrial));
+      }
+
+      // 5. Call backend DELETE endpoint if authenticated
+      if (user != null && !user.isAnonymous) {
+        try {
+          await _client.delete('/history/$scanId');
+        } catch (e) {
+          debugPrint('Backend delete scan notice: $e');
+        }
+      }
+
+      // 6. Invalidate / update health stats and recent scans
+      try {
+        _ref.read(healthStatsProvider.notifier).fetchStats(quietly: true);
+      } catch (_) {}
+      try {
+        _ref.read(recentScansProvider.notifier).fetchRecentScans();
+      } catch (_) {}
+
+      return true;
+    } catch (e) {
+      debugPrint('Error deleting scan: $e');
+      return false;
+    }
   }
 }
 

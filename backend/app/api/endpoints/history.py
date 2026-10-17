@@ -3,7 +3,7 @@ History Endpoints
 User's scan and interaction history
 """
 
-from fastapi import APIRouter, Depends, Query, status
+from fastapi import APIRouter, Depends, Query, status, HTTPException
 from typing import Dict, Any
 import structlog
 
@@ -145,5 +145,24 @@ async def migrate_history_item(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Failed to migrate scan: {str(e)}"
         )
+
+
+@router.delete("/{scan_id}", status_code=status.HTTP_200_OK)
+async def delete_history_item(
+    scan_id: str,
+    user: Dict[str, Any] = Depends(require_full_account),
+):
+    """
+    🗑️ Delete a scan from user's history
+    """
+    user_id = user["uid"]
+    logger.info("Deleting scan from history", user_id=user_id, scan_id=scan_id)
+    success = scan_history_service.delete_scan(scan_id=scan_id, user_id=user_id)
+    if not success:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Scan not found or unauthorized",
+        )
+    return {"status": "success", "deleted_id": scan_id}
 
 

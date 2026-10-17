@@ -7,19 +7,23 @@ import 'package:path_provider/path_provider.dart';
 
 import '../../../core/constants/api_constants.dart';
 import '../../../data/models/recent_scan.dart';
+import '../../../data/remote/api_client.dart';
+import '../../../data/local/secure_storage.dart';
 import '../../auth/providers/auth_provider.dart';
+import '../../history/providers/pharmacy_provider.dart';
 import '../../../core/di/providers.dart';
 import '../../../shared/utils/localization.dart';
 
 class RecentScansNotifier extends StateNotifier<AsyncValue<List<RecentScan>>> {
   final Ref _ref;
-  final _client;
-  final _storage;
+  final ApiClient _client;
+  final SecureStorageService _storage;
 
   RecentScansNotifier(this._ref)
       : _client = _ref.read(apiClientProvider),
         _storage = _ref.read(secureStorageServiceProvider),
         super(const AsyncValue.loading()) {
+    _loadFromCacheOrPharmacy();
     _ref.listen(firebaseAuthStateProvider, (previous, next) {
       final user = next.value;
       if (user != null) {
@@ -30,13 +34,62 @@ class RecentScansNotifier extends StateNotifier<AsyncValue<List<RecentScan>>> {
     }, fireImmediately: true);
   }
 
+  void _loadFromCacheOrPharmacy() {
+    try {
+      final prefs = _ref.read(sharedPrefsServiceProvider);
+      final deletedIds = prefs.getDeletedScanIds();
+
+      // 1. Check pharmacyProvider first
+      final pharmacyScans = _ref.read(pharmacyProvider).allScans;
+      final validPharmacy = pharmacyScans
+          .where((s) => !deletedIds.contains(s.scanId) && !deletedIds.contains(s.id))
+          .toList();
+      if (validPharmacy.isNotEmpty) {
+        validPharmacy.sort((a, b) => b.scannedAt.compareTo(a.scannedAt));
+        state = AsyncValue.data(validPharmacy.take(4).toList());
+        return;
+      }
+
+      // 2. Check local user/trial cache
+      final user = _ref.read(firebaseAuthStateProvider).value;
+      final cacheJson = prefs.getPharmacyCache(user?.uid ?? 'trial') ?? prefs.getPharmacyCache('trial');
+      if (cacheJson != null && cacheJson.isNotEmpty) {
+        final List<dynamic> decoded = json.decode(cacheJson);
+        final list = decoded
+            .map((e) => RecentScan.fromJson(e))
+            .where((s) => !deletedIds.contains(s.scanId) && !deletedIds.contains(s.id))
+            .toList();
+        list.sort((a, b) => b.scannedAt.compareTo(a.scannedAt));
+        if (list.isNotEmpty) {
+          state = AsyncValue.data(list.take(4).toList());
+        }
+      }
+    } catch (_) {}
+  }
+
+  void syncWithPharmacy(List<RecentScan> scans) {
+    if (!mounted || scans.isEmpty) return;
+    final prefs = _ref.read(sharedPrefsServiceProvider);
+    final deletedIds = prefs.getDeletedScanIds();
+    final valid = scans
+        .where((s) => !deletedIds.contains(s.scanId) && !deletedIds.contains(s.id))
+        .toList();
+    valid.sort((a, b) => b.scannedAt.compareTo(a.scannedAt));
+    if (valid.isNotEmpty) {
+      state = AsyncValue.data(valid.take(4).toList());
+    }
+  }
+
   void _syncUnauthenticatedState() async {
     final token = await _storage.getAuthToken();
     if (!mounted) return;
     if (token != null && token.isNotEmpty) {
       fetchRecentScans();
     } else {
-      state = const AsyncValue.data([]);
+      _loadFromCacheOrPharmacy();
+      if (state.value == null || state.value!.isEmpty) {
+        state = const AsyncValue.data([]);
+      }
     }
   }
 
@@ -44,18 +97,20 @@ class RecentScansNotifier extends StateNotifier<AsyncValue<List<RecentScan>>> {
     final token = await _storage.getAuthToken();
     if (!mounted) return;
     if (token == null || token.isEmpty) {
-      state = const AsyncValue.data([]);
+      _loadFromCacheOrPharmacy();
       return;
     }
 
-    state = const AsyncValue.loading();
+    if (state.value == null || state.value!.isEmpty) {
+      state = const AsyncValue.loading();
+    }
 
     try {
       final lang = _ref.read(languageProvider);
-      // Fetch the latest 3 scans from the backend MongoDB history
+      // Fetch up to 50 scans from the backend to ensure we always have 4 active items after deleted/tombstone filtering
       final response = await _client.get(
         '/history',
-        queryParameters: {'limit': 3, 'page': 1, 'language': lang},
+        queryParameters: {'limit': 50, 'page': 1, 'language': lang},
       );
       if (!mounted) return;
       final List<dynamic> listJson = response.data['scans'] ?? response.data['history'] ?? [];
@@ -80,10 +135,9 @@ class RecentScansNotifier extends StateNotifier<AsyncValue<List<RecentScan>>> {
         return scan;
       }).toList();
 
-      // Merge with local cache so localImagePath and offline photos are never lost
       final prefs = _ref.read(sharedPrefsServiceProvider);
       final user = _ref.read(firebaseAuthStateProvider).value;
-      final cacheJson = prefs.getPharmacyCache(user?.uid ?? 'trial');
+      final cacheJson = prefs.getPharmacyCache(user?.uid ?? 'trial') ?? prefs.getPharmacyCache('trial');
 
       Map<String, RecentScan> localCacheMap = {};
       if (cacheJson != null && cacheJson.isNotEmpty) {
@@ -96,8 +150,25 @@ class RecentScansNotifier extends StateNotifier<AsyncValue<List<RecentScan>>> {
         } catch (_) {}
       }
 
-      final mergedScans = resolvedScans.map<RecentScan>((scan) {
-        final local = localCacheMap[scan.scanId];
+      // Merge local cache, pharmacy provider, and backend scans together
+      final Map<String, RecentScan> mergedMap = {};
+
+      // 1. Local cache scans
+      for (final local in localCacheMap.values) {
+        mergedMap[local.scanId] = local;
+      }
+
+      // 2. Pharmacy provider scans
+      final pharmacyScans = _ref.read(pharmacyProvider).allScans;
+      for (final pScan in pharmacyScans) {
+        if (!mergedMap.containsKey(pScan.scanId)) {
+          mergedMap[pScan.scanId] = pScan;
+        }
+      }
+
+      // 3. Backend resolved scans (authoritative details, preserving localImagePath)
+      for (final scan in resolvedScans) {
+        final local = mergedMap[scan.scanId];
         String? finalLocalPath = local?.localImagePath;
         if (finalLocalPath == null && scan.imageUrl != null && !scan.imageUrl!.startsWith('http')) {
           final fileName = scan.imageUrl!.split('/').last;
@@ -106,121 +177,71 @@ class RecentScansNotifier extends StateNotifier<AsyncValue<List<RecentScan>>> {
             finalLocalPath = resolvedFile.path;
           }
         }
-        return scan.copyWith(
+        final earliestDate = (local != null && local.scannedAt.isBefore(scan.scannedAt))
+            ? local.scannedAt
+            : scan.scannedAt;
+
+        mergedMap[scan.scanId] = scan.copyWith(
+          scannedAt: earliestDate,
           localImagePath: finalLocalPath,
           imageUrl: (scan.imageUrl != null && scan.imageUrl!.isNotEmpty) ? scan.imageUrl : local?.imageUrl,
         );
-      }).toList();
-
-      if (mergedScans.isEmpty && localCacheMap.isNotEmpty) {
-        final cachedList = localCacheMap.values.take(3).toList();
-        if (mounted) {
-          state = AsyncValue.data(cachedList);
-          return;
-        }
       }
 
+      final deletedIds = prefs.getDeletedScanIds();
+      final activeMergedScans = mergedMap.values
+          .where((s) => !deletedIds.contains(s.scanId) && !deletedIds.contains(s.id))
+          .toList();
+
+      activeMergedScans.sort((a, b) => b.scannedAt.compareTo(a.scannedAt));
+
       if (mounted) {
-        state = AsyncValue.data(mergedScans);
+        state = AsyncValue.data(activeMergedScans.take(4).toList());
       }
     } catch (e, stack) {
       debugPrint('Failed to fetch recent scans from backend, falling back to cache: $e');
-      
-      // Fallback: load from local cache if backend is unreachable / offline
-      try {
-        final prefs = _ref.read(sharedPrefsServiceProvider);
-        final user = _ref.read(firebaseAuthStateProvider).value;
-        final cacheJson = prefs.getPharmacyCache(user?.uid ?? 'trial');
-        if (cacheJson != null) {
-          final List<dynamic> decoded = json.decode(cacheJson);
-          var cachedScans = decoded.map((e) => RecentScan.fromJson(e)).toList();
-          
-          final appDir = await getApplicationDocumentsDirectory();
-          final resolvedScans = cachedScans.map<RecentScan>((scan) {
-            if (scan.imageUrl != null && !scan.imageUrl!.startsWith('http')) {
-              final fileName = scan.imageUrl!.split('/').last;
-              final resolvedFile = File('${appDir.path}/scanned_images/$fileName');
-              if (resolvedFile.existsSync()) {
-                return scan.copyWith(imageUrl: resolvedFile.path);
-              }
-              return scan.copyWith(imageUrl: ApiConstants.resolveImageUrl(scan.imageUrl));
-            }
-            return scan;
-          }).toList();
-
-          // Translate if needed
-          final lang = _ref.read(languageProvider);
-          final cacheLang = prefs.getPharmacyCacheLanguage(user?.uid ?? 'trial');
-          bool needsTranslation = cacheLang != lang;
-
-          if (needsTranslation) {
-            try {
-              final translationResponse = await _client.post(
-                '/history/translate',
-                data: {'items': resolvedScans.map((e) => e.toJson()).toList()},
-                queryParameters: {'language': lang},
-              );
-              if (!mounted) return;
-              final List<dynamic> translatedJson = translationResponse.data['items'] ?? [];
-              final List<RecentScan> translatedScans = translatedJson.map((e) => RecentScan.fromJson(e)).toList();
-              
-              // Also translate and update the entire cache list
-              final fullListTranslationResponse = await _client.post(
-                '/history/translate',
-                data: {'items': cachedScans.map((e) => e.toJson()).toList()},
-                queryParameters: {'language': lang},
-              );
-              if (!mounted) return;
-              final List<dynamic> fullTranslatedJson = fullListTranslationResponse.data['items'] ?? [];
-              await prefs.setPharmacyCache(user?.uid ?? 'trial', json.encode(fullTranslatedJson));
-              await prefs.setPharmacyCacheLanguage(user?.uid ?? 'trial', lang);
-              if (!mounted) return;
-              
-              // Resolve images for translated scans
-              final resolvedTranslatedScans = translatedScans.map<RecentScan>((scan) {
-                if (scan.imageUrl != null && !scan.imageUrl!.startsWith('http')) {
-                  final fileName = scan.imageUrl!.split('/').last;
-                  final resolvedFile = File('${appDir.path}/scanned_images/$fileName');
-                  return scan.copyWith(imageUrl: resolvedFile.path);
-                }
-                return scan;
-              }).toList();
-
-              if (resolvedTranslatedScans.length > 3) {
-                resolvedTranslatedScans.removeRange(3, resolvedTranslatedScans.length);
-              }
-
-              if (mounted) {
-                state = AsyncValue.data(resolvedTranslatedScans);
-                return;
-              }
-            } catch (translateError) {
-              debugPrint('Failed to translate local cache: $translateError');
-            }
-          }
-
-          if (resolvedScans.length > 3) {
-            resolvedScans.removeRange(3, resolvedScans.length);
-          }
-
-          if (mounted) {
-            state = AsyncValue.data(resolvedScans);
-            return;
-          }
-        }
-      } catch (cacheError) {
-        debugPrint('Cache fallback failed: $cacheError');
-      }
-
-      if (mounted) {
+      _loadFromCacheOrPharmacy();
+      if (state.value == null || state.value!.isEmpty) {
         state = AsyncValue.error(e, stack);
       }
     }
+  }
+
+  Future<bool> deleteScan(String scanId, {String? secondaryId}) async {
+    // 1. Add to tombstone persistent storage immediately
+    final prefs = _ref.read(sharedPrefsServiceProvider);
+    await prefs.addDeletedScanId(scanId);
+    if (secondaryId != null && secondaryId.isNotEmpty && secondaryId != scanId) {
+      await prefs.addDeletedScanId(secondaryId);
+    }
+
+    // 2. Optimistic removal & backfill to always keep 4 items if available
+    final deletedIds = prefs.getDeletedScanIds();
+    final pharmacyScans = _ref.read(pharmacyProvider).allScans;
+    final allAvailable = pharmacyScans.isNotEmpty
+        ? pharmacyScans
+        : (state.value ?? []);
+    final updated = allAvailable
+        .where((s) => !deletedIds.contains(s.scanId) && !deletedIds.contains(s.id))
+        .toList();
+    updated.sort((a, b) => b.scannedAt.compareTo(a.scannedAt));
+    state = AsyncValue.data(updated.take(4).toList());
+
+    // 3. Delegate to pharmacyProvider for cache, backend, and health stats sync
+    final success = await _ref.read(pharmacyProvider.notifier).deleteScan(scanId, secondaryId: secondaryId);
+    await fetchRecentScans();
+    return success;
   }
 }
 
 final recentScansProvider = StateNotifierProvider<RecentScansNotifier, AsyncValue<List<RecentScan>>>((ref) {
   ref.watch(languageProvider);
   ref.watch(firebaseAuthStateProvider);
-  return RecentScansNotifier(ref);
+  final notifier = RecentScansNotifier(ref);
+  ref.listen<PharmacyState>(pharmacyProvider, (prev, next) {
+    if (next.allScans.isNotEmpty) {
+      notifier.syncWithPharmacy(next.allScans);
+    }
+  });
+  return notifier;
 });

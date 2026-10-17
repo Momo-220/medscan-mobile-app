@@ -48,6 +48,11 @@ post_install do |installer|
     target.build_configurations.each do |config|
       # Enforce iOS 15.0 as minimum version for all pods
       config.build_settings['IPHONEOS_DEPLOYMENT_TARGET'] = '15.0'
+      config.build_settings['GCC_PREPROCESSOR_DEFINITIONS'] ||= [
+        '$(inherited)',
+        'PERMISSION_MICROPHONE=1',
+        'PERMISSION_SPEECH_RECOGNIZER=1',
+      ]
     end
   end
 

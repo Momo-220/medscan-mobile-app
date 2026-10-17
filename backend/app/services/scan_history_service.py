@@ -157,10 +157,28 @@ class ScanHistoryService:
     def delete_scan(scan_id: str, user_id: str) -> bool:
         try:
             coll = get_collection(COLLECTION)
+            # Try by scan_id
             result = coll.delete_one({"scan_id": scan_id, "user_id": user_id})
             if result.deleted_count:
-                logger.info("Scan deleted", scan_id=scan_id, user_id=user_id)
+                logger.info("Scan deleted by scan_id", scan_id=scan_id, user_id=user_id)
                 return True
+            
+            # Try by string id
+            result_id = coll.delete_one({"id": scan_id, "user_id": user_id})
+            if result_id.deleted_count:
+                logger.info("Scan deleted by id field", scan_id=scan_id, user_id=user_id)
+                return True
+
+            # Try by MongoDB ObjectId
+            try:
+                from bson import ObjectId
+                result_obj = coll.delete_one({"_id": ObjectId(scan_id), "user_id": user_id})
+                if result_obj.deleted_count:
+                    logger.info("Scan deleted by ObjectId", scan_id=scan_id, user_id=user_id)
+                    return True
+            except Exception:
+                pass
+
             logger.warning("Scan not found or user mismatch", scan_id=scan_id, user_id=user_id)
             return False
         except Exception as e:

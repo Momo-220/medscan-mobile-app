@@ -313,10 +313,10 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
 
     final prefs = ref.watch(sharedPrefsServiceProvider);
     final displayName = isTrial 
-        ? (prefs.getLocalName() ?? 'Essai') 
-        : (user.displayName ?? 'Utilisateur');
+        ? (prefs.getLocalName() ?? ref.t('trialMode')) 
+        : (user.displayName ?? ref.t('user'));
     String computeUserEmail() {
-      if (isTrial) return 'Mode Essai';
+      if (isTrial) return ref.t('trialMode');
 
       // 1. Chercher si un fournisseur (Apple, Google) a transmis un vrai email direct
       for (final provider in user.providerData) {
@@ -329,9 +329,9 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
       final email = user.email ?? '';
       // 2. Si c'est un relais privé Apple, afficher un libellé sobre et élégant
       if (email.contains('@privaterelay.appleid.com')) {
-        return 'E-mail privé';
+        return ref.t('privateEmail');
       }
-      return email.isNotEmpty ? email : 'Compte anonyme';
+      return email.isNotEmpty ? email : ref.t('anonymousAccount');
     }
 
     final userEmail = computeUserEmail();

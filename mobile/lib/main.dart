@@ -226,6 +226,17 @@ void main() async {
   );
 }
 
+/// Global scroll behavior providing fluid, buttery-smooth bouncing physics
+/// across all screens, list views, and scrollables on mobile and web.
+class MedScanScrollBehavior extends MaterialScrollBehavior {
+  const MedScanScrollBehavior();
+
+  @override
+  ScrollPhysics getScrollPhysics(BuildContext context) {
+    return const BouncingScrollPhysics(parent: AlwaysScrollableScrollPhysics());
+  }
+}
+
 class MedScanApp extends ConsumerStatefulWidget {
   const MedScanApp({super.key});
 
@@ -260,6 +271,7 @@ class _MedScanAppState extends ConsumerState<MedScanApp> {
       darkTheme: AppTheme.darkTheme,
       themeMode: themeModeState,
       routerConfig: router,
+      scrollBehavior: const MedScanScrollBehavior(),
     );
   }
 }

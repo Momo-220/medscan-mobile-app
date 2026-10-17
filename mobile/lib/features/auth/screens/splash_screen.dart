@@ -158,6 +158,8 @@ class _SplashPageState extends ConsumerState<SplashPage>
 
       if (user != null && !hasTrialToken && (!avatarCompleted || !hasAvatar)) {
         context.go('/choose-avatar');
+      } else if (user != null && !hasTrialToken && !prefs.isDoctorCompleted()) {
+        context.go('/choose-doctor');
       } else {
         context.go('/home');
       }

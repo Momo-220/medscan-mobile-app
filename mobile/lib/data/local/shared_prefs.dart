@@ -15,6 +15,8 @@ class SharedPrefsService {
   static const String _keyLocalUsername = 'mediscan_user_username';
   static const String _keyAvatarCompleted = 'mediscan_avatar_completed';
   static const String _keyLocalAvatar = 'mediscan_user_avatar';
+  static const String _keyDoctorCompleted = 'mediscan_doctor_completed';
+  static const String _keySelectedDoctorId = 'mediscan_selected_doctor_id';
   static const String _keyPharmacyCachePrefix = 'pharmacy_cache_';
   static const String _keyChatCachePrefix = 'chat_cache_';
   static const String _keySuccessfulScansCount = 'medscan_successful_scans_count';
@@ -68,6 +70,24 @@ class SharedPrefsService {
 
   Future<void> clearLocalAvatar() async {
     await _prefs.remove(_keyLocalAvatar);
+  }
+
+  // Doctor AI Setup Completed
+  bool isDoctorCompleted() {
+    return _prefs.getBool(_keyDoctorCompleted) ?? false;
+  }
+
+  Future<void> setDoctorCompleted(bool completed) async {
+    await _prefs.setBool(_keyDoctorCompleted, completed);
+  }
+
+  // Selected Doctor AI ID
+  String getSelectedDoctorId() {
+    return _prefs.getString(_keySelectedDoctorId) ?? 'dr_sarah';
+  }
+
+  Future<void> setSelectedDoctorId(String doctorId) async {
+    await _prefs.setString(_keySelectedDoctorId, doctorId);
   }
 
   // Local Name (for Trial/Anonymous User)
@@ -130,6 +150,52 @@ class SharedPrefsService {
 
   Future<void> setChatCache(String userId, String cacheJson) async {
     await _prefs.setString('$_keyChatCachePrefix$userId', cacheJson);
+  }
+
+  // ChatGPT-style Chat Sessions Storage
+  static const String _keyChatSessionsPrefix = 'chat_sessions_v2_';
+  static const String _keyActiveChatSessionIdPrefix = 'active_chat_session_id_';
+  static const String _keyActiveConsultationSessionIdPrefix = 'active_consultation_session_id_';
+  static const String _keyLastChatActivityPrefix = 'last_chat_activity_ts_';
+
+  String? getChatSessionsJson(String userId) {
+    return _prefs.getString('$_keyChatSessionsPrefix$userId');
+  }
+
+  Future<void> setChatSessionsJson(String userId, String jsonStr) async {
+    await _prefs.setString('$_keyChatSessionsPrefix$userId', jsonStr);
+  }
+
+  String? getActiveChatSessionId(String userId) {
+    return _prefs.getString('$_keyActiveChatSessionIdPrefix$userId');
+  }
+
+  Future<void> setActiveChatSessionId(String userId, String sessionId) async {
+    await _prefs.setString('$_keyActiveChatSessionIdPrefix$userId', sessionId);
+  }
+
+  String? getActiveConsultationSessionId(String userId) {
+    return _prefs.getString('$_keyActiveConsultationSessionIdPrefix$userId');
+  }
+
+  Future<void> setActiveConsultationSessionId(String userId, String sessionId) async {
+    await _prefs.setString('$_keyActiveConsultationSessionIdPrefix$userId', sessionId);
+  }
+
+  int? getLastChatActivity(String userId) {
+    return _prefs.getInt('$_keyLastChatActivityPrefix$userId');
+  }
+
+  Future<void> setLastChatActivity(String userId, int timestamp) async {
+    await _prefs.setInt('$_keyLastChatActivityPrefix$userId', timestamp);
+  }
+
+  Future<void> clearActiveChatSessionId(String userId) async {
+    await _prefs.remove('$_keyActiveChatSessionIdPrefix$userId');
+  }
+
+  Future<void> clearActiveConsultationSessionId(String userId) async {
+    await _prefs.remove('$_keyActiveConsultationSessionIdPrefix$userId');
   }
 
   // Cache Management (Reminders)
@@ -217,5 +283,23 @@ class SharedPrefsService {
   Future<void> clearTrialScans() async {
     await _prefs.remove('$_keyPharmacyCachePrefix' 'trial');
     await _prefs.remove('pharmacy_cache_language_trial');
+  }
+
+  // Deleted Scans Tombstone / Blacklist (guarantees deleted scans NEVER re-appear)
+  static const String _keyDeletedScanIds = 'medscan_deleted_scan_ids';
+
+  Set<String> getDeletedScanIds() {
+    final list = _prefs.getStringList(_keyDeletedScanIds);
+    if (list != null) {
+      return list.toSet();
+    }
+    return {};
+  }
+
+  Future<void> addDeletedScanId(String scanId) async {
+    if (scanId.trim().isEmpty) return;
+    final current = getDeletedScanIds();
+    current.add(scanId.trim());
+    await _prefs.setStringList(_keyDeletedScanIds, current.toList());
   }
 }

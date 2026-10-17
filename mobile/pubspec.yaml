@@ -81,6 +81,7 @@ dependencies:
   url_launcher: ^6.3.2
   package_info_plus: ^8.2.1
   home_widget: ^0.9.3
+  speech_to_text: ^7.5.0
 
 dev_dependencies:
   flutter_test:

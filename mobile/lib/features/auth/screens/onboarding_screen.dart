@@ -6,6 +6,7 @@ import '../../../core/constants/colors.dart';
 import '../../../core/constants/text_styles.dart';
 import '../../../core/di/providers.dart';
 import '../../../shared/utils/localization.dart';
+import '../../../shared/widgets/language_dialog.dart';
 
 class OnboardingPage extends ConsumerStatefulWidget {
   const OnboardingPage({super.key});
@@ -97,6 +98,50 @@ class _OnboardingPageState extends ConsumerState<OnboardingPage> {
                   colors: _slideGradients[_currentIndex],
                   begin: Alignment.topLeft,
                   end: Alignment.bottomRight,
+                ),
+              ),
+            ),
+
+            // ── Language Selector Button (Top Left) ──────────────────────
+            Positioned(
+              top: topPadding + 14,
+              left: 16,
+              child: GestureDetector(
+                onTap: () => showLanguageSelectionDialog(context),
+                behavior: HitTestBehavior.opaque,
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                  decoration: BoxDecoration(
+                    color: isDark
+                        ? Colors.white.withValues(alpha: 0.10)
+                        : Colors.white.withValues(alpha: 0.75),
+                    borderRadius: BorderRadius.circular(20),
+                    border: Border.all(
+                      color: isDark
+                          ? Colors.white.withValues(alpha: 0.12)
+                          : const Color(0xFFE2E8F0),
+                      width: 1,
+                    ),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withValues(alpha: isDark ? 0.2 : 0.04),
+                        blurRadius: 8,
+                        offset: const Offset(0, 2),
+                      ),
+                    ],
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      CircularFlagBadge(code: ref.watch(languageProvider), size: 20.0),
+                      const SizedBox(width: 6),
+                      Icon(
+                        Icons.keyboard_arrow_down_rounded,
+                        size: 16,
+                        color: isDark ? Colors.white70 : const Color(0xFF64748B),
+                      ),
+                    ],
+                  ),
                 ),
               ),
             ),

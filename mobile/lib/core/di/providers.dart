@@ -87,3 +87,15 @@ class ThemeStateNotifier extends StateNotifier<ThemeMode> {
 final themeProvider = StateNotifierProvider<ThemeStateNotifier, ThemeMode>((ref) {
   return ThemeStateNotifier(ref);
 });
+
+class ChatInputActiveNotifier extends StateNotifier<bool> {
+  ChatInputActiveNotifier() : super(false);
+  void setActive(bool active) {
+    if (state != active) state = active;
+  }
+}
+
+final chatInputActiveProvider = StateNotifierProvider<ChatInputActiveNotifier, bool>((ref) {
+  return ChatInputActiveNotifier();
+});
+

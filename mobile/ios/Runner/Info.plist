@@ -30,6 +30,10 @@
 	<string>Cette application a besoin d'accéder à l'appareil photo pour vous permettre de prendre en photo vos boîtes de médicaments afin de les analyser.</string>
 	<key>NSPhotoLibraryUsageDescription</key>
 	<string>Cette application a besoin d'accéder à votre galerie de photos pour vous permettre de charger et d'analyser des images de médicaments.</string>
+	<key>NSMicrophoneUsageDescription</key>
+	<string>Cette application a besoin du microphone pour vous permettre de poser vos questions médicales et de décrire vos symptômes vocalement.</string>
+	<key>NSSpeechRecognitionUsageDescription</key>
+	<string>Cette application utilise la reconnaissance vocale pour transcrire vos questions médicales en texte.</string>
 	<key>UIApplicationSceneManifest</key>
 	<dict>
 		<key>UIApplicationSupportsMultipleScenes</key>

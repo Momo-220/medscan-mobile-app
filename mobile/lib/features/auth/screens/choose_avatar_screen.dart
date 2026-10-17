@@ -90,9 +90,9 @@ class _ChooseAvatarPageState extends ConsumerState<ChooseAvatarPage> {
       debugPrint('Widget sync non-blocking: $e');
     }
 
-    // 4. Always navigate to /home smoothly
+    // 4. Step 2/2: Choose AI Doctor before entering the app
     if (mounted) {
-      context.go('/home');
+      context.go('/choose-doctor');
     }
   }
 

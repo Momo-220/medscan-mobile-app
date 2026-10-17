@@ -13,6 +13,8 @@ import '../../auth/providers/auth_provider.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import '../../../core/di/providers.dart';
+import '../../../shared/widgets/language_dialog.dart';
+import '../../chat/providers/doctor_provider.dart';
 
 class SettingsPage extends ConsumerStatefulWidget {
   const SettingsPage({super.key});
@@ -55,45 +57,7 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
   }
 
   void _showLanguageSelector(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    final currentLang = ref.read(languageProvider);
-
-    showDialog(
-      context: context,
-      builder: (context) {
-        return AlertDialog(
-          backgroundColor: isDark ? AppColors.cardDark : AppColors.card,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-          title: Text(ref.t('language'), style: AppTextStyles.h3(isDark: isDark)),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              _buildLanguageOption(context, 'fr', '🇫🇷  Français', currentLang == 'fr'),
-              _buildLanguageOption(context, 'en', '🇺🇸  English', currentLang == 'en'),
-              _buildLanguageOption(context, 'ar', '🇸🇦  العربية', currentLang == 'ar'),
-              _buildLanguageOption(context, 'tr', '🇹🇷  Türkçe', currentLang == 'tr'),
-            ],
-          ),
-        );
-      },
-    );
-  }
-
-  Widget _buildLanguageOption(BuildContext context, String code, String label, bool isSelected) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    return ListTile(
-      title: Text(
-        label,
-        style: AppTextStyles.smallBold(isDark: isDark).copyWith(
-          color: isSelected ? AppColors.primary : null,
-        ),
-      ),
-      trailing: isSelected ? const Icon(Icons.check, color: AppColors.primary) : null,
-      onTap: () {
-        ref.read(languageProvider.notifier).setLanguage(code);
-        Navigator.pop(context);
-      },
-    );
+    showLanguageSelectionDialog(context);
   }
 
   void _showHelpModal(BuildContext context, String title, String content) {
@@ -243,13 +207,14 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
-    final String activeLanguageLabel = ref.watch(languageProvider) == 'fr'
-        ? '🇫🇷  Français'
-        : ref.watch(languageProvider) == 'en'
-            ? '🇺🇸  English'
-            : ref.watch(languageProvider) == 'ar'
-                ? '🇸🇦  العربية'
-                : '🇹🇷  Türkçe';
+    final currentLang = ref.watch(languageProvider);
+    final String activeLanguageFlag = currentLang == 'fr'
+        ? '🇫🇷'
+        : currentLang == 'en'
+            ? '🇺🇸'
+            : currentLang == 'ar'
+                ? '🇦🇪'
+                : '🇹🇷';
 
     return Scaffold(
       backgroundColor: isDark ? AppColors.backgroundDark : const Color(0xFFF3F8FF),
@@ -281,7 +246,7 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
               const SizedBox(height: 32),
 
               // SECTION 1: Notifications
-              _buildSectionHeader('Notifications', isDark),
+              _buildSectionHeader(ref.t('notifications'), isDark),
               const SizedBox(height: 10),
               AppCard(
                 padding: const EdgeInsets.all(20),
@@ -459,11 +424,85 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
                               ),
                             ),
                             Text(
-                              activeLanguageLabel,
-                              style: AppTextStyles.bodyBold(isDark: isDark).copyWith(
-                                fontSize: 16,
-                                color: isDark ? Colors.white70 : const Color(0xFF475569),
+                              activeLanguageFlag,
+                              style: const TextStyle(
+                                fontSize: 22,
                               ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                    const Divider(height: 1, color: Color(0xFFE2E8F0)),
+                    // Row 3: Votre Médecin Référent
+                    InkWell(
+                      borderRadius: BorderRadius.circular(16),
+                      onTap: () => context.push('/choose-doctor'),
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(vertical: 12.0),
+                        child: Row(
+                          children: [
+                            _buildCardIcon(Icons.medical_services_outlined),
+                            const SizedBox(width: 14),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    ref.t('myDoctorAI'),
+                                    style: AppTextStyles.bodyBold(isDark: isDark).copyWith(
+                                      fontSize: 16,
+                                      color: isDark ? Colors.white : const Color(0xFF1E293B),
+                                    ),
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                  const SizedBox(height: 3),
+                                  Text(
+                                    '${ref.watch(doctorProvider).name} • ${ref.t(ref.watch(doctorProvider).specialtyKey)}',
+                                    style: AppTextStyles.small(isDark: isDark).copyWith(
+                                      fontSize: 12.5,
+                                      color: isDark ? AppColors.textMutedDark : const Color(0xFF64748B),
+                                    ),
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                ],
+                              ),
+                            ),
+                            const SizedBox(width: 10),
+                            // Doctor Avatar with prominent ring and shadow
+                            Container(
+                              width: 44,
+                              height: 44,
+                              decoration: BoxDecoration(
+                                shape: BoxShape.circle,
+                                color: isDark ? const Color(0xFF334155) : const Color(0xFFF1F5F9),
+                                border: Border.all(
+                                  color: Color(ref.watch(doctorProvider).accentColorValue).withValues(alpha: 0.45),
+                                  width: 2,
+                                ),
+                                boxShadow: [
+                                  BoxShadow(
+                                    color: Color(ref.watch(doctorProvider).accentColorValue).withValues(alpha: isDark ? 0.35 : 0.20),
+                                    blurRadius: 10,
+                                    offset: const Offset(0, 3),
+                                  ),
+                                ],
+                              ),
+                              child: ClipOval(
+                                child: Image.asset(
+                                  ref.watch(doctorProvider).imagePath,
+                                  fit: BoxFit.cover,
+                                  alignment: Alignment.topCenter,
+                                  errorBuilder: (context, error, stackTrace) => const Icon(Icons.person, size: 22),
+                                ),
+                              ),
+                            ),
+                            const SizedBox(width: 6),
+                            Icon(
+                              Icons.chevron_right_rounded,
+                              size: 20,
+                              color: isDark ? Colors.white38 : const Color(0xFF94A3B8),
                             ),
                           ],
                         ),
@@ -943,3 +982,5 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
     );
   }
 }
+
+

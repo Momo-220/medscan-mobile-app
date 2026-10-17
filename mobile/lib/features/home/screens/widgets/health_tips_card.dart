@@ -1,15 +1,9 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:firebase_auth/firebase_auth.dart';
+import 'package:google_fonts/google_fonts.dart';
 
-import '../../../../core/constants/colors.dart';
-import '../../../../core/constants/text_styles.dart';
 import '../../../../shared/utils/localization.dart';
-import '../../../../shared/widgets/skeleton.dart';
-import '../../../../shared/widgets/reminder_countdown_widget.dart';
-import '../../../reminders/providers/reminders_provider.dart';
-import '../../../../data/models/reminder.dart';
 
 class HealthTipsCardWidget extends ConsumerStatefulWidget {
   const HealthTipsCardWidget({super.key});
@@ -21,92 +15,75 @@ class HealthTipsCardWidget extends ConsumerStatefulWidget {
 class _HealthTipsCardWidgetState extends ConsumerState<HealthTipsCardWidget> {
   int _currentTipIndex = 0;
   Timer? _tipTimer;
-  Reminder? _nextReminder;
-  bool _loadingReminder = true;
 
-  final List<Map<String, dynamic>> _allTips = [
+  final List<Map<String, dynamic>> _tips = [
     {
       'icon': '💧',
-      'title': {
-        'en': 'Hydration',
-        'fr': 'Hydratation',
-        'tr': 'Sıvı Alımı',
-        'ar': 'الترطيب',
+      'title': {'fr': 'Hydratation', 'en': 'Hydration', 'tr': 'Sıvı Alımı', 'ar': 'الترطيب'},
+      'desc': {
+        'fr': 'Buvez un grand verre d\'eau avec vos médicaments pour faciliter l\'absorption.',
+        'en': 'Drink a large glass of water with your medications to facilitate absorption.',
+        'tr': 'İlaçlarınızın emilimini kolaylaştırmak için bol su ile alınız.',
+        'ar': 'اشرب كوبًا كبيرًا من الماء مع دوائك لتسهيل امتصاصه.',
       },
-      'description': {
-        'en': 'Drink a large glass of water with your medications to facilitate absorption',
-        'fr': 'Buvez un grand verre d\'eau avec vos médicaments pour faciliter l\'absorption',
-        'tr': 'İlaçlarınızın emilimini kolaylaştırmak için bol su ile alın',
-        'ar': 'اشرب كوبًا كبيرًا من الماء مع أدويتك لتسهيل امتصاصها',
-      }
     },
     {
       'icon': '⏰',
-      'title': {
-        'en': 'Optimal timing',
-        'fr': 'Timing optimal',
-        'tr': 'Optimal Zamanlama',
-        'ar': 'التوقيت الأمثل',
+      'title': {'fr': 'Régularité', 'en': 'Timing', 'tr': 'Zamanlama', 'ar': 'التوقيت'},
+      'desc': {
+        'fr': 'Prenez vos comprimés à heures fixes pour maintenir un niveau d\'efficacité stable.',
+        'en': 'Take your pills at regular hours to maintain stable effectiveness.',
+        'tr': 'İlaçlarınızı sabit saatlerde alarak etkinliğini koruyun.',
+        'ar': 'تناول أدويتك في أوقات منتظمة للحفاظ على فعاليتها.',
       },
-      'description': {
-        'en': 'Take your medications at fixed times to maintain a constant level',
-        'fr': 'Prenez vos médicaments à heures fixes pour maintenir un niveau constant',
-        'tr': 'Sabit bir seviye korumak için ilaçlarınızı sabit saatlerde alın',
-        'ar': 'تناول أدويتك في أوقات ثابتة للحفاظ على مستوى ثابت في الجسم',
-      }
+    },
+    {
+      'icon': '🍽️',
+      'title': {'fr': 'Repas', 'en': 'Meals', 'tr': 'Yemekler', 'ar': 'الوجبات'},
+      'desc': {
+        'fr': 'Vérifiez toujours si la prise se fait avant, pendant ou après le repas.',
+        'en': 'Check if doses should be taken before, during, or after meals.',
+        'tr': 'Yemekten önce mi, sırasında mı, sonra mı alınacağını kontrol edin.',
+        'ar': 'تحقق مما إذا كان الدواء يؤخذ قبل أو أثناء أو بعد الوجبات.',
+      },
     },
     {
       'icon': '🌡️',
-      'title': {
-        'en': 'Storage',
-        'fr': 'Conservation',
-        'tr': 'Saklama Koşulları',
-        'ar': 'التخزين',
+      'title': {'fr': 'Conservation', 'en': 'Storage', 'tr': 'Saklama', 'ar': 'الحفظ'},
+      'desc': {
+        'fr': 'Conservez vos boîtes à l\'abri de l\'humidité, de la lumière et de la chaleur.',
+        'en': 'Store your medications away from humidity, light, and heat.',
+        'tr': 'İlaçlarınızı nem, ışık ve sıcaktan uzakta muhafaza ediniz.',
+        'ar': 'احفظ أدويتك بعيدًا عن الرطوبة والضوء والحرارة.',
       },
-      'description': {
-        'en': 'Keep your medications away from light and moisture',
-        'fr': 'Conservez vos médicaments à l\'abri de la lumière et de l\'humidité',
-        'tr': 'İlaçlarınızı ışık ve nemden uzak tutun',
-        'ar': 'احفظ أدويتك بعيدًا عن الضوء والرطوبة',
-      }
     },
     {
-      'icon': '⚠️',
-      'title': {
-        'en': 'Interactions',
-        'fr': 'Interactions',
-        'tr': 'Etkileşimler',
-        'ar': 'التفاعلات الدوائية',
+      'icon': '💊',
+      'title': {'fr': 'Ne pas couper', 'en': 'Do not crush', 'tr': 'Kırmayınız', 'ar': 'لا تقسم'},
+      'desc': {
+        'fr': 'Certaines gélules et comprimés à libération prolongée ne doivent jamais être broyés.',
+        'en': 'Certain extended-release capsules and tablets must never be crushed.',
+        'tr': 'Bazı uzun etkili kapsüller asla kırılmamalı veya ezilmemelidir.',
+        'ar': 'بعض الكبسولات ممتدة المفعول يجب عدم كسرها أو طحنها أبدًا.',
       },
-      'description': {
-        'en': 'Avoid alcohol and grapefruit with most medications',
-        'fr': 'Évitez l\'alcool et le pamplemousse avec la plupart des médicaments',
-        'tr': 'Çoğu ilaçla birlikte alkol ve greyfurt tüketmekten kaçının',
-        'ar': 'تجنب تناول الكحول والجريب فروت مع معظم الأدوية',
-      }
     },
-    {
-      'icon': '📅',
-      'title': {
-        'en': 'Expiration',
-        'fr': 'Péremption',
-        'tr': 'Son Kullanma Tarihi',
-        'ar': 'تاريخ الصلاحية',
-      },
-      'description': {
-        'en': 'Always check the expiration date before taking a medication',
-        'fr': 'Vérifiez toujours la date de péremption avant de prendre un médicament',
-        'tr': 'Bir ilacı almadan önce daima son kullanma tarihini kontrol edin',
-        'ar': 'تحقق دائمًا من تاريخ انتهاء الصلاحية قبل تناول أي دواء',
-      }
-    }
   ];
 
   @override
   void initState() {
     super.initState();
-    _startTipRotation();
-    _loadNextReminder();
+    _startTimer();
+  }
+
+  void _startTimer() {
+    _tipTimer?.cancel();
+    _tipTimer = Timer.periodic(const Duration(seconds: 8), (_) {
+      if (mounted) {
+        setState(() {
+          _currentTipIndex = (_currentTipIndex + 1) % _tips.length;
+        });
+      }
+    });
   }
 
   @override
@@ -115,351 +92,152 @@ class _HealthTipsCardWidgetState extends ConsumerState<HealthTipsCardWidget> {
     super.dispose();
   }
 
-  void _startTipRotation() {
-    _tipTimer?.cancel();
-    _tipTimer = Timer.periodic(const Duration(seconds: 8), (timer) {
-      if (mounted) {
-        setState(() {
-          _currentTipIndex = (_currentTipIndex + 1) % _allTips.length;
-        });
-      }
-    });
-  }
-
-  Future<void> _loadNextReminder() async {
-    final user = FirebaseAuth.instance.currentUser;
-    if (user != null) {
-      try {
-        final remindersList = ref.read(remindersProvider).value ?? [];
-        final activeReminders = remindersList.where((r) => r.active).toList();
-        if (activeReminders.isNotEmpty) {
-          activeReminders.sort((a, b) => a.nextDose.compareTo(b.nextDose));
-          if (mounted) {
-            setState(() {
-              _nextReminder = activeReminders.first;
-              _loadingReminder = false;
-            });
-          }
-        } else {
-          if (mounted) {
-            setState(() {
-              _nextReminder = null;
-              _loadingReminder = false;
-            });
-          }
-        }
-      } catch (e) {
-        if (mounted) {
-          setState(() {
-            _nextReminder = null;
-            _loadingReminder = false;
-          });
-        }
-      }
-    } else {
-      if (mounted) {
-        setState(() {
-          _nextReminder = null;
-          _loadingReminder = false;
-        });
-      }
-    }
-  }
-
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    
-    // Auto-listen to reminders changes to refresh next reminder card
-    ref.listen(remindersProvider, (previous, next) {
-      _loadNextReminder();
-    });
-
-    final String langCode = ref.watch(languageProvider);
-
-    final tip = _allTips[_currentTipIndex];
-    final String tipTitle = tip['title'][langCode] ?? tip['title']['fr'];
-    final String tipDesc = tip['description'][langCode] ?? tip['description']['fr'];
-    final String tipIcon = tip['icon'];
+    final String lang = ref.watch(languageProvider);
+    final tip = _tips[_currentTipIndex];
+    final String title = tip['title'][lang] ?? tip['title']['fr'];
+    final String desc = tip['desc'][lang] ?? tip['desc']['fr'];
+    final String icon = tip['icon'];
 
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16.0),
-      child: LayoutBuilder(
-        builder: (context, constraints) {
-          final bool isWide = constraints.maxWidth >= 600;
-          final reminderCard = _buildReminderCard(context, isDark);
-          final tipCard = _buildTipCard(context, isDark, tipIcon, tipTitle, tipDesc);
-
-          if (isWide) {
-            return Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Expanded(child: reminderCard),
-                const SizedBox(width: 16),
-                Expanded(child: tipCard),
-              ],
-            );
-          }
-
-          return Column(
-            children: [
-              reminderCard,
-              const SizedBox(height: 16),
-              tipCard,
-            ],
-          );
+      child: GestureDetector(
+        onTap: () {
+          setState(() {
+            _currentTipIndex = (_currentTipIndex + 1) % _tips.length;
+          });
+          _startTimer();
         },
-      ),
-    );
-  }
-
-  Widget _buildReminderCard(BuildContext context, bool isDark) {
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          colors: isDark 
-              ? [const Color(0xFF1E3A8A).withOpacity(0.2), const Color(0xFF1E40AF).withOpacity(0.1)]
-              : [AppColors.primary.withOpacity(0.12), AppColors.primary.withOpacity(0.06)],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        ),
-        borderRadius: BorderRadius.circular(28),
-        border: Border.all(
-          color: isDark ? const Color(0xFF1E40AF).withOpacity(0.3) : AppColors.primary.withOpacity(0.2),
-          width: 1,
-        ),
-      ),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Container(
-            width: 44,
-            height: 44,
-            decoration: BoxDecoration(
-              color: isDark ? const Color(0xFF1E3A8A).withOpacity(0.4) : AppColors.primary.withOpacity(0.2),
-              borderRadius: BorderRadius.circular(16),
+        behavior: HitTestBehavior.opaque,
+        child: Container(
+          width: double.infinity,
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+          decoration: BoxDecoration(
+            color: isDark
+                ? const Color(0xFF064E3B).withOpacity(0.20)
+                : const Color(0xFFF0FDF4),
+            borderRadius: BorderRadius.circular(20),
+            border: Border.all(
+              color: isDark
+                  ? const Color(0xFF10B981).withOpacity(0.25)
+                  : const Color(0xFF86EFAC).withOpacity(0.60),
+              width: 1,
             ),
-            child: Icon(
-              Icons.notifications_none_outlined,
-              color: isDark ? const Color(0xFF60A5FA) : AppColors.primary,
-              size: 24,
-            ),
+            boxShadow: [
+              BoxShadow(
+                color: const Color(0xFF10B981).withOpacity(0.04),
+                blurRadius: 10,
+                offset: const Offset(0, 2),
+              ),
+            ],
           ),
-          const SizedBox(width: 16),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  ref.t('nextReminderTitle'),
-                  style: AppTextStyles.bodyBold(isDark: isDark).copyWith(
-                    fontSize: 14,
-                  ),
-                ),
-                const SizedBox(height: 4),
-                if (_loadingReminder)
-                  const Skeleton(height: 16, width: 120)
-                else if (_nextReminder != null)
-                  Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // Top row: Label + Count + Sparkles
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Row(
                     children: [
-                      Text(
-                        _nextReminder!.medicationName,
-                        style: AppTextStyles.bodyBold(isDark: isDark).copyWith(fontSize: 16),
-                      ),
-                      const SizedBox(height: 8),
-                      Row(
-                        children: [
-                          Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                            decoration: BoxDecoration(
-                              color: isDark ? Colors.white10 : Colors.white.withOpacity(0.6),
-                              borderRadius: BorderRadius.circular(8),
-                            ),
-                            child: Row(
-                              children: [
-                                const Icon(Icons.access_time, size: 12, color: AppColors.primary),
-                                const SizedBox(width: 4),
-                                Text(
-                                  _nextReminder!.time,
-                                  style: AppTextStyles.micro(isDark: isDark).copyWith(fontWeight: FontWeight.bold),
-                                ),
-                              ],
-                            ),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                        decoration: BoxDecoration(
+                          color: isDark
+                              ? const Color(0xFF10B981).withOpacity(0.18)
+                              : const Color(0xFFDCFCE7),
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        child: Text(
+                          '${ref.t('healthTip')} : ${_currentTipIndex + 1}/${_tips.length}',
+                          style: GoogleFonts.plusJakartaSans(
+                            fontSize: 11,
+                            fontWeight: FontWeight.w700,
+                            color: isDark ? const Color(0xFF34D399) : const Color(0xFF16A34A),
                           ),
-                          if (_nextReminder!.dosage.isNotEmpty) ...[
-                            const SizedBox(width: 8),
-                            Flexible(
-                              child: Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                                decoration: BoxDecoration(
-                                  color: isDark ? Colors.white10 : Colors.white.withOpacity(0.6),
-                                  borderRadius: BorderRadius.circular(8),
-                                ),
-                                child: Row(
-                                  mainAxisSize: MainAxisSize.min,
-                                  children: [
-                                    const Icon(Icons.medication_outlined, size: 12, color: AppColors.primary),
-                                    const SizedBox(width: 4),
-                                    Flexible(
-                                      child: Text(
-                                        _nextReminder!.dosage,
-                                        style: AppTextStyles.micro(isDark: isDark).copyWith(
-                                          fontWeight: FontWeight.bold,
-                                        ),
-                                        overflow: TextOverflow.ellipsis,
-                                        maxLines: 1,
-                                      ),
-                                    ),
-                                  ],
-                                ),
+                        ),
+                      ),
+                    ],
+                  ),
+                  Icon(
+                    Icons.auto_awesome,
+                    size: 14,
+                    color: isDark ? const Color(0xFF34D399) : const Color(0xFF16A34A),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 8),
+
+              // Animated content with zero ghosting/overlap
+              AnimatedSwitcher(
+                duration: const Duration(milliseconds: 300),
+                switchInCurve: Curves.easeIn,
+                switchOutCurve: Curves.easeOut,
+                transitionBuilder: (child, animation) => FadeTransition(opacity: animation, child: child),
+                layoutBuilder: (currentChild, previousChildren) =>
+                    currentChild ?? const SizedBox.shrink(),
+                child: Row(
+                  key: ValueKey<int>(_currentTipIndex),
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      icon,
+                      style: const TextStyle(fontSize: 18),
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: RichText(
+                        text: TextSpan(
+                          style: GoogleFonts.plusJakartaSans(
+                            fontSize: 12.5,
+                            height: 1.35,
+                            color: isDark ? Colors.white.withOpacity(0.9) : const Color(0xFF1E293B),
+                          ),
+                          children: [
+                            TextSpan(
+                              text: '$title – ',
+                              style: const TextStyle(fontWeight: FontWeight.w700),
+                            ),
+                            TextSpan(
+                              text: desc,
+                              style: TextStyle(
+                                fontWeight: FontWeight.w400,
+                                color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF475569),
                               ),
                             ),
                           ],
-                        ],
-                      ),
-                      ReminderCountdownWidget(
-                        nextDose: _nextReminder!.nextDose,
-                        active: _nextReminder!.active,
-                        status: _nextReminder!.status,
-                        dosesTaken: _nextReminder!.dosesTakenToday,
-                        totalDoses: _nextReminder!.totalDosesToday,
-                      ),
-                    ],
-                  )
-                else
-                  Text(
-                    ref.t('noReminderScheduled'),
-                    style: AppTextStyles.small(
-                      color: isDark ? AppColors.textMutedDark : AppColors.textSecondary,
-                    ),
-                  ),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildTipCard(BuildContext context, bool isDark, String tipIcon, String tipTitle, String tipDesc) {
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          colors: isDark
-              ? [const Color(0xFF065F46).withOpacity(0.2), const Color(0xFF064E3B).withOpacity(0.1)]
-              : [const Color(0xFFECFDF5), const Color(0xFFD1FAE5).withOpacity(0.5)],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        ),
-        borderRadius: BorderRadius.circular(28),
-        border: Border.all(
-          color: isDark ? const Color(0xFF047857).withOpacity(0.3) : const Color(0xFFA7F3D0).withOpacity(0.5),
-          width: 1,
-        ),
-      ),
-      child: Column(
-        children: [
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Container(
-                width: 44,
-                height: 44,
-                decoration: BoxDecoration(
-                  color: isDark ? const Color(0xFF065F46).withOpacity(0.4) : const Color(0xFFD1FAE5),
-                  borderRadius: BorderRadius.circular(16),
-                ),
-                alignment: Alignment.center,
-                child: Text(
-                  tipIcon,
-                  style: const TextStyle(fontSize: 22),
-                ),
-              ),
-              const SizedBox(width: 16),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      children: [
-                        const Icon(Icons.lightbulb_outline, size: 16, color: Color(0xFF059669)),
-                        const SizedBox(width: 6),
-                        Text(
-                          ref.t('healthTip'),
-                          style: AppTextStyles.bodyBold(isDark: isDark).copyWith(
-                            fontSize: 14,
-                            color: isDark ? const Color(0xFF34D399) : const Color(0xFF059669),
-                          ),
                         ),
-                      ],
-                    ),
-                    const SizedBox(height: 6),
-                    Text(
-                      tipTitle,
-                      style: AppTextStyles.bodyBold(isDark: isDark).copyWith(fontSize: 16),
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      tipDesc,
-                      style: AppTextStyles.small(
-                        color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondary,
-                      ).copyWith(height: 1.4),
+                      ),
                     ),
                   ],
                 ),
               ),
+              const SizedBox(height: 10),
+
+              // Bottom Indicator Dots
+              Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: List.generate(_tips.length, (idx) {
+                  final bool active = idx == _currentTipIndex;
+                  return AnimatedContainer(
+                    duration: const Duration(milliseconds: 250),
+                    margin: const EdgeInsets.symmetric(horizontal: 2.5),
+                    width: active ? 16 : 5,
+                    height: 4,
+                    decoration: BoxDecoration(
+                      color: active
+                          ? (isDark ? const Color(0xFF34D399) : const Color(0xFF16A34A))
+                          : (isDark ? Colors.white.withOpacity(0.15) : const Color(0xFFCBD5E1)),
+                      borderRadius: BorderRadius.circular(4),
+                    ),
+                  );
+                }),
+              ),
             ],
           ),
-          const SizedBox(height: 16),
-          // Divider and page progress indicator
-          Container(
-            padding: const EdgeInsets.only(top: 12),
-            decoration: BoxDecoration(
-              border: Border(
-                top: BorderSide(
-                  color: isDark ? const Color(0xFF047857).withOpacity(0.2) : const Color(0xFFA7F3D0).withOpacity(0.4),
-                  width: 1,
-                ),
-              ),
-            ),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                // Dots
-                Row(
-                  children: List.generate(_allTips.length, (idx) {
-                    final isActive = idx == _currentTipIndex;
-                    return AnimatedContainer(
-                      duration: const Duration(milliseconds: 300),
-                      margin: const EdgeInsets.only(right: 4),
-                      height: 5,
-                      width: isActive ? 20 : 5,
-                      decoration: BoxDecoration(
-                        color: isActive 
-                            ? (isDark ? const Color(0xFF34D399) : const Color(0xFF10B981))
-                            : (isDark ? const Color(0xFF064E3B) : const Color(0xFFA7F3D0)),
-                        borderRadius: BorderRadius.circular(5),
-                      ),
-                    );
-                  }),
-                ),
-                // Fraction text
-                Text(
-                  '${_currentTipIndex + 1}/${_allTips.length}',
-                  style: AppTextStyles.micro(isDark: isDark).copyWith(
-                    color: isDark ? const Color(0xFF34D399) : const Color(0xFF059669),
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ],
+        ),
       ),
     );
   }

@@ -281,7 +281,11 @@ class _AuthPageState extends ConsumerState<AuthPage> {
       await prefs.setLocalAvatar(existingAvatar);
       await prefs.setAvatarCompleted(true);
       if (mounted) {
-        context.go('/home');
+        if (!prefs.isDoctorCompleted()) {
+          context.go('/choose-doctor');
+        } else {
+          context.go('/home');
+        }
       }
     } else if (isNewRegistration) {
       if (mounted) {

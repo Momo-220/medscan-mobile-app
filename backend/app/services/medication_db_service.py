@@ -182,19 +182,22 @@ class MedicationDBService:
             suggestions = []
             
             for row in rows:
-                med_name = row['name'].lower()
-                if med_name not in seen_names:
+                name = row['name'] or ''
+                med_name = name.lower().strip()
+                if med_name and med_name not in seen_names:
                     seen_names.add(med_name)
+                    presentation = row['presentation'] or ''
+                    form = row['form'] or ''
                     suggestions.append({
                         'id': row['id'],
-                        'name': row['name'],
-                        'form': row['form'],
+                        'name': name,
+                        'form': form,
                         'category': row['category'],
-                        'presentation': row['presentation'][:100],
+                        'presentation': presentation[:100],
                         'composition': row['substance'],
                         'dosage': row['dosage'],
-                        'description': f"{row['form']} - {row['presentation'][:60]}",
-                        'indications': self._get_indications_from_category(row['category'], row['name'])
+                        'description': f"{form} - {presentation[:60]}".strip(' -'),
+                        'indications': self._get_indications_from_category(row['category'], name)
                     })
                     
             return suggestions[:limit]

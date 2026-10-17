@@ -1,12 +1,10 @@
 import 'dart:async';
 import 'dart:convert';
-import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_riverpod/legacy.dart'; // StateNotifier, StateNotifierProvider (Riverpod 3.x legacy)
 
 import '../../../data/models/health_stats.dart';
 import '../../../data/models/reminder.dart';
-import '../../../data/remote/api_client.dart';
 import '../../auth/providers/auth_provider.dart';
 import '../../../core/di/providers.dart';
 
@@ -104,29 +102,46 @@ class HealthStatsNotifier extends StateNotifier<AsyncValue<HealthStats>> {
         }
       }
 
-      // === Process Scans ===
-      List<dynamic> scansJson = historyData['scans'] ?? [];
-      if (scansJson.isEmpty) {
-        final prefs = _ref.read(sharedPrefsServiceProvider);
-        final user = _ref.read(firebaseAuthStateProvider).value;
-        final cacheJson = prefs.getPharmacyCache(user?.uid ?? 'trial');
-        if (cacheJson != null) {
-          try {
-            scansJson = json.decode(cacheJson);
-          } catch (_) {}
-        }
+      // === Process Scans (Merge Backend + Local Cache) ===
+      final List<dynamic> backendScans = historyData['scans'] ?? [];
+      final prefs = _ref.read(sharedPrefsServiceProvider);
+      final user = _ref.read(firebaseAuthStateProvider).value;
+      final cacheJson = prefs.getPharmacyCache(user?.uid ?? 'trial');
+      List<dynamic> localScans = [];
+      if (cacheJson != null && cacheJson.isNotEmpty) {
+        try {
+          localScans = json.decode(cacheJson);
+        } catch (_) {}
       }
-      
-      // Filter scans in the last 7 days
-      final now = DateTime.now().toUtc();
-      final oneWeekAgo = now.subtract(const Duration(days: 7));
-      
+
+      // Merge by scanId / id to prevent dropping local or backend scans
+      final Map<String, dynamic> mergedScansMap = {};
+      for (var s in localScans) {
+        final id = (s['scanId'] ?? s['scan_id'] ?? s['id'])?.toString();
+        if (id != null) mergedScansMap[id] = s;
+      }
+      for (var s in backendScans) {
+        final id = (s['scanId'] ?? s['scan_id'] ?? s['id'])?.toString();
+        if (id != null) mergedScansMap[id] = s;
+      }
+
+      // Robust week cutoff: earliest between calendar week (Monday 00:00) and 7 rolling days
+      final now = DateTime.now();
+      final startOfCurrentWeek = DateTime(now.year, now.month, now.day).subtract(Duration(days: now.weekday - 1));
+      final sevenDaysAgo = now.subtract(const Duration(days: 7));
+      final cutoffDate = startOfCurrentWeek.isBefore(sevenDaysAgo) ? startOfCurrentWeek : sevenDaysAgo;
+
+      final deletedIds = prefs.getDeletedScanIds();
       int scansThisWeek = 0;
-      for (var s in scansJson) {
-        final scannedAtStr = s['scanned_at'];
-        if (scannedAtStr != null) {
-          final scannedAt = DateTime.parse(scannedAtStr);
-          if (scannedAt.isAfter(oneWeekAgo)) {
+      for (var s in mergedScansMap.values) {
+        final id = (s['scanId'] ?? s['scan_id'] ?? s['id'])?.toString();
+        if (id != null && deletedIds.contains(id)) {
+          continue;
+        }
+        final dateStr = s['scanned_at'] ?? s['created_at'] ?? s['scannedAt'];
+        if (dateStr != null) {
+          final scannedAt = DateTime.tryParse(dateStr.toString())?.toLocal();
+          if (scannedAt != null && scannedAt.isAfter(cutoffDate)) {
             scansThisWeek++;
           }
         }
