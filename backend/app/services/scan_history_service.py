@@ -41,9 +41,44 @@ class ScanHistoryService:
             logger.info("Cleaned up old scans", user_id=user_id, deleted=result.deleted_count)
         return result.deleted_count
 
+    INVALID_MED_NAMES = [
+        "Unknown", "unknown",
+        "Médicament non identifié", "médicament non identifié",
+        "Medication not identified", "medication not identified",
+        "Inconnu", "inconnu",
+        "Non identifié", "non identifié",
+        "Not identified", "not identified",
+        "Aucun", "aucun",
+        "Non détecté", "non détecté",
+        "Not detected", "not detected",
+        "", None
+    ]
+
+    @staticmethod
+    def is_valid_medication(name: Optional[str]) -> bool:
+        if not name:
+            return False
+        clean = name.strip()
+        if not clean:
+            return False
+        lower = clean.lower()
+        if (
+            lower in ("unknown", "médicament non identifié", "non identifié", "not identified", "inconnu", "aucun", "non détecté", "not detected")
+            or "non identifié" in lower
+            or "not identified" in lower
+            or "inconnu" in lower
+        ):
+            return False
+        return True
+
     @staticmethod
     def save_scan(user_id: str, scan_data: Dict[str, Any]) -> str:
         scan_id = scan_data.get("scan_id") or str(uuid.uuid4())
+        med_name = scan_data.get("medication_name")
+        if not ScanHistoryService.is_valid_medication(med_name):
+            logger.warning("Rejecting save of unidentified scan to MongoDB history", user_id=user_id, scan_id=scan_id, medication=med_name)
+            return scan_id
+
         try:
             coll = get_collection(COLLECTION)
             ScanHistoryService._cleanup_old_scans(user_id)
@@ -122,7 +157,10 @@ class ScanHistoryService:
         try:
             coll = get_collection(COLLECTION)
             cursor = (
-                coll.find({"user_id": user_id})
+                coll.find({
+                    "user_id": user_id,
+                    "medication_name": {"$nin": ScanHistoryService.INVALID_MED_NAMES}
+                })
                 .sort("created_at", -1)
                 .skip(offset)
                 .limit(limit)
@@ -188,7 +226,10 @@ class ScanHistoryService:
     @staticmethod
     def get_scan_count(user_id: str) -> int:
         try:
-            return get_collection(COLLECTION).count_documents({"user_id": user_id})
+            return get_collection(COLLECTION).count_documents({
+                "user_id": user_id,
+                "medication_name": {"$nin": ScanHistoryService.INVALID_MED_NAMES}
+            })
         except Exception as e:
             logger.error("Failed to get scan count", error=str(e))
             return 0

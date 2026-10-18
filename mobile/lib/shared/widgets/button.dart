@@ -123,9 +123,13 @@ class Button extends StatelessWidget {
           icon!,
           const SizedBox(width: 8),
         ],
-        DefaultTextStyle(
-          style: textStyle,
-          child: child,
+        Flexible(
+          child: DefaultTextStyle(
+            style: textStyle,
+            textAlign: TextAlign.center,
+            overflow: TextOverflow.ellipsis,
+            child: child,
+          ),
         ),
       ],
     );

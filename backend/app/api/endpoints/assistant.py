@@ -7,6 +7,7 @@ from fastapi import APIRouter, Depends, HTTPException, status, Body
 from fastapi import Request
 from fastapi.responses import StreamingResponse
 from typing import Dict, Any
+from datetime import datetime
 import structlog
 import json
 import asyncio
@@ -436,7 +437,7 @@ async def get_chat_history(
                 ChatMessage(
                     role=msg.get("role", "user"),
                     content=msg.get("content", ""),
-                    timestamp=msg.get("created_at"),
+                    timestamp=msg.get("created_at") or datetime.utcnow(),
                 )
                 for msg in history_data
             ]

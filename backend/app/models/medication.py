@@ -3,6 +3,7 @@ Medication Models
 Structured medical data storage
 """
 
+from typing import Any
 from sqlalchemy import Column, String, Text, DateTime, Date, Float, Boolean, JSON, Index, Integer
 from sqlalchemy.dialects.postgresql import UUID
 from datetime import datetime, date
@@ -14,7 +15,7 @@ from app.models.database import Base
 # Use String for SQLite (dev), UUID for PostgreSQL (prod)
 _ENV = os.getenv("ENVIRONMENT", "development")
 
-def get_id_type():
+def get_id_type() -> Any:
     """Return appropriate ID type based on environment"""
     if _ENV == "production":
         return UUID(as_uuid=True)
@@ -105,8 +106,8 @@ class Medication(Base):
             "storage_conditions": self.storage_conditions,
             "confidence_score": self.confidence_score,
             "verified": self.verified,
-            "created_at": self.created_at.isoformat() if self.created_at else None,
-            "updated_at": self.updated_at.isoformat() if self.updated_at else None,
+            "created_at": self.created_at.isoformat() if self.created_at is not None else None,
+            "updated_at": self.updated_at.isoformat() if self.updated_at is not None else None,
         }
 
 
@@ -164,7 +165,7 @@ class UserMedication(Base):
         return {
             "id": str(self.id),
             "user_id": self.user_id,
-            "medication_id": str(self.medication_id) if self.medication_id else None,
+            "medication_id": str(self.medication_id) if self.medication_id is not None else None,
             "medication_name": self.medication_name,
             "scan_id": self.scan_id,
             "image_url": self.image_url,
@@ -178,10 +179,10 @@ class UserMedication(Base):
             "dosage_schedule": self.dosage_schedule,
             "reminder_enabled": self.reminder_enabled,
             "active": self.active,
-            "start_date": self.start_date.isoformat() if self.start_date else None,
-            "end_date": self.end_date.isoformat() if self.end_date else None,
-            "created_at": self.created_at.isoformat() if self.created_at else None,
-            "updated_at": self.updated_at.isoformat() if self.updated_at else None,
+            "start_date": self.start_date.isoformat() if self.start_date is not None else None,
+            "end_date": self.end_date.isoformat() if self.end_date is not None else None,
+            "created_at": self.created_at.isoformat() if self.created_at is not None else None,
+            "updated_at": self.updated_at.isoformat() if self.updated_at is not None else None,
         }
 
 
@@ -201,8 +202,8 @@ class UserCredits(Base):
         return {
             "user_id": self.user_id,
             "credits": self.credits,
-            "quota_reset_date": self.quota_reset_date.isoformat() if self.quota_reset_date else None,
-            "updated_at": self.updated_at.isoformat() if self.updated_at else None,
+            "quota_reset_date": self.quota_reset_date.isoformat() if self.quota_reset_date is not None else None,
+            "updated_at": self.updated_at.isoformat() if self.updated_at is not None else None,
         }
 
 
@@ -258,9 +259,9 @@ class Reminder(Base):
             "days": self.days,
             "notes": self.notes,
             "active": self.active,
-            "next_dose": self.next_dose.isoformat() if self.next_dose else None,
-            "created_at": self.created_at.isoformat() if self.created_at else None,
-            "updated_at": self.updated_at.isoformat() if self.updated_at else None,
+            "next_dose": self.next_dose.isoformat() if self.next_dose is not None else None,
+            "created_at": self.created_at.isoformat() if self.created_at is not None else None,
+            "updated_at": self.updated_at.isoformat() if self.updated_at is not None else None,
         }
 
 
@@ -332,7 +333,7 @@ class ScanHistory(Base):
             "image_url": self.image_url,
             "packaging_language": self.packaging_language,
             "category": self.category,
-            "created_at": self.created_at.isoformat() if self.created_at else None,
-            "updated_at": self.updated_at.isoformat() if self.updated_at else None,
+            "created_at": self.created_at.isoformat() if self.created_at is not None else None,
+            "updated_at": self.updated_at.isoformat() if self.updated_at is not None else None,
         }
 

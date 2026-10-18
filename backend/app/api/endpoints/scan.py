@@ -301,40 +301,7 @@ async def scan_medication(
         analysis["packaging_language"] = packaging_language
         analysis["category"] = category
         
-        # 5. Save to PostgreSQL (replaces Firestore)
-        logger.info("Saving scan to MongoDB", user_id=user_id)
-        import uuid
-        scan_id = str(uuid.uuid4())
-        
-        scan_data = {
-            "scan_id": scan_id,
-            "medication_name": analysis.get("medication_name", "Unknown"),
-            "generic_name": analysis.get("generic_name"),
-            "dosage": analysis.get("dosage"),
-            "form": analysis.get("form"),
-            "manufacturer": analysis.get("manufacturer"),
-            "image_url": image_url,
-            "confidence": analysis.get("confidence", "low"),
-            "warnings": analysis.get("warnings", []),
-            "contraindications": analysis.get("contraindications", []),
-            "interactions": analysis.get("interactions", []),
-            "side_effects": analysis.get("side_effects", []),
-            "analysis_data": analysis,  # Store full analysis
-            "packaging_language": packaging_language,
-            "category": category,
-        }
-        
-        try:
-            saved_scan_id = scan_history_service.save_scan(
-                user_id=user_id,
-                scan_data=scan_data,
-            )
-            scan_id = saved_scan_id
-            logger.info("Scan saved to MongoDB", scan_id=scan_id)
-        except Exception as e:
-            logger.error("Failed to save scan to MongoDB", error=str(e))
-        
-        # 6. Consommer les crédits seulement si identification réussie (pas si "Médicament non identifié")
+        # 5. Vérifier la réussite de l'identification
         med_name = (analysis.get("medication_name") or "").strip()
         confidence = (analysis.get("confidence") or "low").lower()
         med_name_lower = med_name.lower()
@@ -347,11 +314,44 @@ async def scan_medication(
             or "non détecté" in med_name_lower
             or confidence == "low"
         )
+
+        import uuid
+        scan_id = str(uuid.uuid4())
+
+        # 6. Enregistrer dans MongoDB et débiter les crédits UNIQUEMENT si l'identification a réussi
         if not identification_failed:
+            logger.info("Saving verified medication scan to MongoDB", user_id=user_id)
+            scan_data = {
+                "scan_id": scan_id,
+                "medication_name": analysis.get("medication_name", "Unknown"),
+                "generic_name": analysis.get("generic_name"),
+                "dosage": analysis.get("dosage"),
+                "form": analysis.get("form"),
+                "manufacturer": analysis.get("manufacturer"),
+                "image_url": image_url,
+                "confidence": analysis.get("confidence", "medium"),
+                "warnings": analysis.get("warnings", []),
+                "contraindications": analysis.get("contraindications", []),
+                "interactions": analysis.get("interactions", []),
+                "side_effects": analysis.get("side_effects", []),
+                "analysis_data": analysis,  # Store full analysis
+                "packaging_language": packaging_language,
+                "category": category,
+            }
+            try:
+                saved_scan_id = scan_history_service.save_scan(
+                    user_id=user_id,
+                    scan_data=scan_data,
+                )
+                scan_id = saved_scan_id
+                logger.info("Scan saved to MongoDB", scan_id=scan_id)
+            except Exception as e:
+                logger.error("Failed to save scan to MongoDB", error=str(e))
+
             credits_service.consume(user_id, credits_service.SCAN_COST, is_anonymous=is_anonymous)
             logger.info("Credits consumed (fixed cost)", cost=credits_service.SCAN_COST, user_id=user_id)
         else:
-            logger.info("Identification failed, credits NOT consumed", medication=med_name, confidence=confidence, user_id=user_id)
+            logger.info("Identification failed, scan NOT saved to scan_history and credits NOT consumed", medication=med_name, confidence=confidence, user_id=user_id)
 
         # 7. Build response - Notice pharmaceutique complète
         # Helper function pour convertir les listes en strings

@@ -5,6 +5,7 @@ User's scan and interaction history
 
 from fastapi import APIRouter, Depends, Query, status, HTTPException
 from typing import Dict, Any
+from datetime import datetime
 import structlog
 
 from app.models.schemas import HistoryResponse, ScanHistoryItem
@@ -55,6 +56,10 @@ async def get_history(
     # Convert to response format with full data
     scans = []
     for item in history_data:
+        med_name = item.get("medication_name")
+        if not scan_history_service.is_valid_medication(med_name):
+            continue
+
         # Extraire analysis_data si c'est une string JSON
         analysis_data = item.get("analysis_data")
         if isinstance(analysis_data, str):
@@ -64,11 +69,16 @@ async def get_history(
             except:
                 analysis_data = {}
         
+        scan_id_val = str(item.get("scan_id") or item.get("id") or "")
+        created_at_val = item.get("created_at")
+        if not isinstance(created_at_val, datetime):
+            created_at_val = datetime.utcnow()
+            
         scans.append(
             ScanHistoryItem(
-                id=item.get("scan_id", item.get("id")),
-                scan_id=item.get("scan_id", item.get("id")),
-                medication_name=item.get("medication_name", "Unknown"),
+                id=scan_id_val,
+                scan_id=scan_id_val,
+                medication_name=str(med_name),
                 generic_name=analysis_data.get("generic_name") or item.get("generic_name") if analysis_data else item.get("generic_name"),
                 dosage=analysis_data.get("dosage") or item.get("dosage") if analysis_data else item.get("dosage"),
                 form=analysis_data.get("form") or item.get("form") if analysis_data else item.get("form"),
@@ -77,7 +87,7 @@ async def get_history(
                 packaging_language=analysis_data.get("packaging_language") or item.get("packaging_language") or "fr" if analysis_data else "fr",
                 image_url=item.get("image_url"),
                 confidence=item.get("confidence", "medium"),
-                scanned_at=item.get("created_at"),
+                scanned_at=created_at_val,
                 analysis_data=analysis_data,
                 warnings=item.get("warnings"),
                 contraindications=item.get("contraindications"),
@@ -95,7 +105,7 @@ async def get_history(
     return HistoryResponse(
         scans=scans,
         count=len(scans),
-        total=total_count,
+        total=len(scans),
         page=page,
         per_page=limit,
     )
@@ -110,7 +120,12 @@ async def migrate_history_item(
     🚚 Migrate local/anonymous scan history item to MongoDB
     """
     user_id = user["uid"]
-    logger.info("Migrating history item", user_id=user_id, medication=item.get("medication_name"))
+    med_name = item.get("medication_name") or item.get("medicationName")
+    if not scan_history_service.is_valid_medication(med_name):
+        logger.info("Skipping migration of unidentified item", user_id=user_id, medication=med_name)
+        return {"status": "skipped", "reason": "unidentified_medication"}
+
+    logger.info("Migrating history item", user_id=user_id, medication=med_name)
     
     try:
         import uuid
@@ -118,12 +133,12 @@ async def migrate_history_item(
         
         scan_data = {
             "scan_id": scan_id,
-            "medication_name": item.get("medication_name", "Unknown"),
-            "generic_name": item.get("generic_name"),
+            "medication_name": med_name,
+            "generic_name": item.get("generic_name") or item.get("genericName"),
             "dosage": item.get("dosage"),
             "form": item.get("form"),
             "manufacturer": item.get("manufacturer"),
-            "image_url": item.get("image_url"),
+            "image_url": item.get("image_url") or item.get("imageUrl"),
             "confidence": item.get("confidence", "medium"),
             "warnings": item.get("warnings", []),
             "contraindications": item.get("contraindications", []),

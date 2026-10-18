@@ -11,6 +11,8 @@ import '../../../data/models/recent_scan.dart';
 import '../../auth/providers/auth_provider.dart';
 import '../../home/providers/health_stats_provider.dart';
 import '../../home/providers/recent_scans_provider.dart';
+import '../../../data/remote/api_client.dart';
+import '../../../data/local/secure_storage.dart';
 import '../../../shared/utils/localization.dart';
 
 class PharmacyState {
@@ -55,8 +57,8 @@ class PharmacyState {
 
 class PharmacyNotifier extends StateNotifier<PharmacyState> {
   final Ref _ref;
-  final _client;
-  final _storage;
+  final ApiClient _client;
+  final SecureStorageService _storage;
 
   PharmacyNotifier(this._ref)
       : _client = _ref.read(apiClientProvider),
@@ -77,12 +79,33 @@ class PharmacyNotifier extends StateNotifier<PharmacyState> {
     state = PharmacyState(allScans: [], filteredScans: []);
   }
 
+  static bool isIdentifiedMedication(String? name) {
+    if (name == null || name.trim().isEmpty) return false;
+    final lower = name.trim().toLowerCase();
+    if (lower == 'medication not identified' ||
+        lower == 'médicament non identifié' ||
+        lower == 'non identifié' ||
+        lower == 'not identified' ||
+        lower == 'unknown' ||
+        lower == 'inconnu' ||
+        lower == 'aucun' ||
+        lower == 'tanımlanamayan ilaç' ||
+        lower == 'دواء غير محدد') {
+      return false;
+    }
+    return true;
+  }
+
   /// Migrates ONLY anonymous/guest trial scans (if any) to the newly authenticated user.
   /// Never touches or reads scans belonging to any other user account on this device.
   void _migrateTrialScansIfAny(String targetUid) async {
     try {
       final prefs = _ref.read(sharedPrefsServiceProvider);
-      final trialScans = prefs.getTrialScans();
+      final rawTrialScans = prefs.getTrialScans();
+      final trialScans = rawTrialScans.where((item) {
+        final name = (item['medicationName'] ?? item['medication_name'])?.toString();
+        return isIdentifiedMedication(name);
+      }).toList();
       if (trialScans.isEmpty) return;
 
       final targetCacheJson = prefs.getPharmacyCache(targetUid);
@@ -132,7 +155,10 @@ class PharmacyNotifier extends StateNotifier<PharmacyState> {
     if (cacheJson != null && cacheJson.isNotEmpty) {
       try {
         final List<dynamic> list = json.decode(cacheJson);
-        final cachedScans = list.map((e) => RecentScan.fromJson(e)).toList();
+        final cachedScans = list
+            .map((e) => RecentScan.fromJson(e))
+            .where((s) => isIdentifiedMedication(s.medicationName))
+            .toList();
         
         // Translate local cache if language differs
         final lang = _ref.read(languageProvider);
@@ -211,7 +237,10 @@ class PharmacyNotifier extends StateNotifier<PharmacyState> {
       );
       if (!mounted) return;
       final List<dynamic> listJson = response.data['scans'] ?? response.data['history'] ?? [];
-      final List<RecentScan> list = listJson.map((e) => RecentScan.fromJson(e)).toList();
+      final List<RecentScan> list = listJson
+          .map((e) => RecentScan.fromJson(e))
+          .where((s) => isIdentifiedMedication(s.medicationName))
+          .toList();
 
       final appDir = await getApplicationDocumentsDirectory();
       if (!mounted) return;
@@ -238,7 +267,10 @@ class PharmacyNotifier extends StateNotifier<PharmacyState> {
       if (userCacheJson != null && userCacheJson.isNotEmpty) {
         try {
           final List<dynamic> localDecoded = json.decode(userCacheJson);
-          userLocalScans = localDecoded.map((e) => RecentScan.fromJson(e)).toList();
+          userLocalScans = localDecoded
+              .map((e) => RecentScan.fromJson(e))
+              .where((s) => isIdentifiedMedication(s.medicationName))
+              .toList();
         } catch (_) {}
       }
 
@@ -263,15 +295,18 @@ class PharmacyNotifier extends StateNotifier<PharmacyState> {
       final mergedList = mergedMap.values.toList();
       mergedList.sort((a, b) => b.scannedAt.compareTo(a.scannedAt));
 
-      // Filter out permanently deleted scans from blacklist
+      // Filter out permanently deleted scans from blacklist & unidentified medications
       final deletedIds = prefs.getDeletedScanIds();
       final activeMergedList = mergedList
-          .where((s) => !deletedIds.contains(s.scanId) && !deletedIds.contains(s.id))
+          .where((s) => !deletedIds.contains(s.scanId) && !deletedIds.contains(s.id) && isIdentifiedMedication(s.medicationName))
           .toList();
 
       // Auto-sync any user local-only scans to MongoDB backend in background
       for (final scan in userLocalScans) {
-        if (!deletedIds.contains(scan.scanId) && !deletedIds.contains(scan.id) && !list.any((b) => (b.scanId == scan.scanId || b.id == scan.id))) {
+        if (!deletedIds.contains(scan.scanId) &&
+            !deletedIds.contains(scan.id) &&
+            isIdentifiedMedication(scan.medicationName) &&
+            !list.any((b) => (b.scanId == scan.scanId || b.id == scan.id))) {
           try {
             _client.post('/history/migrate', data: scan.toJson());
           } catch (_) {}

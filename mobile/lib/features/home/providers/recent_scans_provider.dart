@@ -34,6 +34,23 @@ class RecentScansNotifier extends StateNotifier<AsyncValue<List<RecentScan>>> {
     }, fireImmediately: true);
   }
 
+  static bool isIdentifiedMedication(String? name) {
+    if (name == null || name.trim().isEmpty) return false;
+    final lower = name.trim().toLowerCase();
+    if (lower == 'medication not identified' ||
+        lower == 'médicament non identifié' ||
+        lower == 'non identifié' ||
+        lower == 'not identified' ||
+        lower == 'unknown' ||
+        lower == 'inconnu' ||
+        lower == 'aucun' ||
+        lower == 'tanımlanamayan ilaç' ||
+        lower == 'دواء غير محدد') {
+      return false;
+    }
+    return true;
+  }
+
   void _loadFromCacheOrPharmacy() {
     try {
       final prefs = _ref.read(sharedPrefsServiceProvider);
@@ -42,7 +59,7 @@ class RecentScansNotifier extends StateNotifier<AsyncValue<List<RecentScan>>> {
       // 1. Check pharmacyProvider first
       final pharmacyScans = _ref.read(pharmacyProvider).allScans;
       final validPharmacy = pharmacyScans
-          .where((s) => !deletedIds.contains(s.scanId) && !deletedIds.contains(s.id))
+          .where((s) => !deletedIds.contains(s.scanId) && !deletedIds.contains(s.id) && isIdentifiedMedication(s.medicationName))
           .toList();
       if (validPharmacy.isNotEmpty) {
         validPharmacy.sort((a, b) => b.scannedAt.compareTo(a.scannedAt));
@@ -50,14 +67,16 @@ class RecentScansNotifier extends StateNotifier<AsyncValue<List<RecentScan>>> {
         return;
       }
 
-      // 2. Check local user/trial cache
+      // 2. Check local user/trial cache (isolated by user ID)
       final user = _ref.read(firebaseAuthStateProvider).value;
-      final cacheJson = prefs.getPharmacyCache(user?.uid ?? 'trial') ?? prefs.getPharmacyCache('trial');
+      final cacheJson = user != null
+          ? prefs.getPharmacyCache(user.uid)
+          : prefs.getPharmacyCache('trial');
       if (cacheJson != null && cacheJson.isNotEmpty) {
         final List<dynamic> decoded = json.decode(cacheJson);
         final list = decoded
             .map((e) => RecentScan.fromJson(e))
-            .where((s) => !deletedIds.contains(s.scanId) && !deletedIds.contains(s.id))
+            .where((s) => !deletedIds.contains(s.scanId) && !deletedIds.contains(s.id) && isIdentifiedMedication(s.medicationName))
             .toList();
         list.sort((a, b) => b.scannedAt.compareTo(a.scannedAt));
         if (list.isNotEmpty) {
@@ -72,7 +91,7 @@ class RecentScansNotifier extends StateNotifier<AsyncValue<List<RecentScan>>> {
     final prefs = _ref.read(sharedPrefsServiceProvider);
     final deletedIds = prefs.getDeletedScanIds();
     final valid = scans
-        .where((s) => !deletedIds.contains(s.scanId) && !deletedIds.contains(s.id))
+        .where((s) => !deletedIds.contains(s.scanId) && !deletedIds.contains(s.id) && isIdentifiedMedication(s.medicationName))
         .toList();
     valid.sort((a, b) => b.scannedAt.compareTo(a.scannedAt));
     if (valid.isNotEmpty) {
@@ -114,7 +133,10 @@ class RecentScansNotifier extends StateNotifier<AsyncValue<List<RecentScan>>> {
       );
       if (!mounted) return;
       final List<dynamic> listJson = response.data['scans'] ?? response.data['history'] ?? [];
-      final List<RecentScan> list = listJson.map((e) => RecentScan.fromJson(e)).toList();
+      final List<RecentScan> list = listJson
+          .map((e) => RecentScan.fromJson(e))
+          .where((s) => isIdentifiedMedication(s.medicationName))
+          .toList();
 
       final appDir = await getApplicationDocumentsDirectory();
       if (!mounted) return;
@@ -137,7 +159,9 @@ class RecentScansNotifier extends StateNotifier<AsyncValue<List<RecentScan>>> {
 
       final prefs = _ref.read(sharedPrefsServiceProvider);
       final user = _ref.read(firebaseAuthStateProvider).value;
-      final cacheJson = prefs.getPharmacyCache(user?.uid ?? 'trial') ?? prefs.getPharmacyCache('trial');
+      final cacheJson = user != null
+          ? prefs.getPharmacyCache(user.uid)
+          : prefs.getPharmacyCache('trial');
 
       Map<String, RecentScan> localCacheMap = {};
       if (cacheJson != null && cacheJson.isNotEmpty) {
@@ -145,7 +169,9 @@ class RecentScansNotifier extends StateNotifier<AsyncValue<List<RecentScan>>> {
           final List<dynamic> decoded = json.decode(cacheJson);
           for (var item in decoded) {
             final localScan = RecentScan.fromJson(item);
-            localCacheMap[localScan.scanId] = localScan;
+            if (isIdentifiedMedication(localScan.medicationName)) {
+              localCacheMap[localScan.scanId] = localScan;
+            }
           }
         } catch (_) {}
       }
@@ -161,7 +187,7 @@ class RecentScansNotifier extends StateNotifier<AsyncValue<List<RecentScan>>> {
       // 2. Pharmacy provider scans
       final pharmacyScans = _ref.read(pharmacyProvider).allScans;
       for (final pScan in pharmacyScans) {
-        if (!mergedMap.containsKey(pScan.scanId)) {
+        if (!mergedMap.containsKey(pScan.scanId) && isIdentifiedMedication(pScan.medicationName)) {
           mergedMap[pScan.scanId] = pScan;
         }
       }
@@ -190,7 +216,7 @@ class RecentScansNotifier extends StateNotifier<AsyncValue<List<RecentScan>>> {
 
       final deletedIds = prefs.getDeletedScanIds();
       final activeMergedScans = mergedMap.values
-          .where((s) => !deletedIds.contains(s.scanId) && !deletedIds.contains(s.id))
+          .where((s) => !deletedIds.contains(s.scanId) && !deletedIds.contains(s.id) && isIdentifiedMedication(s.medicationName))
           .toList();
 
       activeMergedScans.sort((a, b) => b.scannedAt.compareTo(a.scannedAt));

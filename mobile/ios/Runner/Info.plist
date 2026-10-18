@@ -22,16 +22,39 @@
 	<string>$(FLUTTER_BUILD_NAME)</string>
 	<key>CFBundleSignature</key>
 	<string>????</string>
+	<key>CFBundleURLTypes</key>
+	<array>
+		<dict>
+			<key>CFBundleTypeRole</key>
+			<string>Editor</string>
+			<key>CFBundleURLSchemes</key>
+			<array>
+				<string>com.googleusercontent.apps.14523087808-v9is49662fi56e8i0cf0pcfb94vmppo8</string>
+			</array>
+		</dict>
+		<dict>
+			<key>CFBundleTypeRole</key>
+			<string>Editor</string>
+			<key>CFBundleURLName</key>
+			<string>com.seinimomo.medscanapp</string>
+			<key>CFBundleURLSchemes</key>
+			<array>
+				<string>medscan</string>
+			</array>
+		</dict>
+	</array>
 	<key>CFBundleVersion</key>
 	<string>$(FLUTTER_BUILD_NUMBER)</string>
+	<key>GIDClientID</key>
+	<string>14523087808-v9is49662fi56e8i0cf0pcfb94vmppo8.apps.googleusercontent.com</string>
 	<key>LSRequiresIPhoneOS</key>
 	<true/>
 	<key>NSCameraUsageDescription</key>
 	<string>Cette application a besoin d'accéder à l'appareil photo pour vous permettre de prendre en photo vos boîtes de médicaments afin de les analyser.</string>
-	<key>NSPhotoLibraryUsageDescription</key>
-	<string>Cette application a besoin d'accéder à votre galerie de photos pour vous permettre de charger et d'analyser des images de médicaments.</string>
 	<key>NSMicrophoneUsageDescription</key>
 	<string>Cette application a besoin du microphone pour vous permettre de poser vos questions médicales et de décrire vos symptômes vocalement.</string>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>Cette application a besoin d'accéder à votre galerie de photos pour vous permettre de charger et d'analyser des images de médicaments.</string>
 	<key>NSSpeechRecognitionUsageDescription</key>
 	<string>Cette application utilise la reconnaissance vocale pour transcrire vos questions médicales en texte.</string>
 	<key>UIApplicationSceneManifest</key>
@@ -77,31 +100,6 @@
 		<string>UIInterfaceOrientationPortraitUpsideDown</string>
 		<string>UIInterfaceOrientationLandscapeLeft</string>
 		<string>UIInterfaceOrientationLandscapeRight</string>
-	</array>
-	<key>GIDClientID</key>
-	<string>14523087808-v9is49662fi56e8i0cf0pcfb94vmppo8.apps.googleusercontent.com</string>
-	<key>CFBundleURLTypes</key>
-	<array>
-		<!-- Google Sign-In scheme -->
-		<dict>
-			<key>CFBundleTypeRole</key>
-			<string>Editor</string>
-			<key>CFBundleURLSchemes</key>
-			<array>
-				<string>com.googleusercontent.apps.14523087808-v9is49662fi56e8i0cf0pcfb94vmppo8</string>
-			</array>
-		</dict>
-		<!-- MedScan deep link scheme (widget tap) -->
-		<dict>
-			<key>CFBundleTypeRole</key>
-			<string>Editor</string>
-			<key>CFBundleURLName</key>
-			<string>com.seinimomo.medscanapp</string>
-			<key>CFBundleURLSchemes</key>
-			<array>
-				<string>medscan</string>
-			</array>
-		</dict>
 	</array>
 </dict>
 </plist>

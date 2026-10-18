@@ -70,7 +70,7 @@ def create_reminder(user_id: str, data: Dict[str, Any]) -> Dict[str, Any]:
 
 
 def get_reminders(user_id: str, active_only: bool = True, limit: int = 50) -> List[Dict[str, Any]]:
-    q = {"user_id": user_id}
+    q: Dict[str, Any] = {"user_id": user_id}
     if active_only:
         q["active"] = True
     cursor = get_collection(REMINDERS).find(q).sort("next_dose", 1).limit(limit)

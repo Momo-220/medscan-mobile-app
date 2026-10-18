@@ -25,7 +25,7 @@ const List<DoctorProfile> kAvailableDoctors = [
     shortName: 'Dr. Sarah',
     specialtyKey: 'doctorSpecialtySarah',
     descriptionKey: 'doctorDescSarah',
-    imagePath: 'assets/images/dr_sarah_header.png',
+    imagePath: 'assets/images/dr_sarah_3d.png',
     accentColorValue: 0xFF0284C7, // Sky Blue
   ),
   DoctorProfile(
@@ -34,7 +34,7 @@ const List<DoctorProfile> kAvailableDoctors = [
     shortName: 'Dr. Thomas',
     specialtyKey: 'doctorSpecialtyThomas',
     descriptionKey: 'doctorDescThomas',
-    imagePath: 'assets/images/doctor_white_male.png',
+    imagePath: 'assets/images/dr_thomas_3d.png',
     accentColorValue: 0xFF2563EB, // Royal Blue
   ),
   DoctorProfile(
@@ -43,7 +43,7 @@ const List<DoctorProfile> kAvailableDoctors = [
     shortName: 'Dr. Emma',
     specialtyKey: 'doctorSpecialtyEmma',
     descriptionKey: 'doctorDescEmma',
-    imagePath: 'assets/images/doctor_blonde_female.png',
+    imagePath: 'assets/images/dr_emma_3d.png',
     accentColorValue: 0xFF0D9488, // Teal
   ),
   DoctorProfile(
@@ -52,7 +52,7 @@ const List<DoctorProfile> kAvailableDoctors = [
     shortName: 'Dr. Aris',
     specialtyKey: 'doctorSpecialtyAris',
     descriptionKey: 'doctorDescAris',
-    imagePath: 'assets/images/doctor_brown_male.png',
+    imagePath: 'assets/images/dr_aris_3d.png',
     accentColorValue: 0xFF6366F1, // Indigo
   ),
 ];
