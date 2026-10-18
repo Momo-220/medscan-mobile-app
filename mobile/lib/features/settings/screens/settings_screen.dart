@@ -243,7 +243,130 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
                   color: isDark ? AppColors.textMutedDark : const Color(0xFF64748B),
                 ),
               ),
-              const SizedBox(height: 32),
+              const SizedBox(height: 28),
+
+              // SECTION 0: Votre Médecin Référent
+              _buildSectionHeader(ref.t('myDoctorAI'), isDark),
+              const SizedBox(height: 10),
+              AppCard(
+                onTap: () => context.push('/choose-doctor'),
+                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
+                children: Row(
+                  children: [
+                    // Doctor Avatar with prominent ring, status badge and glow
+                    Stack(
+                      alignment: Alignment.bottomRight,
+                      children: [
+                        Container(
+                          width: 48,
+                          height: 48,
+                          decoration: BoxDecoration(
+                            shape: BoxShape.circle,
+                            color: isDark ? const Color(0xFF334155) : const Color(0xFFF1F5F9),
+                            border: Border.all(
+                              color: Color(ref.watch(doctorProvider).accentColorValue).withValues(alpha: 0.55),
+                              width: 2,
+                            ),
+                            boxShadow: [
+                              BoxShadow(
+                                color: Color(ref.watch(doctorProvider).accentColorValue).withValues(alpha: isDark ? 0.35 : 0.20),
+                                blurRadius: 8,
+                                offset: const Offset(0, 2),
+                              ),
+                            ],
+                          ),
+                          child: ClipOval(
+                            child: Image.asset(
+                              ref.watch(doctorProvider).imagePath,
+                              fit: BoxFit.cover,
+                              alignment: Alignment.topCenter,
+                              errorBuilder: (context, error, stackTrace) => const Icon(Icons.person, size: 24),
+                            ),
+                          ),
+                        ),
+                        Container(
+                          width: 13,
+                          height: 13,
+                          decoration: BoxDecoration(
+                            color: const Color(0xFF10B981),
+                            shape: BoxShape.circle,
+                            border: Border.all(
+                              color: isDark ? const Color(0xFF1E293B) : Colors.white,
+                              width: 2,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(width: 14),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            children: [
+                              Flexible(
+                                child: Text(
+                                  ref.watch(doctorProvider).name,
+                                  style: AppTextStyles.bodyBold(isDark: isDark).copyWith(
+                                    fontSize: 16.5,
+                                    color: isDark ? Colors.white : const Color(0xFF1E293B),
+                                  ),
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              ),
+                              const SizedBox(width: 5),
+                              const Icon(Icons.verified, color: Color(0xFF2563EB), size: 16),
+                            ],
+                          ),
+                          const SizedBox(height: 3),
+                          Text(
+                            ref.t(ref.watch(doctorProvider).specialtyKey),
+                            style: AppTextStyles.small(isDark: isDark).copyWith(
+                              fontSize: 12.5,
+                              color: isDark ? AppColors.textMutedDark : const Color(0xFF64748B),
+                            ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                      decoration: BoxDecoration(
+                        color: isDark ? const Color(0xFF334155).withValues(alpha: 0.6) : const Color(0xFFF1F5F9),
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(
+                          color: isDark ? Colors.white10 : const Color(0xFFE2E8F0),
+                          width: 1,
+                        ),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Text(
+                            ref.t('changeDoctor'),
+                            style: TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.w600,
+                              color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF475569),
+                            ),
+                          ),
+                          const SizedBox(width: 4),
+                          Icon(
+                            Icons.arrow_forward_ios_rounded,
+                            size: 11,
+                            color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF475569),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 24),
 
               // SECTION 1: Notifications
               _buildSectionHeader(ref.t('notifications'), isDark),
@@ -428,81 +551,6 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
                               style: const TextStyle(
                                 fontSize: 22,
                               ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
-                    const Divider(height: 1, color: Color(0xFFE2E8F0)),
-                    // Row 3: Votre Médecin Référent
-                    InkWell(
-                      borderRadius: BorderRadius.circular(16),
-                      onTap: () => context.push('/choose-doctor'),
-                      child: Padding(
-                        padding: const EdgeInsets.symmetric(vertical: 12.0),
-                        child: Row(
-                          children: [
-                            _buildCardIcon(Icons.medical_services_outlined),
-                            const SizedBox(width: 14),
-                            Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text(
-                                    ref.t('myDoctorAI'),
-                                    style: AppTextStyles.bodyBold(isDark: isDark).copyWith(
-                                      fontSize: 16,
-                                      color: isDark ? Colors.white : const Color(0xFF1E293B),
-                                    ),
-                                    overflow: TextOverflow.ellipsis,
-                                  ),
-                                  const SizedBox(height: 3),
-                                  Text(
-                                    '${ref.watch(doctorProvider).name} • ${ref.t(ref.watch(doctorProvider).specialtyKey)}',
-                                    style: AppTextStyles.small(isDark: isDark).copyWith(
-                                      fontSize: 12.5,
-                                      color: isDark ? AppColors.textMutedDark : const Color(0xFF64748B),
-                                    ),
-                                    maxLines: 1,
-                                    overflow: TextOverflow.ellipsis,
-                                  ),
-                                ],
-                              ),
-                            ),
-                            const SizedBox(width: 10),
-                            // Doctor Avatar with prominent ring and shadow
-                            Container(
-                              width: 44,
-                              height: 44,
-                              decoration: BoxDecoration(
-                                shape: BoxShape.circle,
-                                color: isDark ? const Color(0xFF334155) : const Color(0xFFF1F5F9),
-                                border: Border.all(
-                                  color: Color(ref.watch(doctorProvider).accentColorValue).withValues(alpha: 0.45),
-                                  width: 2,
-                                ),
-                                boxShadow: [
-                                  BoxShadow(
-                                    color: Color(ref.watch(doctorProvider).accentColorValue).withValues(alpha: isDark ? 0.35 : 0.20),
-                                    blurRadius: 10,
-                                    offset: const Offset(0, 3),
-                                  ),
-                                ],
-                              ),
-                              child: ClipOval(
-                                child: Image.asset(
-                                  ref.watch(doctorProvider).imagePath,
-                                  fit: BoxFit.cover,
-                                  alignment: Alignment.topCenter,
-                                  errorBuilder: (context, error, stackTrace) => const Icon(Icons.person, size: 22),
-                                ),
-                              ),
-                            ),
-                            const SizedBox(width: 6),
-                            Icon(
-                              Icons.chevron_right_rounded,
-                              size: 20,
-                              color: isDark ? Colors.white38 : const Color(0xFF94A3B8),
                             ),
                           ],
                         ),

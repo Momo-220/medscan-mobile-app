@@ -135,9 +135,26 @@ class _CustomNavigationBarState extends ConsumerState<CustomNavigationBar> {
     });
   }
 
+  Widget _wrapWithCapsule({required Widget child, required bool isAndroid}) {
+    if (isAndroid) {
+      return ClipRRect(
+        borderRadius: BorderRadius.circular(36),
+        child: child,
+      );
+    }
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(36),
+      child: BackdropFilter(
+        filter: ImageFilter.blur(sigmaX: 25, sigmaY: 25),
+        child: child,
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final bool isDark = Theme.of(context).brightness == Brightness.dark;
+    final bool isAndroid = Theme.of(context).platform == TargetPlatform.android;
 
     final safeAreaBottom = MediaQuery.paddingOf(context).bottom;
     final double bottomMargin = safeAreaBottom > 0 ? safeAreaBottom + 8.0 : 20.0;
@@ -157,12 +174,10 @@ class _CustomNavigationBarState extends ConsumerState<CustomNavigationBar> {
           child: Stack(
             clipBehavior: Clip.none,
             children: [
-              // Frosted Glassmorphism Floating Capsule
-              ClipRRect(
-                borderRadius: BorderRadius.circular(36),
-                child: BackdropFilter(
-                  filter: ImageFilter.blur(sigmaX: 25, sigmaY: 25),
-                  child: Container(
+              // Frosted Glassmorphism Floating Capsule (Optimized on Android for 60/120fps with zero saveLayer)
+              _wrapWithCapsule(
+                isAndroid: isAndroid,
+                child: Container(
                     height: 68,
                     padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
                     decoration: BoxDecoration(
@@ -172,12 +187,12 @@ class _CustomNavigationBarState extends ConsumerState<CustomNavigationBar> {
                         end: Alignment.bottomRight,
                         colors: isDark
                             ? [
-                                const Color(0xFF1E293B).withValues(alpha: 0.65),
-                                const Color(0xFF0F172A).withValues(alpha: 0.55),
+                                const Color(0xFF1E293B).withValues(alpha: isAndroid ? 0.94 : 0.65),
+                                const Color(0xFF0F172A).withValues(alpha: isAndroid ? 0.94 : 0.55),
                               ]
                             : [
-                                Colors.white.withValues(alpha: 0.72),
-                                Colors.white.withValues(alpha: 0.48),
+                                Colors.white.withValues(alpha: isAndroid ? 0.96 : 0.72),
+                                Colors.white.withValues(alpha: isAndroid ? 0.96 : 0.48),
                               ],
                       ),
                       border: Border.all(
@@ -322,7 +337,6 @@ class _CustomNavigationBarState extends ConsumerState<CustomNavigationBar> {
                     ),
                   ),
                 ),
-              ),
 
               // Mascot (if present)
               if (widget.mascot != null)

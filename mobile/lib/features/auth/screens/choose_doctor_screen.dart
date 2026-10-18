@@ -92,47 +92,8 @@ class _ChooseDoctorPageState extends ConsumerState<ChooseDoctorPage> {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.stretch,
                         children: [
-                          const SizedBox(height: 12),
+                          const SizedBox(height: 16),
 
-                          // Step Pill Badge - Luxury Concierge
-                          Center(
-                            child: Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
-                              decoration: BoxDecoration(
-                                color: isDark
-                                    ? Colors.white.withValues(alpha: 0.06)
-                                    : AppColors.primary.withValues(alpha: 0.08),
-                                borderRadius: BorderRadius.circular(24),
-                                border: Border.all(
-                                  color: isDark
-                                      ? Colors.white.withValues(alpha: 0.12)
-                                      : AppColors.primary.withValues(alpha: 0.22),
-                                  width: 1,
-                                ),
-                              ),
-                              child: Row(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  Icon(
-                                    Icons.auto_awesome,
-                                    size: 13,
-                                    color: isDark ? AppColors.primaryLight : AppColors.primary,
-                                  ),
-                                  const SizedBox(width: 7),
-                                  Text(
-                                    ref.t('myDoctorAI'),
-                                    style: GoogleFonts.outfit(
-                                      fontSize: 12,
-                                      fontWeight: FontWeight.w600,
-                                      letterSpacing: 0.3,
-                                      color: isDark ? AppColors.primaryLight : AppColors.primary,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                          ),
-                          const SizedBox(height: 20),
 
                           // Main Question - Luxury Palace Serif Typography (Grand & Centered)
                           Builder(
@@ -358,61 +319,46 @@ class _ChooseDoctorPageState extends ConsumerState<ChooseDoctorPage> {
                           ),
                           const SizedBox(height: 32),
 
-                          // Enhanced Luxury Confirm Button
-                          Material(
-                            color: Colors.transparent,
-                            child: InkWell(
-                              onTap: _loading ? null : _handleConfirm,
-                              borderRadius: BorderRadius.circular(22),
-                              child: Ink(
-                                height: 56,
-                                width: double.infinity,
-                                decoration: BoxDecoration(
-                                  gradient: const LinearGradient(
-                                    colors: [Color(0xFF3B82F6), Color(0xFF1D4ED8)],
-                                    begin: Alignment.topLeft,
-                                    end: Alignment.bottomRight,
-                                  ),
-                                  borderRadius: BorderRadius.circular(22),
-                                  boxShadow: [
-                                    BoxShadow(
-                                      color: const Color(0xFF3B82F6).withValues(alpha: isDark ? 0.45 : 0.32),
-                                      blurRadius: 18,
-                                      offset: const Offset(0, 6),
-                                    ),
-                                  ],
-                                ),
-                                child: Center(
-                                  child: _loading
-                                      ? const SizedBox(
-                                          width: 24,
-                                          height: 24,
-                                          child: CircularProgressIndicator(
-                                            color: Colors.white,
-                                            strokeWidth: 2.5,
-                                          ),
-                                        )
-                                      : Row(
-                                          mainAxisAlignment: MainAxisAlignment.center,
-                                          children: [
-                                            Text(
-                                              '${ref.t('chooseDoctorConfirm')} (${selectedDoctor.shortName})',
-                                              style: GoogleFonts.outfit(
-                                                fontSize: 16,
-                                                fontWeight: FontWeight.w700,
-                                                color: Colors.white,
-                                                letterSpacing: 0.2,
-                                              ),
-                                            ),
-                                            const SizedBox(width: 8),
-                                            const Icon(
-                                              Icons.arrow_forward_rounded,
-                                              color: Colors.white,
-                                              size: 18,
-                                            ),
-                                          ],
+                          // Confirm Button (Matching reminder action button style)
+                          GestureDetector(
+                            onTap: _loading ? null : _handleConfirm,
+                            behavior: HitTestBehavior.opaque,
+                            child: Container(
+                              width: double.infinity,
+                              height: 50,
+                              decoration: BoxDecoration(
+                                color: isDark ? const Color(0xFF3B82F6) : const Color(0xFF0F172A),
+                                borderRadius: BorderRadius.circular(999),
+                              ),
+                              child: Center(
+                                child: _loading
+                                    ? const SizedBox(
+                                        width: 20,
+                                        height: 20,
+                                        child: CircularProgressIndicator(
+                                          color: Colors.white,
+                                          strokeWidth: 2.2,
                                         ),
-                                ),
+                                      )
+                                    : Row(
+                                        mainAxisAlignment: MainAxisAlignment.center,
+                                        children: [
+                                          Text(
+                                            '${ref.t('chooseDoctorConfirm')} (${selectedDoctor.shortName})',
+                                            style: GoogleFonts.plusJakartaSans(
+                                              fontSize: 14.5,
+                                              fontWeight: FontWeight.w600,
+                                              color: Colors.white,
+                                            ),
+                                          ),
+                                          const SizedBox(width: 8),
+                                          const Icon(
+                                            Icons.arrow_forward_rounded,
+                                            color: Colors.white,
+                                            size: 16,
+                                          ),
+                                        ],
+                                      ),
                               ),
                             ),
                           ),

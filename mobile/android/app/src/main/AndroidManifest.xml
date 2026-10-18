@@ -62,10 +62,10 @@
             </intent-filter>
         </receiver>
 
-        <!-- Enable Impeller GPU rendering backend for 60/120fps ultra-fluid animations on Android -->
+        <!-- Use rock-solid stable Skia GPU rendering backend for smooth 60/120fps on Android -->
         <meta-data
             android:name="io.flutter.embedding.android.EnableImpeller"
-            android:value="true" />
+            android:value="false" />
 
         <!-- Firebase Cloud Messaging Default Channel & Icon for Production Background Push -->
         <meta-data

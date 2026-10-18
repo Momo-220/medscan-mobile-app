@@ -228,7 +228,7 @@
   "minutes": "Minutes",
   "quickHours": "Quick hours",
   "infoNotAvailable": "Information not available",
-  "doctorGreeting": "Hello, I am Dr. Sarah Martin",
+  "doctorGreeting": "Hello, I am {name}",
   "doctorDescription": "Your dedicated pharmaceutical assistant. I am here to answer all your questions about your medications, interactions, dosage, and much more, with kindness and professionalism.",
   "doctorName": "Dr. Sarah Martin",
   "online": "Online",

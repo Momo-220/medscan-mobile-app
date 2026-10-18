@@ -15,7 +15,6 @@ import '../../../data/models/scan_response.dart';
 import '../../../shared/utils/localization.dart';
 import '../../../shared/widgets/card.dart';
 import '../../../shared/widgets/skeleton.dart';
-import '../../../shared/widgets/navigation_bar.dart';
 import '../../../shared/widgets/medical_sources_widget.dart';
 import '../providers/suggestions_provider.dart';
 import '../../../core/di/providers.dart';
@@ -41,12 +40,21 @@ class _ScanResultPageState extends ConsumerState<ScanResultPage> {
   String? _resolvedLocalImagePath;
   int _activeCarouselIndex = 0;
   final PageController _carouselController = PageController();
+  final ScrollController _scrollController = ScrollController();
+  final ValueNotifier<double> _scrollOffset = ValueNotifier<double>(0.0);
+  final ValueNotifier<double> _carouselScrollOffset = ValueNotifier<double>(0.0);
   Map<String, dynamic>? _translatedScanData;
   bool _translating = false;
 
   @override
   void initState() {
     super.initState();
+    _scrollController.addListener(() {
+      _scrollOffset.value = _scrollController.hasClients ? _scrollController.offset : 0.0;
+    });
+    _carouselController.addListener(() {
+      _carouselScrollOffset.value = _carouselController.hasClients ? _carouselController.offset : 0.0;
+    });
     _resolveImagePath();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _fetchTranslatedDetails();
@@ -56,6 +64,9 @@ class _ScanResultPageState extends ConsumerState<ScanResultPage> {
 
   @override
   void dispose() {
+    _scrollController.dispose();
+    _scrollOffset.dispose();
+    _carouselScrollOffset.dispose();
     _carouselController.dispose();
     super.dispose();
   }
@@ -270,7 +281,7 @@ class _ScanResultPageState extends ConsumerState<ScanResultPage> {
     // 2. Indications Card
     if (scan.indications != null && scan.indications!.trim().isNotEmpty) {
       carouselItems.add({
-        'title': ref.t('indications') ?? 'Indications',
+        'title': ref.t('indications'),
         'icon': Icons.info_outline,
         'content': scan.indications,
       });
@@ -350,51 +361,106 @@ class _ScanResultPageState extends ConsumerState<ScanResultPage> {
       });
     }
 
+    final double topPadding = MediaQuery.of(context).padding.top;
+
     return Scaffold(
-      backgroundColor: isDark ? AppColors.backgroundDark : AppColors.background,
-      appBar: AppBar(
-        backgroundColor: Colors.transparent,
-        elevation: 0,
-        leadingWidth: 70,
-        leading: Padding(
-          padding: const EdgeInsets.only(left: 16.0, top: 4.0, bottom: 4.0),
-          child: Container(
-            decoration: BoxDecoration(
-              color: isDark ? Colors.grey[900] : Colors.white,
-              shape: BoxShape.circle,
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withOpacity(0.05),
-                  blurRadius: 10,
-                  offset: const Offset(0, 4),
+      backgroundColor: isDark ? AppColors.backgroundDark : const Color(0xFFF1F6FB),
+      body: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // 1. Header with Dashboard-matching smooth gradient fondu
+          RepaintBoundary(
+            child: Container(
+              width: double.infinity,
+              decoration: BoxDecoration(
+                color: isDark ? const Color(0xFF1E293B) : const Color(0xFFD6EAFC),
+                gradient: LinearGradient(
+                  begin: Alignment.topCenter,
+                  end: Alignment.bottomCenter,
+                  colors: isDark
+                      ? [const Color(0xFF1E293B), AppColors.backgroundDark]
+                      : [const Color(0xFFD4E8FC), const Color(0xFFF1F6FB)],
                 ),
-              ],
-            ),
-            child: IconButton(
-              icon: Icon(Icons.arrow_back, color: isDark ? Colors.white : AppColors.textPrimary),
-              onPressed: () {
-                if (context.canPop()) {
-                  context.pop();
-                } else {
-                  context.go('/home');
-                }
-              },
+              ),
+              child: Padding(
+                padding: EdgeInsets.only(
+                  top: topPadding + 6,
+                  left: 16.0,
+                  right: 16.0,
+                  bottom: 12.0,
+                ),
+                child: Row(
+                  children: [
+                    Container(
+                      decoration: BoxDecoration(
+                        color: isDark ? Colors.grey[900] : Colors.white,
+                        shape: BoxShape.circle,
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withOpacity(0.05),
+                            blurRadius: 10,
+                            offset: const Offset(0, 4),
+                          ),
+                        ],
+                      ),
+                      child: IconButton(
+                        icon: Icon(Icons.arrow_back, color: isDark ? Colors.white : AppColors.textPrimary),
+                        onPressed: () {
+                          if (context.canPop()) {
+                            context.pop();
+                          } else {
+                            context.go('/home');
+                          }
+                        },
+                      ),
+                    ),
+                    const SizedBox(width: 14),
+                    Text(
+                      ref.t('scanResult'),
+                      style: AppTextStyles.h2(isDark: isDark).copyWith(fontSize: 20),
+                    ),
+                  ],
+                ),
+              ),
             ),
           ),
-        ),
-        title: Text(
-          ref.t('scanResult'),
-          style: AppTextStyles.h2(isDark: isDark).copyWith(fontSize: 20),
-        ),
-        centerTitle: false,
-      ),
-      body: SafeArea(
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.all(16.0),
-          child: ResponsiveContainer(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
+
+          // 2. Body: Scrollable with Dashboard cinematic dissolve
+          Expanded(
+            child: ValueListenableBuilder<double>(
+              valueListenable: _scrollOffset,
+              builder: (context, offset, child) {
+                // Cinematic film dissolve: smooth gradient fade at top of scrolling body
+                final double fadeStop = (offset / 32.0).clamp(0.0, 1.0) * 0.048;
+                if (fadeStop <= 0.001) {
+                  return child!;
+                }
+                return ShaderMask(
+                  shaderCallback: (Rect bounds) {
+                    return LinearGradient(
+                      begin: Alignment.topCenter,
+                      end: Alignment.bottomCenter,
+                      colors: const [
+                        Colors.transparent,
+                        Colors.black,
+                      ],
+                      stops: [0.0, fadeStop],
+                    ).createShader(bounds);
+                  },
+                  blendMode: BlendMode.dstIn,
+                  child: child,
+                );
+              },
+              child: SingleChildScrollView(
+                controller: _scrollController,
+                physics: const BouncingScrollPhysics(
+                  parent: AlwaysScrollableScrollPhysics(),
+                ),
+                padding: const EdgeInsets.all(16.0),
+                child: ResponsiveContainer(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
                 // 1. Medication Image Card (matching layout)
               Center(
                 child: Container(
@@ -633,90 +699,157 @@ class _ScanResultPageState extends ConsumerState<ScanResultPage> {
                 const SizedBox(height: 10),
                 SizedBox(
                   height: 350,
-                  child: PageView.builder(
-                    controller: _carouselController,
-                    scrollDirection: Axis.horizontal,
-                    onPageChanged: (index) {
-                      setState(() {
-                        _activeCarouselIndex = index;
-                      });
-                    },
-                    itemCount: carouselItems.length,
-                    itemBuilder: (context, index) {
-                      final item = carouselItems[index];
-                      final isSelected = index == _activeCarouselIndex;
-                      return AnimatedContainer(
-                        duration: const Duration(milliseconds: 300),
-                        margin: const EdgeInsets.only(top: 8.0, bottom: 14.0, left: 8.0, right: 14.0),
-                        decoration: BoxDecoration(
-                          color: isDark ? AppColors.cardDark : Colors.white,
-                          borderRadius: BorderRadius.circular(24),
-                          border: Border.all(
-                            color: isDark ? Colors.white24 : const Color(0xFF0F172A),
-                            width: 2,
-                          ),
-                          boxShadow: [
-                            BoxShadow(
-                              color: isSelected
-                                  ? AppColors.primary.withOpacity(isDark ? 0.35 : 0.8)
-                                  : (isDark ? const Color(0xFF1E1E2F) : const Color(0xFF0F172A).withOpacity(0.15)),
-                              blurRadius: 0,
-                              offset: const Offset(6, 6),
-                            ),
-                          ],
-                        ),
-                        padding: const EdgeInsets.all(20.0),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            // Card Title header with Colored Icon and Title text
-                            Row(
-                              children: [
-                                Container(
-                                  padding: const EdgeInsets.all(8),
-                                  decoration: BoxDecoration(
-                                    color: AppColors.primary.withOpacity(0.1),
-                                    shape: BoxShape.circle,
-                                  ),
-                                  child: Icon(
-                                    item['icon'] as IconData,
-                                    color: AppColors.primary,
-                                    size: 20,
-                                  ),
-                                ),
-                                const SizedBox(width: 12),
-                                Expanded(
-                                  child: Text(
-                                    item['title'] as String,
-                                    style: AppTextStyles.bodyBold(isDark: isDark).copyWith(
-                                      fontSize: 16,
-                                      color: isDark ? const Color(0xFF818CF8) : const Color(0xFF4F46E5), // Indigo!
-                                    ),
-                                  ),
-                                ),
-                              ],
-                            ),
-                            const SizedBox(height: 12),
-                            // Card Content Markdown (Scrollable inside the card if content is too long)
-                            Expanded(
-                              child: SingleChildScrollView(
-                                physics: const BouncingScrollPhysics(),
-                                child: MarkdownBody(
-                                  data: item['content'] as String,
-                                  styleSheet: MarkdownStyleSheet.fromTheme(Theme.of(context)).copyWith(
-                                    p: AppTextStyles.small(isDark: isDark).copyWith(height: 1.5),
-                                    listBullet: AppTextStyles.small(isDark: isDark),
-                                    strong: AppTextStyles.smallBold(isDark: isDark).copyWith(
-                                      color: isDark ? const Color(0xFF60A5FA) : const Color(0xFF2563EB),
-                                    ),
-                                  ),
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
+                  child: ValueListenableBuilder<double>(
+                    valueListenable: _carouselScrollOffset,
+                    builder: (context, cOffset, child) {
+                      if (Theme.of(context).platform == TargetPlatform.android) {
+                        return child!;
+                      }
+                      return ShaderMask(
+                        shaderCallback: (Rect bounds) {
+                          final double leftStop = (cOffset / 28.0).clamp(0.0, 1.0) * 0.045;
+                          final double maxScroll = _carouselController.hasClients && _carouselController.position.hasContentDimensions
+                              ? _carouselController.position.maxScrollExtent
+                              : 1.0;
+                          final double distFromEnd = (maxScroll - cOffset).clamp(0.0, 28.0);
+                          final double rightStop = 1.0 - ((distFromEnd / 28.0).clamp(0.0, 1.0) * 0.045);
+
+                          return LinearGradient(
+                            begin: Alignment.centerLeft,
+                            end: Alignment.centerRight,
+                            colors: const [
+                              Colors.transparent,
+                              Colors.black,
+                              Colors.black,
+                              Colors.transparent,
+                            ],
+                            stops: [
+                              0.0,
+                              leftStop > 0.001 ? leftStop : 0.0,
+                              rightStop < 0.999 ? rightStop : 1.0,
+                              1.0,
+                            ],
+                          ).createShader(bounds);
+                        },
+                        blendMode: BlendMode.dstIn,
+                        child: child!,
                       );
                     },
+                    child: PageView.builder(
+                      controller: _carouselController,
+                      physics: const BouncingScrollPhysics(),
+                      scrollDirection: Axis.horizontal,
+                      onPageChanged: (index) {
+                        setState(() {
+                          _activeCarouselIndex = index;
+                        });
+                      },
+                      itemCount: carouselItems.length,
+                      itemBuilder: (context, index) {
+                        final item = carouselItems[index];
+                        final isSelected = index == _activeCarouselIndex;
+                        return AnimatedContainer(
+                          duration: const Duration(milliseconds: 300),
+                          margin: const EdgeInsets.only(top: 8.0, bottom: 14.0, left: 8.0, right: 14.0),
+                          decoration: BoxDecoration(
+                            color: isDark ? AppColors.cardDark : Colors.white,
+                            borderRadius: BorderRadius.circular(24),
+                            border: Border.all(
+                              color: isDark ? Colors.white24 : const Color(0xFF0F172A),
+                              width: 2,
+                            ),
+                            boxShadow: [
+                              BoxShadow(
+                                color: isSelected
+                                    ? AppColors.primary.withOpacity(isDark ? 0.35 : 0.8)
+                                    : (isDark ? const Color(0xFF1E1E2F) : const Color(0xFF0F172A).withOpacity(0.15)),
+                                blurRadius: 0,
+                                offset: const Offset(6, 6),
+                              ),
+                            ],
+                          ),
+                          padding: const EdgeInsets.all(20.0),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              // Card Title header with Colored Icon and Title text
+                              Row(
+                                children: [
+                                  Container(
+                                    padding: const EdgeInsets.all(8),
+                                    decoration: BoxDecoration(
+                                      color: AppColors.primary.withOpacity(0.1),
+                                      shape: BoxShape.circle,
+                                    ),
+                                    child: Icon(
+                                      item['icon'] as IconData,
+                                      color: AppColors.primary,
+                                      size: 20,
+                                    ),
+                                  ),
+                                  const SizedBox(width: 12),
+                                  Expanded(
+                                    child: Text(
+                                      item['title'] as String,
+                                      style: AppTextStyles.bodyBold(isDark: isDark).copyWith(
+                                        fontSize: 16,
+                                        color: isDark ? const Color(0xFF818CF8) : const Color(0xFF4F46E5), // Indigo!
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                              const SizedBox(height: 12),
+                              // Card Content Markdown (Scrollable inside the card if content is too long)
+                              Expanded(
+                                child: Theme.of(context).platform == TargetPlatform.android
+                                    ? SingleChildScrollView(
+                                        physics: const BouncingScrollPhysics(),
+                                        child: MarkdownBody(
+                                          data: item['content'] as String,
+                                          styleSheet: MarkdownStyleSheet.fromTheme(Theme.of(context)).copyWith(
+                                            p: AppTextStyles.small(isDark: isDark).copyWith(height: 1.5),
+                                            listBullet: AppTextStyles.small(isDark: isDark),
+                                            strong: AppTextStyles.smallBold(isDark: isDark).copyWith(
+                                              color: isDark ? const Color(0xFF60A5FA) : const Color(0xFF2563EB),
+                                            ),
+                                          ),
+                                        ),
+                                      )
+                                    : ShaderMask(
+                                        shaderCallback: (Rect bounds) {
+                                          return const LinearGradient(
+                                            begin: Alignment.topCenter,
+                                            end: Alignment.bottomCenter,
+                                            colors: [
+                                              Colors.black,
+                                              Colors.black,
+                                              Colors.transparent,
+                                            ],
+                                            stops: [0.0, 0.88, 1.0],
+                                          ).createShader(bounds);
+                                        },
+                                        blendMode: BlendMode.dstIn,
+                                        child: SingleChildScrollView(
+                                          physics: const BouncingScrollPhysics(),
+                                          child: MarkdownBody(
+                                            data: item['content'] as String,
+                                            styleSheet: MarkdownStyleSheet.fromTheme(Theme.of(context)).copyWith(
+                                              p: AppTextStyles.small(isDark: isDark).copyWith(height: 1.5),
+                                              listBullet: AppTextStyles.small(isDark: isDark),
+                                              strong: AppTextStyles.smallBold(isDark: isDark).copyWith(
+                                                color: isDark ? const Color(0xFF60A5FA) : const Color(0xFF2563EB),
+                                              ),
+                                            ),
+                                          ),
+                                        ),
+                                      ),
+                              ),
+                            ],
+                          ),
+                        );
+                      },
+                    ),
                   ),
                 ),
                 const SizedBox(height: 12),
@@ -830,7 +963,10 @@ class _ScanResultPageState extends ConsumerState<ScanResultPage> {
         ),
       ),
     ),
-  );
+  ),
+],
+),
+);
 }
 
   Widget _buildMedicationImage(ScanResponse scan, bool isDark) {
@@ -851,7 +987,7 @@ class _ScanResultPageState extends ConsumerState<ScanResultPage> {
     // 3. Instant local display if image file is present on disk (camera/gallery pick)
     if (hasValidLocalFile) {
       return Image.file(
-        File(localPath!),
+        File(localPath),
         fit: BoxFit.cover,
         errorBuilder: (context, error, stackTrace) {
           if (networkUrl != null && networkUrl.isNotEmpty) {

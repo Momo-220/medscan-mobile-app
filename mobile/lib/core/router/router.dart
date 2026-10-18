@@ -19,6 +19,7 @@ import '../../features/profile/screens/profile_screen.dart';
 import '../../features/scan/screens/scan_result_screen.dart';
 import '../../features/scan/screens/scan_screen.dart';
 import '../../features/settings/screens/settings_screen.dart';
+import '../../shared/widgets/floating_scan_button.dart';
 import '../../shared/widgets/navigation_bar.dart';
 
 // Keys created once at module level — never reassigned, never recreated
@@ -201,11 +202,45 @@ class AppShell extends ConsumerWidget {
     final isChatInputActive = currentPath == '/chat' && ref.watch(chatInputActiveProvider);
     final hideNavBar = isKeyboardOpen || isChatInputActive;
 
+    // Show floating scan (+) action button on Home and Pharmacy tabs
+    final showFab = !hideNavBar && (currentPath == '/home' || currentPath == '/pharmacy');
+
+    final safeAreaBottom = MediaQuery.paddingOf(context).bottom;
+    final double bottomMargin = safeAreaBottom > 0 ? safeAreaBottom + 8.0 : 20.0;
+    final double fabBottom = bottomMargin + 68.0 + 80.0;
+
+    final screenWidth = MediaQuery.sizeOf(context).width;
+    final double horizontalMargin = screenWidth < 360 ? 12.0 : (screenWidth < 400 ? 16.0 : 20.0);
+    final double clampedWidth = screenWidth.clamp(0.0, 500.0);
+    final double fabRight = ((screenWidth - clampedWidth) / 2) + horizontalMargin + 4.0;
+
     return Scaffold(
       resizeToAvoidBottomInset: false,
       body: Stack(
         children: [
           Positioned.fill(child: child),
+
+          // Floating Scan (+) Action Button (Positioned at bottom right)
+          Positioned(
+            right: fabRight,
+            bottom: fabBottom,
+            child: AnimatedSlide(
+              offset: showFab ? Offset.zero : const Offset(0, 1.6),
+              duration: const Duration(milliseconds: 280),
+              curve: Curves.easeInOutCubic,
+              child: AnimatedOpacity(
+                opacity: showFab ? 1.0 : 0.0,
+                duration: const Duration(milliseconds: 220),
+                curve: Curves.easeInOut,
+                child: IgnorePointer(
+                  ignoring: !showFab,
+                  child: const FloatingScanButton(),
+                ),
+              ),
+            ),
+          ),
+
+          // Docked Bottom Navigation Bar
           Positioned(
             left: 0,
             right: 0,
@@ -227,3 +262,4 @@ class AppShell extends ConsumerWidget {
     );
   }
 }
+

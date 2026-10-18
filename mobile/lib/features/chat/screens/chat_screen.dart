@@ -114,9 +114,13 @@ class _ChatPageState extends ConsumerState<ChatPage>
       ref.read(chatProvider.notifier).setMode('chat');
       _tabController.reverse();
 
-      // Trigger automatic inquiry to Dr. Sarah about this medication
+      // Trigger automatic inquiry to active doctor about this medication
       final promptTemplate = ref.t('medicationChatPrompt');
-      final promptText = promptTemplate.replaceAll('{name}', medName);
+      final activeDoc = ref.read(doctorProvider);
+      final promptText = promptTemplate
+          .replaceAll('{name}', medName)
+          .replaceAll('Dr. Sarah', activeDoc.shortName)
+          .replaceAll('د. سارة', activeDoc.shortName);
 
       // Auto-send after a short delay so the chat UI is rendered
       Future.delayed(const Duration(milliseconds: 350), () {
@@ -353,46 +357,52 @@ class _ChatPageState extends ConsumerState<ChatPage>
                       }
                       return false;
                     },
-                    child: ShaderMask(
-                      shaderCallback: (Rect bounds) {
-                        const double fadeHeight = 28.0;
-                        final double stop = bounds.height > 0
-                            ? (fadeHeight / bounds.height).clamp(0.01, 0.12)
-                            : 0.04;
-                        return LinearGradient(
-                          begin: Alignment.topCenter,
-                          end: Alignment.bottomCenter,
-                          colors: const [
-                            Colors.transparent,
-                            Colors.black,
-                          ],
-                          stops: [0.0, stop],
-                        ).createShader(bounds);
-                      },
-                      blendMode: BlendMode.dstIn,
-                      child: ResponsiveContainer(
-                        child: chatState.when(
-                          loading: () => isConsultation
-                              ? _buildConsultationWelcome(isDark)
-                              : _buildChatWelcome(isDark),
-                          error: (err, stack) => Center(
-                            child: Padding(
-                              padding: const EdgeInsets.symmetric(horizontal: 32.0),
-                              child: Text(ref.t('chatError'),
-                                  style: AppTextStyles.small(isDark: isDark),
-                                  textAlign: TextAlign.center),
+                    child: Builder(
+                      builder: (context) {
+                        final listContent = ResponsiveContainer(
+                          child: chatState.when(
+                            loading: () => isConsultation
+                                ? _buildConsultationWelcome(isDark)
+                                : _buildChatWelcome(isDark),
+                            error: (err, stack) => Center(
+                              child: Padding(
+                                padding: const EdgeInsets.symmetric(horizontal: 32.0),
+                                child: Text(ref.t('chatError'),
+                                    style: AppTextStyles.small(isDark: isDark),
+                                    textAlign: TextAlign.center),
+                              ),
                             ),
+                            data: (messages) {
+                              if (messages.isEmpty) {
+                                return isConsultation
+                                    ? _buildConsultationWelcome(isDark)
+                                    : _buildChatWelcome(isDark);
+                              }
+                              return _buildMessageList(isDark, messages);
+                            },
                           ),
-                          data: (messages) {
-                            if (messages.isEmpty) {
-                              return isConsultation
-                                  ? _buildConsultationWelcome(isDark)
-                                  : _buildChatWelcome(isDark);
-                            }
-                            return _buildMessageList(isDark, messages);
+                        );
+
+                        return ShaderMask(
+                          shaderCallback: (Rect bounds) {
+                            const double fadeHeight = 28.0;
+                            final double stop = bounds.height > 0
+                                ? (fadeHeight / bounds.height).clamp(0.01, 0.12)
+                                : 0.04;
+                            return LinearGradient(
+                              begin: Alignment.topCenter,
+                              end: Alignment.bottomCenter,
+                              colors: const [
+                                Colors.transparent,
+                                Colors.black,
+                              ],
+                              stops: [0.0, stop],
+                            ).createShader(bounds);
                           },
-                        ),
-                      ),
+                          blendMode: BlendMode.dstIn,
+                          child: listContent,
+                        );
+                      },
                     ),
                   ),
                 ),
@@ -1598,15 +1608,26 @@ class _ChatPageState extends ConsumerState<ChatPage>
             ],
           ),
           const SizedBox(height: 14),
-          Text(
-            ref.t('doctorGreeting'),
-            style: GoogleFonts.plusJakartaSans(
-              fontSize: 20,
-              fontWeight: FontWeight.w700,
-              letterSpacing: -0.4,
-              color: isDark ? Colors.white : const Color(0xFF0F172A),
-            ),
-            textAlign: TextAlign.center,
+          Builder(
+            builder: (context) {
+              final currentDoctor = ref.watch(doctorProvider);
+              final rawGreeting = ref.t('doctorGreeting');
+              final greetingText = rawGreeting.contains('{name}')
+                  ? rawGreeting.replaceAll('{name}', currentDoctor.name)
+                  : rawGreeting
+                      .replaceAll('Dr. Sarah Martin', currentDoctor.name)
+                      .replaceAll('د. سارة مارتن', currentDoctor.name);
+              return Text(
+                greetingText,
+                style: GoogleFonts.plusJakartaSans(
+                  fontSize: 20,
+                  fontWeight: FontWeight.w700,
+                  letterSpacing: -0.4,
+                  color: isDark ? Colors.white : const Color(0xFF0F172A),
+                ),
+                textAlign: TextAlign.center,
+              );
+            },
           ),
           const SizedBox(height: 8),
           Padding(
@@ -1748,7 +1769,9 @@ class _ChatPageState extends ConsumerState<ChatPage>
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 16.0),
             child: Text(
-              ref.t('consultationWelcomeDesc'),
+              ref.t('consultationWelcomeDesc')
+                  .replaceAll('Dr. Sarah Martin', ref.watch(doctorProvider).name)
+                  .replaceAll('د. سارة مارتن', ref.watch(doctorProvider).name),
               style: GoogleFonts.plusJakartaSans(
                 fontSize: 13.5,
                 fontWeight: FontWeight.w400,
@@ -1812,7 +1835,9 @@ class _ChatPageState extends ConsumerState<ChatPage>
             step: '2',
             icon: CupertinoIcons.question_diamond_fill,
             title: ref.t('consultationStep2Title'),
-            desc: ref.t('consultationStep2Desc'),
+            desc: ref.t('consultationStep2Desc')
+                .replaceAll('Dr. Sarah', ref.watch(doctorProvider).shortName)
+                .replaceAll('د. سارة', ref.watch(doctorProvider).shortName),
             color: const Color(0xFF3B82F6),
           ),
           _buildConsultationStepCard(

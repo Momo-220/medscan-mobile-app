@@ -228,7 +228,7 @@
   "minutes": "Dakika",
   "quickHours": "Hızlı saatler",
   "infoNotAvailable": "Bilgi mevcut değil",
-  "doctorGreeting": "Merhaba, ben Dr. Sarah Martin",
+  "doctorGreeting": "Merhaba, ben {name}",
   "doctorDescription": "Kişisel eczacılık asistanınız. İlaçlarınız, etkileşimleri, dozajları ve daha fazlası hakkındaki tüm sorularınızı şefkat ve profesyonellikle yanıtlamak için buradayım.",
   "doctorName": "Dr. Sarah Martin",
   "online": "Çevrimiçi",

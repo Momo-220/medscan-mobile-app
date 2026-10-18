@@ -1,7 +1,9 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:google_fonts/google_fonts.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:lottie/lottie.dart';
@@ -199,129 +201,94 @@ class _ScanPageState extends ConsumerState<ScanPage> with SingleTickerProviderSt
     }
 
     return Scaffold(
-      backgroundColor: isDark ? AppColors.backgroundDark : AppColors.background,
+      backgroundColor: isDark ? AppColors.backgroundDark : const Color(0xFFF8FAFC),
       appBar: AppBar(
         backgroundColor: Colors.transparent,
         elevation: 0,
-        leading: IconButton(
-          icon: Icon(Icons.arrow_back, color: isDark ? Colors.white : AppColors.textPrimary),
-          onPressed: () => context.pop(),
+        leading: Padding(
+          padding: const EdgeInsets.only(left: 16.0),
+          child: Center(
+            child: Material(
+              color: Colors.transparent,
+              child: InkWell(
+                borderRadius: BorderRadius.circular(20),
+                onTap: () {
+                  HapticFeedback.lightImpact();
+                  context.pop();
+                },
+                child: Container(
+                  width: 38,
+                  height: 38,
+                  decoration: BoxDecoration(
+                    color: isDark ? const Color(0xFF1E293B) : Colors.white,
+                    shape: BoxShape.circle,
+                    border: Border.all(
+                      color: isDark ? Colors.white10 : const Color(0xFFE2E8F0),
+                      width: 1,
+                    ),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withValues(alpha: isDark ? 0.2 : 0.04),
+                        blurRadius: 8,
+                        offset: const Offset(0, 2),
+                      ),
+                    ],
+                  ),
+                  child: Icon(
+                    Icons.arrow_back_ios_new_rounded,
+                    size: 15,
+                    color: isDark ? Colors.white : const Color(0xFF0F172A),
+                  ),
+                ),
+              ),
+            ),
+          ),
         ),
         title: Text(
           ref.t('scanMedication'),
-          style: AppTextStyles.h3(isDark: isDark).copyWith(fontWeight: FontWeight.bold),
+          style: GoogleFonts.plusJakartaSans(
+            fontSize: 18,
+            fontWeight: FontWeight.w700,
+            letterSpacing: -0.3,
+            color: isDark ? Colors.white : const Color(0xFF0F172A),
+          ),
         ),
-        centerTitle: false,
+        centerTitle: true,
       ),
       body: SafeArea(
         child: Center(
           child: ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 580),
-            child: CustomScrollView(
-              physics: const AlwaysScrollableScrollPhysics(),
-              slivers: [
-                SliverFillRemaining(
-                  hasScrollBody: false,
-                  child: Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 24.0, vertical: 24.0),
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      crossAxisAlignment: CrossAxisAlignment.center,
-                      children: [
-                        // 1. Banner Card
-                        Container(
-                          width: double.infinity,
-                          padding: const EdgeInsets.all(16.0),
-                          decoration: BoxDecoration(
-                            color: isDark ? AppColors.cardDark : Colors.white,
-                            borderRadius: BorderRadius.circular(20),
-                            boxShadow: [
-                              BoxShadow(
-                                color: const Color(0xFF1A3B5D).withOpacity(0.04),
-                                blurRadius: 20,
-                                offset: const Offset(0, 4),
-                              ),
-                            ],
-                          ),
-                          child: Row(
-                            crossAxisAlignment: CrossAxisAlignment.center,
-                            children: [
-                              const Text(
-                                '📸',
-                                style: TextStyle(fontSize: 24),
-                              ),
-                              const SizedBox(width: 16),
-                              Expanded(
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Text(
-                                      ref.t('scanMethodTitle'),
-                                      style: AppTextStyles.bodyBold(isDark: isDark).copyWith(fontSize: 15),
-                                    ),
-                                    const SizedBox(height: 4),
-                                    Text(
-                                      ref.t('scanMethodSubtitle'),
-                                      style: AppTextStyles.small(
-                                        color: isDark ? AppColors.textMutedDark : AppColors.textSecondary,
-                                      ).copyWith(fontSize: 12),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                        const SizedBox(height: 32),
-
-                        const Spacer(), // Centering Spacer at the top
-
-                        // 2. Row of Two Side-by-Side Cards (Reduced size)
-                        Row(
-                          children: [
-                            // Left Card: Upload Photo
-                            Expanded(
-                              child: ScanActionButton(
-                                onTap: () => _pickImage(ImageSource.gallery),
-                                icon: Icons.photo_library_rounded,
-                                title: ref.t('uploadPhoto'),
-                                subtitle: 'JPEG / PNG',
-                                gradientColors: const [Color(0xFF3B82F6), Color(0xFF06B6D4)],
-                                shadowColor: const Color(0xFF3B82F6),
-                              ),
-                            ),
-                            const SizedBox(width: 16),
-
-                            // Right Card: Take Photo
-                            Expanded(
-                              child: ScanActionButton(
-                                onTap: () => _pickImage(ImageSource.camera),
-                                icon: Icons.camera_alt_rounded,
-                                title: ref.t('takePhoto'),
-                                subtitle: ref.t('cameraThenAnalyze'),
-                                gradientColors: const [Color(0xFF8B5CF6), Color(0xFFEC4899)],
-                                shadowColor: const Color(0xFF8B5CF6),
-                              ),
-                            ),
-                          ],
-                        ),
-
-                        const Spacer(),
-
-                        // Bottom Disclaimer
-                        const SizedBox(height: 32),
-                        Center(
-                          child: Text(
-                            ref.t('disclaimerMedical'),
-                            style: AppTextStyles.micro(isDark: isDark),
-                            textAlign: TextAlign.center,
-                          ),
-                        ),
-                      ],
+            constraints: const BoxConstraints(maxWidth: 420),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 24.0),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // Left Button: Take Photo (Circular Shutter Button)
+                  Expanded(
+                    child: CircularScanButton(
+                      onTap: () => _pickImage(ImageSource.camera),
+                      icon: Icons.camera_alt_rounded,
+                      title: ref.t('takePhoto'),
+                      subtitle: ref.t('cameraThenAnalyze'),
+                      isPrimary: true,
                     ),
                   ),
-                ),
-              ],
+                  const SizedBox(width: 24),
+
+                  // Right Button: Upload Photo (Circular Gallery Button)
+                  Expanded(
+                    child: CircularScanButton(
+                      onTap: () => _pickImage(ImageSource.gallery),
+                      icon: Icons.photo_library_rounded,
+                      title: ref.t('uploadPhoto'),
+                      subtitle: 'JPEG, PNG',
+                      isPrimary: false,
+                    ),
+                  ),
+                ],
+              ),
             ),
           ),
         ),
@@ -626,29 +593,27 @@ class _ScanPageState extends ConsumerState<ScanPage> with SingleTickerProviderSt
   }
 }
 
-class ScanActionButton extends StatefulWidget {
+class CircularScanButton extends StatefulWidget {
   final VoidCallback onTap;
   final IconData icon;
   final String title;
   final String subtitle;
-  final List<Color> gradientColors;
-  final Color shadowColor;
+  final bool isPrimary;
 
-  const ScanActionButton({
+  const CircularScanButton({
     super.key,
     required this.onTap,
     required this.icon,
     required this.title,
     required this.subtitle,
-    required this.gradientColors,
-    required this.shadowColor,
+    this.isPrimary = false,
   });
 
   @override
-  State<ScanActionButton> createState() => _ScanActionButtonState();
+  State<CircularScanButton> createState() => _CircularScanButtonState();
 }
 
-class _ScanActionButtonState extends State<ScanActionButton> with SingleTickerProviderStateMixin {
+class _CircularScanButtonState extends State<CircularScanButton> with SingleTickerProviderStateMixin {
   late AnimationController _controller;
   late Animation<double> _scaleAnimation;
 
@@ -657,10 +622,10 @@ class _ScanActionButtonState extends State<ScanActionButton> with SingleTickerPr
     super.initState();
     _controller = AnimationController(
       vsync: this,
-      duration: const Duration(milliseconds: 100),
+      duration: const Duration(milliseconds: 120),
     );
-    _scaleAnimation = Tween<double>(begin: 1.0, end: 0.92).animate(
-      CurvedAnimation(parent: _controller, curve: Curves.easeInOut),
+    _scaleAnimation = Tween<double>(begin: 1.0, end: 0.91).animate(
+      CurvedAnimation(parent: _controller, curve: Curves.easeOutCubic),
     );
   }
 
@@ -672,125 +637,132 @@ class _ScanActionButtonState extends State<ScanActionButton> with SingleTickerPr
 
   @override
   Widget build(BuildContext context) {
-    return ScaleTransition(
-      scale: _scaleAnimation,
-      child: GestureDetector(
-        onTapDown: (_) => _controller.forward(),
-        onTapUp: (_) {
-          _controller.reverse();
-          widget.onTap();
-        },
-        onTapCancel: () => _controller.reverse(),
-        child: Container(
-          height: 150,
-          decoration: BoxDecoration(
-            gradient: LinearGradient(
-              colors: widget.gradientColors,
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-            ),
-            borderRadius: BorderRadius.circular(28),
-            boxShadow: [
-              BoxShadow(
-                color: widget.shadowColor.withOpacity(0.35),
-                blurRadius: 18,
-                offset: const Offset(0, 8),
-              ),
-              BoxShadow(
-                color: widget.gradientColors[0].withOpacity(0.2),
-                blurRadius: 30,
-                offset: const Offset(0, 15),
-              ),
-            ],
-            border: Border.all(
-              color: Colors.white.withOpacity(0.25),
-              width: 1.5,
-            ),
-          ),
-          child: ClipRRect(
-            borderRadius: BorderRadius.circular(28),
-            child: Stack(
-              children: [
-                Positioned(
-                  right: -20,
-                  top: -20,
-                  child: Container(
-                    width: 70,
-                    height: 70,
-                    decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-                      color: Colors.white.withOpacity(0.12),
-                    ),
-                  ),
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
+    return GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      onTapDown: (_) => _controller.forward(),
+      onTapUp: (_) {
+        _controller.reverse();
+        HapticFeedback.lightImpact();
+        widget.onTap();
+      },
+      onTapCancel: () => _controller.reverse(),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        mainAxisAlignment: MainAxisAlignment.center,
+        crossAxisAlignment: CrossAxisAlignment.center,
+        children: [
+          // Circular Button Trigger with Scale Animation
+          ScaleTransition(
+            scale: _scaleAnimation,
+            child: Container(
+              width: 104,
+              height: 104,
+              padding: const EdgeInsets.all(6),
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                border: Border.all(
+                  color: widget.isPrimary
+                      ? const Color(0xFF3B82F6).withValues(alpha: isDark ? 0.40 : 0.28)
+                      : (isDark ? Colors.white.withValues(alpha: 0.12) : const Color(0xFFE2E8F0)),
+                  width: 2,
                 ),
-                Positioned(
-                  left: -10,
-                  bottom: -10,
-                  child: Container(
-                    width: 50,
-                    height: 50,
-                    decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-                      color: Colors.white.withOpacity(0.06),
-                    ),
+              ),
+              child: Container(
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  gradient: widget.isPrimary
+                      ? const LinearGradient(
+                          colors: [Color(0xFF3B82F6), Color(0xFF1D4ED8)],
+                          begin: Alignment.topLeft,
+                          end: Alignment.bottomRight,
+                        )
+                      : null,
+                  color: widget.isPrimary
+                      ? null
+                      : (isDark ? const Color(0xFF1E293B) : Colors.white),
+                  border: Border.all(
+                    color: widget.isPrimary
+                        ? Colors.white.withValues(alpha: 0.28)
+                        : (isDark ? Colors.white.withValues(alpha: 0.08) : const Color(0xFFE2E8F0)),
+                    width: 1.2,
                   ),
-                ),
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 14.0, vertical: 16.0),
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    crossAxisAlignment: CrossAxisAlignment.center,
-                    children: [
-                      Container(
-                        width: 48,
-                        height: 48,
-                        decoration: BoxDecoration(
-                          color: Colors.white.withOpacity(0.2),
-                          shape: BoxShape.circle,
-                          border: Border.all(
-                            color: Colors.white.withOpacity(0.3),
-                            width: 1,
-                          ),
-                        ),
-                        child: Icon(
-                          widget.icon,
-                          color: Colors.white,
-                          size: 24,
-                        ),
+                  boxShadow: [
+                    if (widget.isPrimary) ...[
+                      BoxShadow(
+                        color: const Color(0xFF2563EB).withValues(alpha: isDark ? 0.45 : 0.32),
+                        blurRadius: 22,
+                        offset: const Offset(0, 8),
                       ),
-                      const SizedBox(height: 12),
-                      Text(
-                        widget.title,
-                        style: const TextStyle(
-                          color: Colors.white,
-                          fontSize: 14,
-                          fontWeight: FontWeight.bold,
-                          letterSpacing: 0.2,
-                        ),
-                        textAlign: TextAlign.center,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
+                      BoxShadow(
+                        color: const Color(0xFF1D4ED8).withValues(alpha: isDark ? 0.25 : 0.16),
+                        blurRadius: 6,
+                        offset: const Offset(0, 2),
                       ),
-                      const SizedBox(height: 4),
-                      Text(
-                        widget.subtitle,
-                        style: TextStyle(
-                          color: Colors.white.withOpacity(0.75),
-                          fontSize: 11,
-                          fontWeight: FontWeight.w500,
-                        ),
-                        textAlign: TextAlign.center,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
+                    ] else ...[
+                      BoxShadow(
+                        color: const Color(0xFF0F172A).withValues(alpha: isDark ? 0.35 : 0.06),
+                        blurRadius: 18,
+                        offset: const Offset(0, 6),
+                      ),
+                      BoxShadow(
+                        color: const Color(0xFF0F172A).withValues(alpha: isDark ? 0.15 : 0.02),
+                        blurRadius: 4,
+                        offset: const Offset(0, 1),
                       ),
                     ],
+                  ],
+                ),
+                child: Center(
+                  child: Icon(
+                    widget.icon,
+                    color: widget.isPrimary
+                        ? Colors.white
+                        : const Color(0xFF2563EB),
+                    size: 36,
                   ),
                 ),
-              ],
+              ),
             ),
           ),
-        ),
+
+          const SizedBox(height: 16),
+
+          // Title
+          Text(
+            widget.title,
+            style: GoogleFonts.plusJakartaSans(
+              color: isDark ? Colors.white : const Color(0xFF0F172A),
+              fontSize: 15,
+              fontWeight: FontWeight.w700,
+              letterSpacing: -0.2,
+            ),
+            textAlign: TextAlign.center,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+          ),
+
+          const SizedBox(height: 4),
+
+          // Subtitle
+          Text(
+            widget.subtitle,
+            style: GoogleFonts.plusJakartaSans(
+              color: isDark ? AppColors.textMutedDark : const Color(0xFF64748B),
+              fontSize: 12,
+              fontWeight: FontWeight.w500,
+            ),
+            textAlign: TextAlign.center,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+          ),
+        ],
       ),
     );
   }
 }
+
+typedef ScanActionButton = CircularScanButton;
+
+

@@ -520,20 +520,21 @@ class _HomePageState extends ConsumerState<HomePage> {
 
                 SizedBox(height: screenHeight < 700 ? 12 : 16),
 
-                // Sleek Frosted Glass AI Pill Bar with blur
+                // Sleek Frosted Glass AI Pill Bar (Zero saveLayer on Android)
                 GestureDetector(
                   onTap: () => context.go('/chat'),
                   behavior: HitTestBehavior.opaque,
-                  child: ClipRRect(
-                    borderRadius: BorderRadius.circular(30),
-                    child: BackdropFilter(
-                      filter: ImageFilter.blur(sigmaX: 12, sigmaY: 12),
-                      child: Container(
+                  child: Builder(
+                    builder: (context) {
+                      final isAndroid = Theme.of(context).platform == TargetPlatform.android;
+                      final pillContainer = Container(
                         width: double.infinity,
                         height: 48,
                         padding: const EdgeInsets.fromLTRB(14, 4, 6, 4),
                         decoration: BoxDecoration(
-                          color: (isDark ? const Color(0xFF1E293B) : Colors.white).withValues(alpha: 0.65),
+                          color: (isDark ? const Color(0xFF1E293B) : Colors.white).withValues(
+                            alpha: isAndroid ? 0.95 : 0.65,
+                          ),
                           borderRadius: BorderRadius.circular(30),
                           border: Border.all(
                             color: isDark
@@ -559,9 +560,7 @@ class _HomePageState extends ConsumerState<HomePage> {
                             const SizedBox(width: 10),
                             Expanded(
                               child: Text(
-                                ref.watch(doctorProvider).id == 'dr_sarah'
-                                    ? '${ref.t('askDrSarah')}...'
-                                    : 'Poser une question à ${ref.watch(doctorProvider).shortName}...',
+                                '${ref.t('askDrSarah').replaceAll('Dr. Sarah Martin', ref.watch(doctorProvider).name).replaceAll('د. سارة مارتن', ref.watch(doctorProvider).name)}...',
                                 maxLines: 1,
                                 overflow: TextOverflow.ellipsis,
                                 style: GoogleFonts.plusJakartaSans(
@@ -604,8 +603,20 @@ class _HomePageState extends ConsumerState<HomePage> {
                             ),
                           ],
                         ),
-                      ),
-                    ),
+                      );
+
+                      if (isAndroid) {
+                        return pillContainer;
+                      }
+
+                      return ClipRRect(
+                        borderRadius: BorderRadius.circular(30),
+                        child: BackdropFilter(
+                          filter: ImageFilter.blur(sigmaX: 12, sigmaY: 12),
+                          child: pillContainer,
+                        ),
+                      );
+                    },
                   ),
                 ),
               ],

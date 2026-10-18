@@ -139,17 +139,16 @@ class _PillToastState extends State<_PillToast> with SingleTickerProviderStateMi
             },
             child: Material(
               color: Colors.transparent,
-              child: ClipRRect(
-                borderRadius: BorderRadius.circular(999),
-                child: BackdropFilter(
-                  filter: ImageFilter.blur(sigmaX: 18, sigmaY: 18),
-                  child: Container(
+              child: Builder(
+                builder: (context) {
+                  final isAndroid = Theme.of(context).platform == TargetPlatform.android;
+                  final notificationPill = Container(
                     constraints: const BoxConstraints(maxWidth: 420),
                     padding: const EdgeInsets.fromLTRB(8, 8, 18, 8),
                     decoration: BoxDecoration(
                       color: isDark
-                          ? const Color(0xFF0F172A).withValues(alpha: 0.88)
-                          : Colors.white.withValues(alpha: 0.92),
+                          ? const Color(0xFF0F172A).withValues(alpha: isAndroid ? 0.96 : 0.88)
+                          : Colors.white.withValues(alpha: isAndroid ? 0.98 : 0.92),
                       borderRadius: BorderRadius.circular(999),
                       border: Border.all(
                         color: accent.withValues(alpha: isDark ? 0.35 : 0.22),
@@ -207,8 +206,20 @@ class _PillToastState extends State<_PillToast> with SingleTickerProviderStateMi
                         ),
                       ],
                     ),
-                  ),
-                ),
+                  );
+
+                  if (isAndroid) {
+                    return notificationPill;
+                  }
+
+                  return ClipRRect(
+                    borderRadius: BorderRadius.circular(999),
+                    child: BackdropFilter(
+                      filter: ImageFilter.blur(sigmaX: 18, sigmaY: 18),
+                      child: notificationPill,
+                    ),
+                  );
+                },
               ),
             ),
           ),
