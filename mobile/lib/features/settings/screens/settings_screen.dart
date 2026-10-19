@@ -14,6 +14,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import '../../../core/di/providers.dart';
 import '../../../shared/widgets/language_dialog.dart';
+import '../../../shared/widgets/legal_modal.dart';
 import '../../chat/providers/doctor_provider.dart';
 
 class SettingsPage extends ConsumerStatefulWidget {
@@ -654,10 +655,11 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
 
                     // Row 3: Conditions d'utilisation
                     InkWell(
-                      onTap: () => _showHelpModal(
+                      onTap: () => showLegalModal(
                         context,
-                        ref.t('termsTitle'),
-                        ref.t('termsContent'),
+                        title: ref.t('termsTitle'),
+                        content: ref.t('termsContent'),
+                        closeLabel: ref.t('close'),
                       ),
                       child: Padding(
                         padding: const EdgeInsets.symmetric(vertical: 12.0),
@@ -696,10 +698,11 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
 
                     // Row 4: Politique de confidentialité
                     InkWell(
-                      onTap: () => _showHelpModal(
+                      onTap: () => showLegalModal(
                         context,
-                        ref.t('privacyTitle'),
-                        ref.t('privacyContent'),
+                        title: ref.t('privacyTitle'),
+                        content: ref.t('privacyContent'),
+                        closeLabel: ref.t('close'),
                       ),
                       child: Padding(
                         padding: const EdgeInsets.symmetric(vertical: 12.0),

@@ -2,12 +2,15 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import 'package:google_fonts/google_fonts.dart';
+
 import '../../../core/constants/colors.dart';
 import '../../../core/constants/text_styles.dart';
 import '../../../core/widgets/responsive_layout.dart';
 import '../../../core/di/providers.dart';
 import '../../../shared/utils/localization.dart';
 import '../../../shared/widgets/button.dart';
+import '../../../shared/widgets/legal_modal.dart';
 
 import '../providers/auth_provider.dart';
 
@@ -188,6 +191,65 @@ class _TrialOrSignInPageState extends ConsumerState<TrialOrSignInPage> {
                           decoration: TextDecoration.underline,
                         ),
                       ),
+                ),
+
+                const SizedBox(height: 20),
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 16.0),
+                  child: Wrap(
+                    alignment: WrapAlignment.center,
+                    crossAxisAlignment: WrapCrossAlignment.center,
+                    children: [
+                      Text(
+                        '${ref.t('authTermsNotice')} ',
+                        style: GoogleFonts.plusJakartaSans(
+                          fontSize: 11.5,
+                          color: isDark ? AppColors.textMutedDark : const Color(0xFF64748B),
+                        ),
+                      ),
+                      GestureDetector(
+                        onTap: () => showLegalModal(
+                          context,
+                          title: ref.t('termsTitle'),
+                          content: ref.t('termsContent'),
+                          closeLabel: ref.t('close'),
+                        ),
+                        child: Text(
+                          ref.t('terms'),
+                          style: GoogleFonts.plusJakartaSans(
+                            fontSize: 11.5,
+                            fontWeight: FontWeight.w600,
+                            color: const Color(0xFF2563EB),
+                            decoration: TextDecoration.underline,
+                          ),
+                        ),
+                      ),
+                      Text(
+                        ' ${ref.t('andOur')} ',
+                        style: GoogleFonts.plusJakartaSans(
+                          fontSize: 11.5,
+                          color: isDark ? AppColors.textMutedDark : const Color(0xFF64748B),
+                        ),
+                      ),
+                      GestureDetector(
+                        onTap: () => showLegalModal(
+                          context,
+                          title: ref.t('privacyTitle'),
+                          content: ref.t('privacyContent'),
+                          closeLabel: ref.t('close'),
+                        ),
+                        child: Text(
+                          ref.t('privacyPolicy'),
+                          style: GoogleFonts.plusJakartaSans(
+                            fontSize: 11.5,
+                            fontWeight: FontWeight.w600,
+                            color: const Color(0xFF2563EB),
+                            decoration: TextDecoration.underline,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
               ],
             ),

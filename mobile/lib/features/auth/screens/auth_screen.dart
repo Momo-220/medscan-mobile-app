@@ -4,6 +4,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:google_fonts/google_fonts.dart';
 import 'package:sign_in_with_apple/sign_in_with_apple.dart';
 
 import '../../../core/di/providers.dart';
@@ -15,6 +16,7 @@ import '../../../shared/widgets/button.dart';
 import '../../../shared/widgets/card.dart';
 import '../../../shared/widgets/google_logo.dart';
 import '../../../shared/widgets/input.dart';
+import '../../../shared/widgets/legal_modal.dart';
 import '../../../shared/services/username_service.dart';
 import '../../../shared/utils/email_validator.dart';
 import '../providers/auth_provider.dart';
@@ -817,6 +819,66 @@ class _AuthPageState extends ConsumerState<AuthPage> {
                                 ),
                               ),
                             ],
+                          ),
+
+                          // Terms & Conditions and Privacy Notice
+                          const SizedBox(height: 28),
+                          Padding(
+                            padding: const EdgeInsets.symmetric(horizontal: 16.0),
+                            child: Wrap(
+                              alignment: WrapAlignment.center,
+                              crossAxisAlignment: WrapCrossAlignment.center,
+                              children: [
+                                Text(
+                                  '${ref.t('authTermsNotice')} ',
+                                  style: GoogleFonts.plusJakartaSans(
+                                    fontSize: 12,
+                                    color: isDark ? AppColors.textMutedDark : const Color(0xFF64748B),
+                                  ),
+                                ),
+                                GestureDetector(
+                                  onTap: () => showLegalModal(
+                                    context,
+                                    title: ref.t('termsTitle'),
+                                    content: ref.t('termsContent'),
+                                    closeLabel: ref.t('close'),
+                                  ),
+                                  child: Text(
+                                    ref.t('terms'),
+                                    style: GoogleFonts.plusJakartaSans(
+                                      fontSize: 12,
+                                      fontWeight: FontWeight.w600,
+                                      color: const Color(0xFF2563EB),
+                                      decoration: TextDecoration.underline,
+                                    ),
+                                  ),
+                                ),
+                                Text(
+                                  ' ${ref.t('andOur')} ',
+                                  style: GoogleFonts.plusJakartaSans(
+                                    fontSize: 12,
+                                    color: isDark ? AppColors.textMutedDark : const Color(0xFF64748B),
+                                  ),
+                                ),
+                                GestureDetector(
+                                  onTap: () => showLegalModal(
+                                    context,
+                                    title: ref.t('privacyTitle'),
+                                    content: ref.t('privacyContent'),
+                                    closeLabel: ref.t('close'),
+                                  ),
+                                  child: Text(
+                                    ref.t('privacyPolicy'),
+                                    style: GoogleFonts.plusJakartaSans(
+                                      fontSize: 12,
+                                      fontWeight: FontWeight.w600,
+                                      color: const Color(0xFF2563EB),
+                                      decoration: TextDecoration.underline,
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
                           ),
                         ],
                       ),
