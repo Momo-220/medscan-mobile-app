@@ -24,8 +24,16 @@ class TrialOrSignInPage extends ConsumerStatefulWidget {
 class _TrialOrSignInPageState extends ConsumerState<TrialOrSignInPage> {
   String? _error;
   bool _loading = false;
+  bool _acceptedTerms = false;
 
   Future<void> _handleTryApp() async {
+    if (!_acceptedTerms) {
+      setState(() {
+        _error = ref.t('termsRequiredError');
+      });
+      return;
+    }
+
     setState(() {
       _error = null;
       _loading = true;
@@ -135,7 +143,7 @@ class _TrialOrSignInPageState extends ConsumerState<TrialOrSignInPage> {
                   ).copyWith(fontSize: 14),
                   textAlign: TextAlign.center,
                 ),
-                const SizedBox(height: 32),
+                const SizedBox(height: 28),
 
                 // Error Message Box
                 if (_error != null) ...[
@@ -143,24 +151,133 @@ class _TrialOrSignInPageState extends ConsumerState<TrialOrSignInPage> {
                     width: double.infinity,
                     padding: const EdgeInsets.all(12),
                     decoration: BoxDecoration(
-                      color: Colors.amber.withOpacity(0.15),
+                      color: Colors.red.withValues(alpha: 0.12),
                       borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: Colors.red.withValues(alpha: 0.3)),
                     ),
-                    child: Text(
-                      _error!,
-                      style: AppTextStyles.small(
-                        color: isDark ? Colors.amber[200] : Colors.amber[900],
-                      ),
-                      textAlign: TextAlign.center,
+                    child: Row(
+                      children: [
+                        const Icon(Icons.error_outline_rounded, color: Colors.red, size: 20),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: Text(
+                            _error!,
+                            style: AppTextStyles.small(
+                              color: isDark ? const Color(0xFFFCA5A5) : const Color(0xFFB91C1C),
+                            ),
+                          ),
+                        ),
+                      ],
                     ),
                   ),
-                  const SizedBox(height: 24),
+                  const SizedBox(height: 20),
                 ],
+
+                // Mandatory Checkbox for Terms & Privacy
+                InkWell(
+                  onTap: () {
+                    setState(() {
+                      _acceptedTerms = !_acceptedTerms;
+                      if (_acceptedTerms) _error = null;
+                    });
+                  },
+                  borderRadius: BorderRadius.circular(10),
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 6.0, horizontal: 4.0),
+                    child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.center,
+                      children: [
+                        SizedBox(
+                          width: 24,
+                          height: 24,
+                          child: Checkbox(
+                            value: _acceptedTerms,
+                            activeColor: const Color(0xFF2563EB),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(6),
+                            ),
+                            onChanged: (val) {
+                              setState(() {
+                                _acceptedTerms = val ?? false;
+                                if (_acceptedTerms) _error = null;
+                              });
+                            },
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Wrap(
+                            crossAxisAlignment: WrapCrossAlignment.center,
+                            children: [
+                              Text(
+                                '${ref.t('acceptTermsCheckbox')} ',
+                                style: GoogleFonts.plusJakartaSans(
+                                  fontSize: 12.5,
+                                  color: isDark ? AppColors.textMutedDark : const Color(0xFF475569),
+                                ),
+                              ),
+                              GestureDetector(
+                                onTap: () => showLegalModal(
+                                  context,
+                                  title: ref.t('termsTitle'),
+                                  content: ref.t('termsContent'),
+                                  closeLabel: ref.t('close'),
+                                ),
+                                child: Text(
+                                  ref.t('terms'),
+                                  style: GoogleFonts.plusJakartaSans(
+                                    fontSize: 12.5,
+                                    fontWeight: FontWeight.w600,
+                                    color: const Color(0xFF2563EB),
+                                    decoration: TextDecoration.underline,
+                                  ),
+                                ),
+                              ),
+                              Text(
+                                ' ${ref.t('andOur')} ',
+                                style: GoogleFonts.plusJakartaSans(
+                                  fontSize: 12.5,
+                                  color: isDark ? AppColors.textMutedDark : const Color(0xFF475569),
+                                ),
+                              ),
+                              GestureDetector(
+                                onTap: () => showLegalModal(
+                                  context,
+                                  title: ref.t('privacyTitle'),
+                                  content: ref.t('privacyContent'),
+                                  closeLabel: ref.t('close'),
+                                ),
+                                child: Text(
+                                  ref.t('privacyPolicy'),
+                                  style: GoogleFonts.plusJakartaSans(
+                                    fontSize: 12.5,
+                                    fontWeight: FontWeight.w600,
+                                    color: const Color(0xFF2563EB),
+                                    decoration: TextDecoration.underline,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 20),
 
                 // Sign Up Button
                 Button(
                   width: double.infinity,
-                  onTap: () => context.go('/auth', extra: {'isLogin': false}),
+                  onTap: () {
+                    if (!_acceptedTerms) {
+                      setState(() {
+                        _error = ref.t('termsRequiredError');
+                      });
+                      return;
+                    }
+                    context.go('/auth', extra: {'isLogin': false, 'acceptedTerms': true});
+                  },
                   child: Text(ref.t('authRegister')),
                 ),
                 const SizedBox(height: 16),
@@ -169,14 +286,30 @@ class _TrialOrSignInPageState extends ConsumerState<TrialOrSignInPage> {
                 Button(
                   width: double.infinity,
                   variant: ButtonVariant.secondary,
-                  onTap: () => context.go('/auth', extra: {'isLogin': true}),
+                  onTap: () {
+                    if (!_acceptedTerms) {
+                      setState(() {
+                        _error = ref.t('termsRequiredError');
+                      });
+                      return;
+                    }
+                    context.go('/auth', extra: {'isLogin': true, 'acceptedTerms': true});
+                  },
                   child: Text(ref.t('authLogin')),
                 ),
                 const SizedBox(height: 24),
 
                 // Try App Link Button
                 TextButton(
-                  onPressed: _loading ? null : _handleTryApp,
+                  onPressed: _loading ? null : () {
+                    if (!_acceptedTerms) {
+                      setState(() {
+                        _error = ref.t('termsRequiredError');
+                      });
+                      return;
+                    }
+                    _handleTryApp();
+                  },
                   child: _loading 
                     ? const SizedBox(
                         width: 16, height: 16, 
@@ -191,65 +324,6 @@ class _TrialOrSignInPageState extends ConsumerState<TrialOrSignInPage> {
                           decoration: TextDecoration.underline,
                         ),
                       ),
-                ),
-
-                const SizedBox(height: 20),
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 16.0),
-                  child: Wrap(
-                    alignment: WrapAlignment.center,
-                    crossAxisAlignment: WrapCrossAlignment.center,
-                    children: [
-                      Text(
-                        '${ref.t('authTermsNotice')} ',
-                        style: GoogleFonts.plusJakartaSans(
-                          fontSize: 11.5,
-                          color: isDark ? AppColors.textMutedDark : const Color(0xFF64748B),
-                        ),
-                      ),
-                      GestureDetector(
-                        onTap: () => showLegalModal(
-                          context,
-                          title: ref.t('termsTitle'),
-                          content: ref.t('termsContent'),
-                          closeLabel: ref.t('close'),
-                        ),
-                        child: Text(
-                          ref.t('terms'),
-                          style: GoogleFonts.plusJakartaSans(
-                            fontSize: 11.5,
-                            fontWeight: FontWeight.w600,
-                            color: const Color(0xFF2563EB),
-                            decoration: TextDecoration.underline,
-                          ),
-                        ),
-                      ),
-                      Text(
-                        ' ${ref.t('andOur')} ',
-                        style: GoogleFonts.plusJakartaSans(
-                          fontSize: 11.5,
-                          color: isDark ? AppColors.textMutedDark : const Color(0xFF64748B),
-                        ),
-                      ),
-                      GestureDetector(
-                        onTap: () => showLegalModal(
-                          context,
-                          title: ref.t('privacyTitle'),
-                          content: ref.t('privacyContent'),
-                          closeLabel: ref.t('close'),
-                        ),
-                        child: Text(
-                          ref.t('privacyPolicy'),
-                          style: GoogleFonts.plusJakartaSans(
-                            fontSize: 11.5,
-                            fontWeight: FontWeight.w600,
-                            color: const Color(0xFF2563EB),
-                            decoration: TextDecoration.underline,
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
                 ),
               ],
             ),

@@ -93,7 +93,10 @@ final GoRouter _router = GoRouter(
       pageBuilder: (context, state) {
         final extra = state.extra as Map<String, dynamic>? ?? {};
         return _buildSmoothPage(
-          child: AuthPage(isLoginDefault: extra['isLogin'] ?? true),
+          child: AuthPage(
+            isLoginDefault: extra['isLogin'] ?? true,
+            acceptedTermsDefault: extra['acceptedTerms'] ?? false,
+          ),
           state: state,
         );
       },
