@@ -9,7 +9,10 @@ import 'package:go_router/go_router.dart';
 import '../../../../core/di/providers.dart';
 import '../../../../core/services/speech_recognition_service.dart';
 import '../../../../data/models/chat_message.dart';
+import '../../../../data/models/recent_scan.dart';
 import '../../../../shared/utils/localization.dart';
+import '../../../../shared/widgets/medication_recommendation_card.dart';
+import '../../history/providers/pharmacy_provider.dart';
 import '../providers/chat_provider.dart';
 import '../providers/doctor_provider.dart';
 
@@ -60,6 +63,9 @@ class _VoiceConsultationScreenState extends ConsumerState<VoiceConsultationScree
 
   // Submission guard
   bool _isSubmitting = false;
+
+  // Active medication recommendation from personal pharmacy
+  Map<String, dynamic>? _recommendedMedication;
 
   @override
   void initState() {
@@ -234,7 +240,22 @@ class _VoiceConsultationScreenState extends ConsumerState<VoiceConsultationScree
     _sphereShrinkController.forward();
 
     String doctorReply = '';
+    Map<String, dynamic>? recommendedMed;
+
     try {
+      final pharmacy = ref.read(pharmacyProvider);
+      final List<Map<String, dynamic>> localScans = pharmacy.allScans.take(25).map((s) => {
+        'scan_id': s.scanId,
+        'id': s.id,
+        'medication_name': s.medicationName,
+        'dosage': s.dosage,
+        'form': s.form,
+        'category': s.category,
+        'image_url': s.imageUrl,
+        'indications': s.analysisData?['indications'] ?? '',
+        'contraindications': s.contraindications,
+      }).toList();
+
       final client = ref.read(apiClientProvider);
       final response = await client.post(
         '/assistant/chat',
@@ -243,12 +264,18 @@ class _VoiceConsultationScreenState extends ConsumerState<VoiceConsultationScree
           'language': lang,
           'mode': 'consultation',
           'include_history': false,
+          if (localScans.isNotEmpty) 'local_scans': localScans,
         },
       );
 
       final msg = response.data['message'];
       if (msg is String && msg.trim().isNotEmpty) {
         doctorReply = msg.trim();
+      }
+
+      final rec = response.data['recommended_medication'] ?? MedicationRecommendationParser.parse(doctorReply);
+      if (rec is Map<String, dynamic>) {
+        recommendedMed = rec;
       }
     } catch (_) {
       doctorReply = _getClinicalFallback(queryText, lang);
@@ -259,14 +286,18 @@ class _VoiceConsultationScreenState extends ConsumerState<VoiceConsultationScree
     }
 
     if (mounted) {
+      setState(() {
+        _recommendedMedication = recommendedMed;
+      });
       _startLyricsSongAnimation(doctorReply, queryText);
     }
   }
 
   List<String> _splitIntoLyrics(String text) {
     // Splits text cleanly by sentences for karaoke / lyrics progression
-    // Strips markdown characters (*, #, _) so text looks clean and editorial
-    final clean = text
+    // Strips markdown characters and tags so text looks clean and editorial
+    final stripped = MedicationRecommendationParser.cleanText(text);
+    final clean = stripped
         .replaceAll('**', '')
         .replaceAll('*', '')
         .replaceAll('###', '')
@@ -1402,7 +1433,7 @@ class _VoiceConsultationScreenState extends ConsumerState<VoiceConsultationScree
           child: Container(
             constraints: BoxConstraints(
               maxWidth: MediaQuery.of(context).size.width * 0.88,
-              maxHeight: MediaQuery.of(context).size.height * 0.42,
+              maxHeight: MediaQuery.of(context).size.height * (_recommendedMedication != null ? 0.52 : 0.42),
             ),
             padding: const EdgeInsets.all(16),
             decoration: BoxDecoration(
@@ -1524,6 +1555,29 @@ class _VoiceConsultationScreenState extends ConsumerState<VoiceConsultationScree
                     ),
                   ),
                 ),
+                if (_recommendedMedication != null) ...[
+                  MedicationRecommendationCard(
+                    medicationData: _recommendedMedication!,
+                    onCustomTap: () {
+                      _speechService.cancel();
+                      final pharmacyState = ref.read(pharmacyProvider);
+                      final scanId = (_recommendedMedication!['id'] ?? _recommendedMedication!['scan_id'] ?? '').toString();
+                      RecentScan? matchedScan;
+                      try {
+                        matchedScan = pharmacyState.allScans.firstWhere(
+                          (s) => s.scanId == scanId || s.id == scanId,
+                        );
+                      } catch (_) {
+                        matchedScan = null;
+                      }
+                      if (matchedScan != null) {
+                        context.push('/scan-result', extra: matchedScan.toJson());
+                      } else {
+                        context.push('/scan-result', extra: _recommendedMedication!);
+                      }
+                    },
+                  ),
+                ],
               ],
             ),
           ),

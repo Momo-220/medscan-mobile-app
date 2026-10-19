@@ -24,6 +24,7 @@ import '../../../shared/widgets/medical_sources_widget.dart';
 import '../providers/chat_provider.dart';
 import '../providers/doctor_provider.dart';
 import '../../../shared/utils/pill_notification.dart';
+import '../../../shared/widgets/medication_recommendation_card.dart';
 
 class ChatPage extends ConsumerStatefulWidget {
   /// Optional medication context injected from scan result screen.
@@ -2135,25 +2136,39 @@ class _ChatPageState extends ConsumerState<ChatPage>
                             : (index == messages.length - 1 &&
                                     msg.content.isEmpty
                                 ? const StreamingMarkdownWidget()
-                                : MarkdownBody(
-                                    data: msg.content,
-                                    styleSheet:
-                                        MarkdownStyleSheet.fromTheme(
-                                                Theme.of(context))
-                                            .copyWith(
-                                      p: GoogleFonts.plusJakartaSans(
-                                        fontSize: 13.5,
-                                        fontWeight: FontWeight.w400,
-                                        height: 1.48,
-                                        color: isDark ? Colors.white : const Color(0xFF1E293B),
-                                      ),
-                                      listBullet:
-                                          GoogleFonts.plusJakartaSans(
-                                        fontSize: 13.5,
-                                        color: isDark ? Colors.white70 : const Color(0xFF334155),
-                                      ),
-                                    ),
-                                  )),
+                                : () {
+                                    final recommendedMed = MedicationRecommendationParser.parse(msg.content);
+                                    final cleanContent = MedicationRecommendationParser.cleanText(msg.content);
+                                    return Column(
+                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        MarkdownBody(
+                                          data: cleanContent,
+                                          styleSheet:
+                                              MarkdownStyleSheet.fromTheme(
+                                                      Theme.of(context))
+                                                  .copyWith(
+                                            p: GoogleFonts.plusJakartaSans(
+                                              fontSize: 13.5,
+                                              fontWeight: FontWeight.w400,
+                                              height: 1.48,
+                                              color: isDark ? Colors.white : const Color(0xFF1E293B),
+                                            ),
+                                            listBullet:
+                                                GoogleFonts.plusJakartaSans(
+                                              fontSize: 13.5,
+                                              color: isDark ? Colors.white70 : const Color(0xFF334155),
+                                            ),
+                                          ),
+                                        ),
+                                        if (recommendedMed != null)
+                                          MedicationRecommendationCard(
+                                            medicationData: recommendedMed,
+                                          ),
+                                      ],
+                                    );
+                                  }()),
                       ),
                     ),
                     if (!isUser) ...[
@@ -2629,12 +2644,25 @@ class StreamingMarkdownWidget extends ConsumerWidget {
       );
     }
 
-    return MarkdownBody(
-      data: streamText,
-      styleSheet: MarkdownStyleSheet.fromTheme(Theme.of(context)).copyWith(
-        p: AppTextStyles.small(isDark: isDark).copyWith(height: 1.5),
-        listBullet: AppTextStyles.small(isDark: isDark),
-      ),
+    final recommendedMed = MedicationRecommendationParser.parse(streamText);
+    final cleanStreamText = MedicationRecommendationParser.cleanText(streamText);
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        MarkdownBody(
+          data: cleanStreamText,
+          styleSheet: MarkdownStyleSheet.fromTheme(Theme.of(context)).copyWith(
+            p: AppTextStyles.small(isDark: isDark).copyWith(height: 1.5),
+            listBullet: AppTextStyles.small(isDark: isDark),
+          ),
+        ),
+        if (recommendedMed != null)
+          MedicationRecommendationCard(
+            medicationData: recommendedMed,
+          ),
+      ],
     );
   }
 }

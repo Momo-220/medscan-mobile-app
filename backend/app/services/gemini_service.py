@@ -373,6 +373,109 @@ Rappelle qu'il s'agit d'une évaluation préliminaire IA ne remplaçant pas une 
 IMPORTANT: Réponds toujours en français."""
 
 
+def format_user_pharmacy_context(pharmacy_scans: Optional[List[Dict[str, Any]]], language: str = "fr") -> str:
+    """Format user's scanned medications as structured inventory for the system prompt"""
+    if not pharmacy_scans:
+        return ""
+    
+    inventory_lines = []
+    for s in pharmacy_scans[:25]:
+        scan_id = s.get("scan_id") or s.get("id")
+        med_name = s.get("medication_name")
+        if not scan_id or not med_name:
+            continue
+        dosage = s.get("dosage") or ""
+        form = s.get("form") or ""
+        category = s.get("category") or ""
+        image_url = s.get("image_url") or ""
+        
+        # Extract indications / posology summary from analysis_data if available
+        analysis = s.get("analysis_data") or {}
+        indications = analysis.get("indications") or s.get("indications") or ""
+        if isinstance(indications, list):
+            indications = ", ".join(indications)
+        elif isinstance(indications, str):
+            indications = indications.replace("\n", " ").strip()
+        if len(indications) > 100:
+            indications = indications[:97] + "..."
+            
+        contra = analysis.get("contraindications") or s.get("contraindications") or []
+        if isinstance(contra, list):
+            contra_str = ", ".join([str(c) for c in contra[:3]])
+        else:
+            contra_str = str(contra)[:80]
+
+        inventory_lines.append(
+            f"- [ID: {scan_id}] Nom: {med_name} | Dosage: {dosage} | Forme: {form} | Catégorie: {category} | Image: {image_url} | Indications: {indications} | Contre-indications: {contra_str}"
+        )
+    
+    if not inventory_lines:
+        return ""
+        
+    inventory_block = "\n".join(inventory_lines)
+    lang_key = (language or "fr").lower()[:2]
+    
+    if lang_key == "en":
+        return f"""
+
+📦 USER'S PERSONAL MEDICINE CABINET (SCANNED MEDICATIONS):
+The user has scanned and currently has these medications in their personal medicine cabinet:
+{inventory_block}
+
+RULES FOR PERSONAL MEDICINE CABINET:
+1. When the user asks what to take for a symptom (headache, pain, fever, stomach ache, flu, etc.) or asks what they have in their pharmacy/scanned cabinet:
+   - Prioritize checking if their personal medicine cabinet contains an appropriate and safe medication for their issue.
+   - If YES: Recommend it, explaining the dosage and safety precautions. At the very end of your response, ALWAYS append the exact recommendation marker:
+     [[MEDICATION_RECOMMENDED:{{"id":"<scan_id>","name":"<medication_name>","dosage":"<dosage>","form":"<form>","category":"<category>","image_url":"<image_url>"}}]]
+     (replace with the exact values from their cabinet above).
+   - If NO (no suitable medication in their cabinet): Clearly tell them that their scanned medicine cabinet doesn't contain a suitable medication for this condition, then suggest a common OTC alternative or consulting a professional. Do NOT include any [[MEDICATION_RECOMMENDED:...]] tag.
+2. Only include [[MEDICATION_RECOMMENDED:...]] if you recommend a medication from their personal medicine cabinet above.
+"""
+    elif lang_key == "ar":
+        return f"""
+
+📦 صيدلية المستخدم الشخصية (الأدوية الممسوحة ضوئياً):
+قام المستخدم بمسح وحفظ الأدوية التالية في خزانة أدويته:
+{inventory_block}
+
+قواعد الصيدلية الشخصية:
+1. عندما يسأل المستخدم عن علاج لأعراض معينة (صداع، ألم، حمى، مغص، إلخ) أو عما لديه في صيدليته:
+   - افحصي أولاً ما إذا كانت صيدليته تحتوي على دواء مناسب وآمن.
+   - إذا كان نعم: اقترحي هذا الدواء مع توضيح الجرعة والاحتياطات، وضعي في نهاية ردكِ حصراً الوسم التالي:
+     [[MEDICATION_RECOMMENDED:{{"id":"<scan_id>","name":"<medication_name>","dosage":"<dosage>","form":"<form>","category":"<category>","image_url":"<image_url>"}}]]
+   - إذا كان لا: وضحي له بلطف أنه لا يملك دواءً مناسباً في صيدليته الممسوحة، ثم اقترحي حلاً بديلاً أو مراجعة الطبيب، دون وضع الوسم.
+"""
+    elif lang_key == "tr":
+        return f"""
+
+📦 KULLANICININ KİŞİSEL ECZA DOLABI (TARANAN İLAÇLAR):
+Kullanıcı daha önce ecza dolabına şu ilaçları taramıştır:
+{inventory_block}
+
+KİŞİSEL ECZA DOLABI KURALLARI:
+1. Kullanıcı bir semptom (baş ağrısı, ateş, mide ağrısı vb.) için ne alabileceğini veya ecza dolabında ne olduğunu sorduğunda:
+   - Öncelikle dolabında uygun ve güvenli bir ilaç olup olmadığını kontrol edin.
+   - EVET ise: Bu ilacı önerin, kullanım dozunu ve uyarılarını açıklayın. Yanıtınızın en sonuna mutlaka şu etiketi ekleyin:
+     [[MEDICATION_RECOMMENDED:{{"id":"<scan_id>","name":"<medication_name>","dosage":"<dosage>","form":"<form>","category":"<category>","image_url":"<image_url>"}}]]
+   - HAYIR ise: Taranan ecza dolabında uygun bir ilaç bulunmadığını açıkça belirtin, ardından genel bir reçetesiz alternatif önerin. Etiket eklemeyin.
+"""
+    else:
+        return f"""
+
+📦 ARMOIRE À PHARMACIE PERSONNELLE DE L'UTILISATEUR (MÉDICAMENTS SCANNÉS) :
+L'utilisateur a scanné et possède les médicaments suivants dans sa boîte à pharmacie personnelle :
+{inventory_block}
+
+RÈGLES D'OR POUR L'ARMOIRE À PHARMACIE PERSONNELLE :
+1. Lorsque l'utilisateur décrit des symptômes (ex: mal de tête, mal de dos, fièvre, courbatures, maux de ventre, rhume, etc.) ou demande directement quel médicament prendre parmi ses médicaments scannés / dans sa pharmacie :
+   - Vérifie en PRIORITÉ si sa boîte à pharmacie contient un médicament adapté, efficace et sûr pour son cas.
+   - Si OUI : Conseille-lui ce médicament précis de son armoire, donne-lui la posologie claire (dose, fréquence) et les précautions indispensables. À la TOUTE FIN de ta réponse, ajoute OBLIGATOIREMENT le tag de recommandation technique :
+     [[MEDICATION_RECOMMENDED:{{"id":"<scan_id>","name":"<medication_name>","dosage":"<dosage>","form":"<form>","category":"<category>","image_url":"<image_url>"}}]]
+     (remplace scrupuleusement avec l'ID, le nom, le dosage, la forme, la catégorie et l'image_url du médicament issu de sa liste ci-dessus).
+   - Si NON (aucun médicament de sa boîte à pharmacie n'est adapté ou sûr pour ce problème) : Dis-lui clairement, poliment et avec bienveillance qu'il ne dispose actuellement d'aucun médicament adapté dans sa boîte à pharmacie scannée. Conseille-lui ensuite un médicament usuel en vente libre en officine ou une consultation médicale. N'ajoute AUCUN tag [[MEDICATION_RECOMMENDED:...]] dans ce cas.
+2. N'ajoute JAMAIS de tag [[MEDICATION_RECOMMENDED:...]] pour un médicament qui ne figure pas dans sa liste ci-dessus.
+"""
+
 
 class GeminiService:
     """Manage Google Gemini AI interactions"""
@@ -735,6 +838,9 @@ Analyze this medication image. Return ONLY a valid JSON object - no explanations
         message: str,
         chat_history: Optional[List[Dict[str, str]]] = None,
         language: str = "fr",
+        mode: str = "chat",
+        medication_context: Optional[str] = None,
+        user_pharmacy: Optional[List[Dict[str, Any]]] = None,
     ) -> Any:
         """
         Chat with AI assistant
@@ -754,13 +860,34 @@ Analyze this medication image. Return ONLY a valid JSON object - no explanations
             # Format chat history with system prompt included in first message
             formatted_history: List[Any] = self._format_chat_history(chat_history)
             
-            # Get system prompt in correct language
-            system_prompt = get_chat_system_prompt(language)
-            intro_message = self._get_intro_message(language)
+            # Choose system prompt based on mode
+            if mode == "consultation":
+                system_prompt = get_consultation_system_prompt(language)
+                intro_message = self._get_consultation_intro_message(language)
+            else:
+                system_prompt = get_chat_system_prompt(language)
+                intro_message = self._get_intro_message(language)
             
-            # If no history, start with system prompt
+            # If medication context is provided (scan-to-chat), prepend it to the system prompt
+            if medication_context:
+                context_prefixes = {
+                    "fr": f"\n\n📦 CONTEXTE DE SCAN : L'utilisateur vient de scanner le médicament « {medication_context} ». Il souhaite en savoir plus. Commence par proposer des informations détaillées sur ce médicament avant de répondre à sa question.",
+                    "en": f"\n\n📦 SCAN CONTEXT: The user just scanned the medication '{medication_context}'. They want to know more. Start by offering detailed information about this medication before answering their question.",
+                    "ar": f"\n\n📦 سياق المسح: قام المستخدم للتو بمسح الدواء «{medication_context}». يريد معرفة المزيد. ابدأ بتقديم معلومات تفصيلية عن هذا الدواء قبل الإجابة على سؤاله.",
+                    "tr": f"\n\n📦 TARAMA BAĞLAMI: Kullanıcı az önce «{medication_context}» ilacını taradı. Daha fazla bilgi edinmek istiyor. Sorusunu yanıtlamadan önce bu ilaç hakkında ayrıntılı bilgi sunarak başlayın.",
+                }
+                lang_key = (language or "fr").lower()[:2]
+                prefix = context_prefixes.get(lang_key, context_prefixes["fr"])
+                system_prompt = system_prompt + prefix
+
+            # Inject user's personal scanned pharmacy context
+            if user_pharmacy:
+                pharmacy_context = format_user_pharmacy_context(user_pharmacy, language)
+                if pharmacy_context:
+                    system_prompt = system_prompt + pharmacy_context
+            
+            # Ensure system prompt is present as the first message turn
             if not formatted_history:
-                # Include system prompt as first message from assistant
                 formatted_history = [
                     {
                         "role": "user",
@@ -771,6 +898,17 @@ Analyze this medication image. Return ONLY a valid JSON object - no explanations
                         "parts": [intro_message]
                     }
                 ]
+            else:
+                formatted_history = [
+                    {
+                        "role": "user",
+                        "parts": [system_prompt]
+                    },
+                    {
+                        "role": "model",
+                        "parts": [intro_message]
+                    }
+                ] + formatted_history
             
             # Start or continue chat session
             chat_session = self.chat_model.start_chat(history=formatted_history)  # type: ignore
@@ -837,6 +975,7 @@ Analyze this medication image. Return ONLY a valid JSON object - no explanations
         language: str = "fr",
         mode: str = "chat",
         medication_context: Optional[str] = None,
+        user_pharmacy: Optional[List[Dict[str, Any]]] = None,
     ) -> AsyncGenerator[tuple[str, int], None]:
         """
         Streaming chat for real-time responses
@@ -846,6 +985,7 @@ Analyze this medication image. Return ONLY a valid JSON object - no explanations
         Args:
             mode: 'chat' for general pharma Q&A, 'consultation' for pre-consultation symptom workflow
             medication_context: Name of a scanned medication to add context (scan-to-chat feature)
+            user_pharmacy: List of user's personal scanned medications from pharmacy
         """
         tokens_used = 0
         try:
@@ -878,13 +1018,18 @@ Analyze this medication image. Return ONLY a valid JSON object - no explanations
                     "ar": f"\n\n📦 سياق المسح: قام المستخدم للتو بمسح الدواء «{medication_context}». يريد معرفة المزيد. ابدأ بتقديم معلومات تفصيلية عن هذا الدواء قبل الإجابة على سؤاله.",
                     "tr": f"\n\n📦 TARAMA BAĞLAMI: Kullanıcı az önce «{medication_context}» ilacını taradı. Daha fazla bilgi edinmek istiyor. Sorusunu yanıtlamadan önce bu ilaç hakkında ayrıntılı bilgi sunarak başlayın.",
                 }
-                lang_key = language.lower()[:2]
+                lang_key = (language or "fr").lower()[:2]
                 prefix = context_prefixes.get(lang_key, context_prefixes["fr"])
                 system_prompt = system_prompt + prefix
+
+            # Inject user's personal scanned pharmacy context
+            if user_pharmacy:
+                pharmacy_context = format_user_pharmacy_context(user_pharmacy, language)
+                if pharmacy_context:
+                    system_prompt = system_prompt + pharmacy_context
             
-            # If no history, start with system prompt
+            # Ensure system prompt is present as the first message turn
             if not formatted_history:
-                # Include system prompt as first message from assistant
                 formatted_history = [
                     {
                         "role": "user",
@@ -895,6 +1040,17 @@ Analyze this medication image. Return ONLY a valid JSON object - no explanations
                         "parts": [intro_message]
                     }
                 ]
+            else:
+                formatted_history = [
+                    {
+                        "role": "user",
+                        "parts": [system_prompt]
+                    },
+                    {
+                        "role": "model",
+                        "parts": [intro_message]
+                    }
+                ] + formatted_history
             
             chat_session = self.chat_model.start_chat(history=formatted_history)  # type: ignore
 

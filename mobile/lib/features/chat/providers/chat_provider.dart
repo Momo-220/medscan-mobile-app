@@ -13,6 +13,7 @@ import '../../../data/models/chat_session.dart';
 import '../../../data/remote/api_client.dart';
 import '../../auth/providers/auth_provider.dart';
 import '../../home/providers/credits_provider.dart';
+import '../../history/providers/pharmacy_provider.dart';
 
 // ─── Chat mode ───────────────────────────────────────────────────────────────
 // 'chat'         → normal pharmaceutical Q&A
@@ -435,6 +436,23 @@ class ChatNotifier extends StateNotifier<AsyncValue<List<ChatMessage>>> {
         payload['image_url'] = attachedImageUrl;
         _medicationImageUrl = null;
       }
+
+      try {
+        final pharmacy = _ref.read(pharmacyProvider);
+        if (pharmacy.allScans.isNotEmpty) {
+          payload['local_scans'] = pharmacy.allScans.take(25).map((s) => {
+            'scan_id': s.scanId,
+            'id': s.id,
+            'medication_name': s.medicationName,
+            'dosage': s.dosage,
+            'form': s.form,
+            'category': s.category,
+            'image_url': s.imageUrl,
+            'indications': s.analysisData?['indications'] ?? '',
+            'contraindications': s.contraindications,
+          }).toList();
+        }
+      } catch (_) {}
 
       request.body = json.encode(payload);
 

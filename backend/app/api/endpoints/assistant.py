@@ -72,6 +72,25 @@ async def chat_with_assistant(
             logger.warning("Failed to load chat history", error=str(e))
             chat_history = []
     
+    # Load user's personal pharmacy history (scanned medications)
+    user_pharmacy = []
+    if not is_anonymous:
+        try:
+            from app.services.scan_history_service import scan_history_service
+            user_pharmacy = scan_history_service.get_user_history(user_id, limit=30)
+        except Exception as e:
+            logger.warning("Failed to load user pharmacy for chat", error=str(e))
+            user_pharmacy = []
+    
+    # Merge with client's local scans if any provided
+    if request.local_scans:
+        existing_ids = {s.get("scan_id") or s.get("id") for s in user_pharmacy}
+        for ls in request.local_scans:
+            lid = ls.get("scan_id") or ls.get("id")
+            if lid and lid not in existing_ids:
+                user_pharmacy.append(ls)
+                existing_ids.add(lid)
+
     try:
         credits_service.ensure_credits(user_id, credits_service.CHAT_COST, is_anonymous=is_anonymous)
 
@@ -85,6 +104,9 @@ async def chat_with_assistant(
             message=request.message,
             chat_history=chat_history,
             language=request.language,
+            mode=getattr(request, 'mode', 'chat'),
+            medication_context=getattr(request, 'medication_context', None),
+            user_pharmacy=user_pharmacy,
         )
 
         # 3) Consommer les crédits après succès basé sur les tokens réels
@@ -98,6 +120,33 @@ async def chat_with_assistant(
             credits_service.consume(user_id, credits_service.CHAT_COST, is_anonymous=is_anonymous)
         
         response_text = ai_response.text if hasattr(ai_response, 'text') else str(ai_response)
+
+        # Extraire la recommandation de médicament si présente dans la réponse
+        recommended_med = None
+        import re
+        rec_match = re.search(r'\[\[MEDICATION_RECOMMENDED:(\{.*?\})\]\]', response_text)
+        if rec_match:
+            try:
+                recommended_med = json.loads(rec_match.group(1))
+            except Exception:
+                pass
+        else:
+            rec_id_match = re.search(r'\[\[MEDICATION_RECOMMENDED:([a-zA-Z0-9_-]+)\]\]', response_text)
+            if rec_id_match:
+                scan_id_rec = rec_id_match.group(1)
+                matching = next((s for s in user_pharmacy if s.get("scan_id") == scan_id_rec or s.get("id") == scan_id_rec), None)
+                if matching:
+                    recommended_med = {
+                        "id": scan_id_rec,
+                        "name": matching.get("medication_name"),
+                        "dosage": matching.get("dosage"),
+                        "form": matching.get("form"),
+                        "category": matching.get("category"),
+                        "image_url": matching.get("image_url"),
+                    }
+                else:
+                    recommended_med = {"id": scan_id_rec}
+
         message_id = None
         if not is_anonymous:
             try:
@@ -117,11 +166,12 @@ async def chat_with_assistant(
                 logger.warning("Failed to save chat message", error=str(e))
                 message_id = None
         
-        logger.info("Chat response generated", user_id=user_id, message_id=message_id)
+        logger.info("Chat response generated", user_id=user_id, message_id=message_id, has_recommendation=bool(recommended_med))
         
         return ChatResponse(
             message=response_text,
             message_id=message_id,
+            recommended_medication=recommended_med,
         )
         
     except AIServiceError as e:
@@ -275,6 +325,24 @@ async def chat_with_assistant_stream(
         except Exception as e:
             logger.warning("Failed to load chat history for stream", error=str(e))
     
+    # Load user's pharmacy history (scanned medications)
+    user_pharmacy = []
+    if not is_anonymous:
+        try:
+            from app.services.scan_history_service import scan_history_service
+            user_pharmacy = scan_history_service.get_user_history(user_id, limit=30)
+        except Exception as e:
+            logger.warning("Failed to load user pharmacy for stream", error=str(e))
+            user_pharmacy = []
+
+    if chat_request.local_scans:
+        existing_ids = {s.get("scan_id") or s.get("id") for s in user_pharmacy}
+        for ls in chat_request.local_scans:
+            lid = ls.get("scan_id") or ls.get("id")
+            if lid and lid not in existing_ids:
+                user_pharmacy.append(ls)
+                existing_ids.add(lid)
+
     async def generate():
         """Generate streaming response with heartbeat to prevent connection timeouts"""
         full_response = ""
@@ -324,6 +392,7 @@ async def chat_with_assistant_stream(
                         chat_request.language,
                         mode=getattr(chat_request, 'mode', 'chat'),
                         medication_context=getattr(chat_request, 'medication_context', None),
+                        user_pharmacy=user_pharmacy,
                     ):
                         if chunk_text:
                             await chunk_queue.put(('chunk', chunk_text))

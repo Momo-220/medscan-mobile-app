@@ -54,6 +54,7 @@ class ChatRequest(BaseModel):
     mode: Literal["chat", "consultation"] = Field(default="chat", description="Chat mode: 'chat' for general pharma Q&A, 'consultation' for pre-consultation with symptoms analysis")
     medication_context: Optional[str] = Field(None, max_length=300, description="Medication name context from scan result")
     image_url: Optional[str] = Field(None, description="Optional image URL or local path attached to message")
+    local_scans: Optional[List[Dict[str, Any]]] = Field(None, description="Optional list of user's personal scanned medications")
     
     @validator('message')
     def validate_message(cls, v):
@@ -74,6 +75,7 @@ class ChatResponse(BaseModel):
     """Response schema for chat"""
     message: str
     message_id: Optional[str] = None
+    recommended_medication: Optional[Dict[str, Any]] = None
     timestamp: datetime = Field(default_factory=datetime.utcnow)
 
 
