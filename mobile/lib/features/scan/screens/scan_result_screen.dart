@@ -697,7 +697,20 @@ class _ScanResultPageState extends ConsumerState<ScanResultPage> {
                 const SizedBox(height: 10),
                 SizedBox(
                   height: 350,
-                  child: PageView.builder(
+                  child: ShaderMask(
+                    shaderCallback: (Rect bounds) => const LinearGradient(
+                      begin: Alignment.centerLeft,
+                      end: Alignment.centerRight,
+                      colors: [
+                        Colors.transparent,
+                        Colors.black,
+                        Colors.black,
+                        Colors.transparent,
+                      ],
+                      stops: [0.0, 0.03, 0.97, 1.0],
+                    ).createShader(bounds),
+                    blendMode: BlendMode.dstIn,
+                    child: PageView.builder(
                       controller: _carouselController,
                       physics: const BouncingScrollPhysics(),
                       scrollDirection: Axis.horizontal,
@@ -813,6 +826,7 @@ class _ScanResultPageState extends ConsumerState<ScanResultPage> {
                       },
                     ),
                   ),
+                ),
                 const SizedBox(height: 12),
                 // Horizontal dot indicators below the PageView
                 Row(
