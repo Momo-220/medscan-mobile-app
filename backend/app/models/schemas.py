@@ -3,7 +3,7 @@ Pydantic schemas for request/response validation
 """
 
 from pydantic import BaseModel, Field, validator
-from typing import Optional, List, Literal, Union
+from typing import Optional, List, Literal, Union, Dict, Any
 from datetime import datetime
 
 
