@@ -70,8 +70,28 @@ async def get_history(
                 analysis_data = {}
         
         scan_id_val = str(item.get("scan_id") or item.get("id") or "")
-        created_at_val = item.get("created_at")
-        if not isinstance(created_at_val, datetime):
+        
+        # Robust date extraction: strictly preserve true historical date and never overwrite with now
+        created_at_val = item.get("created_at") or item.get("scanned_at")
+        if isinstance(created_at_val, str):
+            try:
+                created_at_val = datetime.fromisoformat(created_at_val.replace("Z", "+00:00"))
+            except Exception:
+                created_at_val = None
+        elif not isinstance(created_at_val, datetime):
+            created_at_val = None
+
+        if not created_at_val:
+            raw_id = item.get("id") or item.get("_id")
+            if raw_id:
+                try:
+                    from bson import ObjectId
+                    if ObjectId.is_valid(str(raw_id)):
+                        created_at_val = ObjectId(str(raw_id)).generation_time
+                except Exception:
+                    pass
+
+        if not created_at_val:
             created_at_val = datetime.utcnow()
             
         scans.append(
@@ -130,6 +150,7 @@ async def migrate_history_item(
     try:
         import uuid
         scan_id = item.get("scan_id") or item.get("id") or str(uuid.uuid4())
+        raw_date = item.get("scanned_at") or item.get("scannedAt") or item.get("created_at")
         
         scan_data = {
             "scan_id": scan_id,
@@ -147,6 +168,8 @@ async def migrate_history_item(
             "analysis_data": item.get("analysis_data") or {},
             "packaging_language": item.get("packaging_language", "fr"),
             "category": item.get("category", "autre"),
+            "scanned_at": raw_date,
+            "created_at": raw_date,
         }
         
         saved_id = scan_history_service.save_scan(

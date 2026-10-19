@@ -194,7 +194,7 @@ class RecentScansNotifier extends StateNotifier<AsyncValue<List<RecentScan>>> {
 
       // 3. Backend resolved scans (authoritative details, preserving localImagePath)
       for (final scan in resolvedScans) {
-        final local = mergedMap[scan.scanId];
+        final local = mergedMap[scan.scanId] ?? (scan.id.isNotEmpty ? mergedMap[scan.id] : null);
         String? finalLocalPath = local?.localImagePath;
         if (finalLocalPath == null && scan.imageUrl != null && !scan.imageUrl!.startsWith('http')) {
           final fileName = scan.imageUrl!.split('/').last;

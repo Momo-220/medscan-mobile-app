@@ -277,22 +277,29 @@ class PharmacyNotifier extends StateNotifier<PharmacyState> {
       final Map<String, RecentScan> mergedMap = {};
       for (final localScan in userLocalScans) {
         mergedMap[localScan.scanId] = localScan;
+        if (localScan.id.isNotEmpty) mergedMap[localScan.id] = localScan;
       }
       for (final backendScan in resolvedScans) {
-        if (mergedMap.containsKey(backendScan.scanId)) {
-          final local = mergedMap[backendScan.scanId]!;
+        final local = mergedMap[backendScan.scanId] ?? (backendScan.id.isNotEmpty ? mergedMap[backendScan.id] : null);
+        if (local != null) {
           final earliestScannedAt = local.scannedAt.isBefore(backendScan.scannedAt)
               ? local.scannedAt
               : backendScan.scannedAt;
-          mergedMap[backendScan.scanId] = backendScan.copyWith(
+          final updated = backendScan.copyWith(
             scannedAt: earliestScannedAt,
             localImagePath: local.localImagePath ?? backendScan.localImagePath,
           );
+          mergedMap[backendScan.scanId] = updated;
+          if (backendScan.id.isNotEmpty) mergedMap[backendScan.id] = updated;
         } else {
           mergedMap[backendScan.scanId] = backendScan;
         }
       }
-      final mergedList = mergedMap.values.toList();
+      final Map<String, RecentScan> deduped = {};
+      for (final scan in mergedMap.values) {
+        deduped[scan.scanId] = scan;
+      }
+      final mergedList = deduped.values.toList();
       mergedList.sort((a, b) => b.scannedAt.compareTo(a.scannedAt));
 
       // Filter out permanently deleted scans from blacklist & unidentified medications

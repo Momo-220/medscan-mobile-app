@@ -106,6 +106,7 @@ class RecentScan {
       'local_image_path': localImagePath,
       'confidence': confidence,
       'scanned_at': scannedAt.toIso8601String(),
+      'created_at': scannedAt.toIso8601String(),
       'analysis_data': analysisData,
       'warnings': warnings,
       'contraindications': contraindications,

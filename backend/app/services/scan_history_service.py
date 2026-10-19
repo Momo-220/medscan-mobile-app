@@ -97,10 +97,28 @@ class ScanHistoryService:
             else:
                 created_at = now
 
+            from bson import ObjectId
+
             existing = coll.find_one({"scan_id": scan_id})
+            if not existing and ObjectId.is_valid(str(scan_id)):
+                existing = coll.find_one({"_id": ObjectId(str(scan_id))})
+
             if existing:
                 # Strictly preserve the original creation date on update!
-                original_created_at = existing.get("created_at") or created_at
+                existing_created_at = existing.get("created_at")
+                if isinstance(existing_created_at, str):
+                    try:
+                        existing_created_at = datetime.fromisoformat(existing_created_at.replace("Z", "+00:00"))
+                    except Exception:
+                        existing_created_at = None
+                if not existing_created_at and "_id" in existing and hasattr(existing["_id"], "generation_time"):
+                    existing_created_at = existing["_id"].generation_time
+
+                # Keep whichever is the earliest true historical date
+                if existing_created_at and created_at:
+                    original_created_at = min(existing_created_at, created_at)
+                else:
+                    original_created_at = existing_created_at or created_at
                 update_fields = {
                     "medication_name": scan_data.get("medication_name") or existing.get("medication_name", "Unknown"),
                     "generic_name": scan_data.get("generic_name") or existing.get("generic_name"),
