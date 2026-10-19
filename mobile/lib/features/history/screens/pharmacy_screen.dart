@@ -36,7 +36,9 @@ class _PharmacyPageState extends ConsumerState<PharmacyPage> {
     super.initState();
     _scrollController = ScrollController();
     _scrollController.addListener(() {
-      _scrollOffset.value = _scrollController.hasClients ? _scrollController.offset : 0.0;
+      if (_scrollController.positions.isNotEmpty) {
+        _scrollOffset.value = _scrollController.positions.first.pixels;
+      }
     });
   }
 
@@ -267,13 +269,14 @@ class _PharmacyPageState extends ConsumerState<PharmacyPage> {
               child: ValueListenableBuilder<double>(
                 valueListenable: _scrollOffset,
                 builder: (context, offset, child) {
-                  // Cinematic film dissolve: smooth gradient fade at top of scrolling body
                   final double fadeStop = (offset / 32.0).clamp(0.0, 1.0) * 0.048;
-                  if (fadeStop <= 0.001) {
-                    return child!;
-                  }
                   return ShaderMask(
                     shaderCallback: (Rect bounds) {
+                      if (fadeStop <= 0.001) {
+                        return const LinearGradient(
+                          colors: [Colors.black, Colors.black],
+                        ).createShader(bounds);
+                      }
                       return LinearGradient(
                         begin: Alignment.topCenter,
                         end: Alignment.bottomCenter,
@@ -285,7 +288,7 @@ class _PharmacyPageState extends ConsumerState<PharmacyPage> {
                       ).createShader(bounds);
                     },
                     blendMode: BlendMode.dstIn,
-                    child: child,
+                    child: child!,
                   );
                 },
                 child: isAnonymous

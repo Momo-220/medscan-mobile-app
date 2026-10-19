@@ -42,7 +42,6 @@ class _ScanResultPageState extends ConsumerState<ScanResultPage> {
   final PageController _carouselController = PageController();
   final ScrollController _scrollController = ScrollController();
   final ValueNotifier<double> _scrollOffset = ValueNotifier<double>(0.0);
-  final ValueNotifier<double> _carouselScrollOffset = ValueNotifier<double>(0.0);
   Map<String, dynamic>? _translatedScanData;
   bool _translating = false;
 
@@ -50,10 +49,9 @@ class _ScanResultPageState extends ConsumerState<ScanResultPage> {
   void initState() {
     super.initState();
     _scrollController.addListener(() {
-      _scrollOffset.value = _scrollController.hasClients ? _scrollController.offset : 0.0;
-    });
-    _carouselController.addListener(() {
-      _carouselScrollOffset.value = _carouselController.hasClients ? _carouselController.offset : 0.0;
+      if (_scrollController.positions.isNotEmpty) {
+        _scrollOffset.value = _scrollController.positions.first.pixels;
+      }
     });
     _resolveImagePath();
     WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -66,7 +64,6 @@ class _ScanResultPageState extends ConsumerState<ScanResultPage> {
   void dispose() {
     _scrollController.dispose();
     _scrollOffset.dispose();
-    _carouselScrollOffset.dispose();
     _carouselController.dispose();
     super.dispose();
   }
@@ -430,13 +427,14 @@ class _ScanResultPageState extends ConsumerState<ScanResultPage> {
             child: ValueListenableBuilder<double>(
               valueListenable: _scrollOffset,
               builder: (context, offset, child) {
-                // Cinematic film dissolve: smooth gradient fade at top of scrolling body
                 final double fadeStop = (offset / 32.0).clamp(0.0, 1.0) * 0.048;
-                if (fadeStop <= 0.001) {
-                  return child!;
-                }
                 return ShaderMask(
                   shaderCallback: (Rect bounds) {
+                    if (fadeStop <= 0.001) {
+                      return const LinearGradient(
+                        colors: [Colors.black, Colors.black],
+                      ).createShader(bounds);
+                    }
                     return LinearGradient(
                       begin: Alignment.topCenter,
                       end: Alignment.bottomCenter,
@@ -448,7 +446,7 @@ class _ScanResultPageState extends ConsumerState<ScanResultPage> {
                     ).createShader(bounds);
                   },
                   blendMode: BlendMode.dstIn,
-                  child: child,
+                  child: child!,
                 );
               },
               child: SingleChildScrollView(
@@ -699,43 +697,7 @@ class _ScanResultPageState extends ConsumerState<ScanResultPage> {
                 const SizedBox(height: 10),
                 SizedBox(
                   height: 350,
-                  child: ValueListenableBuilder<double>(
-                    valueListenable: _carouselScrollOffset,
-                    builder: (context, cOffset, child) {
-                      if (Theme.of(context).platform == TargetPlatform.android) {
-                        return child!;
-                      }
-                      return ShaderMask(
-                        shaderCallback: (Rect bounds) {
-                          final double leftStop = (cOffset / 28.0).clamp(0.0, 1.0) * 0.045;
-                          final double maxScroll = _carouselController.hasClients && _carouselController.position.hasContentDimensions
-                              ? _carouselController.position.maxScrollExtent
-                              : 1.0;
-                          final double distFromEnd = (maxScroll - cOffset).clamp(0.0, 28.0);
-                          final double rightStop = 1.0 - ((distFromEnd / 28.0).clamp(0.0, 1.0) * 0.045);
-
-                          return LinearGradient(
-                            begin: Alignment.centerLeft,
-                            end: Alignment.centerRight,
-                            colors: const [
-                              Colors.transparent,
-                              Colors.black,
-                              Colors.black,
-                              Colors.transparent,
-                            ],
-                            stops: [
-                              0.0,
-                              leftStop > 0.001 ? leftStop : 0.0,
-                              rightStop < 0.999 ? rightStop : 1.0,
-                              1.0,
-                            ],
-                          ).createShader(bounds);
-                        },
-                        blendMode: BlendMode.dstIn,
-                        child: child!,
-                      );
-                    },
-                    child: PageView.builder(
+                  child: PageView.builder(
                       controller: _carouselController,
                       physics: const BouncingScrollPhysics(),
                       scrollDirection: Axis.horizontal,
@@ -851,7 +813,6 @@ class _ScanResultPageState extends ConsumerState<ScanResultPage> {
                       },
                     ),
                   ),
-                ),
                 const SizedBox(height: 12),
                 // Horizontal dot indicators below the PageView
                 Row(
