@@ -158,7 +158,7 @@ class _AuthPageState extends ConsumerState<AuthPage> {
   }
 
   Future<void> _handleSubmit() async {
-    if (!_acceptedTerms) {
+    if (!_isLogin && !_acceptedTerms) {
       setState(() {
         _error = ref.t('termsRequiredError');
       });
@@ -314,7 +314,7 @@ class _AuthPageState extends ConsumerState<AuthPage> {
   }
 
   Future<void> _handleGoogleSignIn() async {
-    if (!_acceptedTerms) {
+    if (!_isLogin && !_acceptedTerms) {
       setState(() {
         _error = ref.t('termsRequiredError');
       });
@@ -347,7 +347,7 @@ class _AuthPageState extends ConsumerState<AuthPage> {
   }
 
   Future<void> _handleAppleSignIn() async {
-    if (!_acceptedTerms) {
+    if (!_isLogin && !_acceptedTerms) {
       setState(() {
         _error = ref.t('termsRequiredError');
       });
@@ -413,7 +413,7 @@ class _AuthPageState extends ConsumerState<AuthPage> {
               height: 320,
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
-                color: AppColors.primary.withOpacity(isDark ? 0.03 : 0.08),
+                color: AppColors.primary.withValues(alpha: isDark ? 0.03 : 0.08),
               ),
             ),
           ),
@@ -425,7 +425,7 @@ class _AuthPageState extends ConsumerState<AuthPage> {
               height: 320,
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
-                color: AppColors.primary.withOpacity(isDark ? 0.03 : 0.05),
+                color: AppColors.primary.withValues(alpha: isDark ? 0.03 : 0.05),
               ),
             ),
           ),
@@ -460,7 +460,7 @@ class _AuthPageState extends ConsumerState<AuthPage> {
                                         ? null
                                         : [
                                             BoxShadow(
-                                              color: Colors.black.withOpacity(0.08),
+                                              color: Colors.black.withValues(alpha: 0.08),
                                               blurRadius: 6,
                                               offset: const Offset(0, 2),
                                             ),
@@ -495,12 +495,13 @@ class _AuthPageState extends ConsumerState<AuthPage> {
                           ),
                           const SizedBox(height: 28),
 
-                          // Toggle Selector: Login / Register
+                          // Toggle Selector: Login / Register (Pill shape)
                           Container(
-                            padding: const EdgeInsets.all(5.0),
+                            height: 48,
+                            padding: const EdgeInsets.all(4.0),
                             decoration: BoxDecoration(
                               color: isDark ? const Color(0xFF1E293B) : const Color(0xFFEFF6FF),
-                              borderRadius: BorderRadius.circular(20),
+                              borderRadius: BorderRadius.circular(50),
                             ),
                             child: Row(
                               children: [
@@ -512,16 +513,16 @@ class _AuthPageState extends ConsumerState<AuthPage> {
                                     }),
                                     child: AnimatedContainer(
                                       duration: const Duration(milliseconds: 200),
-                                      padding: const EdgeInsets.symmetric(vertical: 12),
+                                      curve: Curves.easeInOut,
                                       decoration: BoxDecoration(
                                         color: _isLogin
                                             ? (isDark ? const Color(0xFF334155) : Colors.white)
                                             : Colors.transparent,
-                                        borderRadius: BorderRadius.circular(15),
-                                        boxShadow: _isLogin && !isDark
+                                        borderRadius: BorderRadius.circular(50),
+                                        boxShadow: _isLogin
                                             ? [
                                                 BoxShadow(
-                                                  color: const Color(0xFF3B82F6).withOpacity(0.10),
+                                                  color: const Color(0xFF2563EB).withValues(alpha: isDark ? 0.3 : 0.08),
                                                   blurRadius: 8,
                                                   spreadRadius: 0,
                                                   offset: const Offset(0, 2),
@@ -529,16 +530,16 @@ class _AuthPageState extends ConsumerState<AuthPage> {
                                               ]
                                             : null,
                                       ),
+                                      alignment: Alignment.center,
                                       child: Text(
                                         ref.t('authLogin'),
-                                        style: AppTextStyles.bodyBold(isDark: isDark).copyWith(
+                                        style: GoogleFonts.plusJakartaSans(
                                           color: _isLogin
-                                              ? const Color(0xFF3B82F6)
+                                              ? const Color(0xFF2563EB)
                                               : (isDark ? AppColors.textMutedDark : const Color(0xFF64748B)),
                                           fontSize: 14.5,
-                                          fontWeight: _isLogin ? FontWeight.w700 : FontWeight.w500,
+                                          fontWeight: _isLogin ? FontWeight.w700 : FontWeight.w600,
                                         ),
-                                        textAlign: TextAlign.center,
                                       ),
                                     ),
                                   ),
@@ -551,16 +552,16 @@ class _AuthPageState extends ConsumerState<AuthPage> {
                                     }),
                                     child: AnimatedContainer(
                                       duration: const Duration(milliseconds: 200),
-                                      padding: const EdgeInsets.symmetric(vertical: 12),
+                                      curve: Curves.easeInOut,
                                       decoration: BoxDecoration(
                                         color: !_isLogin
                                             ? (isDark ? const Color(0xFF334155) : Colors.white)
                                             : Colors.transparent,
-                                        borderRadius: BorderRadius.circular(15),
-                                        boxShadow: !_isLogin && !isDark
+                                        borderRadius: BorderRadius.circular(50),
+                                        boxShadow: !_isLogin
                                             ? [
                                                 BoxShadow(
-                                                  color: const Color(0xFF3B82F6).withOpacity(0.10),
+                                                  color: const Color(0xFF2563EB).withValues(alpha: isDark ? 0.3 : 0.08),
                                                   blurRadius: 8,
                                                   spreadRadius: 0,
                                                   offset: const Offset(0, 2),
@@ -568,16 +569,16 @@ class _AuthPageState extends ConsumerState<AuthPage> {
                                               ]
                                             : null,
                                       ),
+                                      alignment: Alignment.center,
                                       child: Text(
                                         ref.t('authRegister'),
-                                        style: AppTextStyles.bodyBold(isDark: isDark).copyWith(
+                                        style: GoogleFonts.plusJakartaSans(
                                           color: !_isLogin
-                                              ? const Color(0xFF3B82F6)
+                                              ? const Color(0xFF2563EB)
                                               : (isDark ? AppColors.textMutedDark : const Color(0xFF64748B)),
                                           fontSize: 14.5,
-                                          fontWeight: !_isLogin ? FontWeight.w700 : FontWeight.w500,
+                                          fontWeight: !_isLogin ? FontWeight.w700 : FontWeight.w600,
                                         ),
-                                        textAlign: TextAlign.center,
                                       ),
                                     ),
                                   ),
@@ -585,30 +586,74 @@ class _AuthPageState extends ConsumerState<AuthPage> {
                               ],
                             ),
                           ),
-                          const SizedBox(height: 24),
+                          const SizedBox(height: 20),
 
-                          // Form Inputs
-                          if (_error != null) ...[
-                            Container(
-                              width: double.infinity,
-                              padding: const EdgeInsets.all(12),
-                              decoration: BoxDecoration(
-                                color: Colors.red[50]!.withOpacity(isDark ? 0.15 : 0.9),
-                                border: Border.all(
-                                  color: Colors.red[200]!.withOpacity(isDark ? 0.3 : 0.9),
-                                ),
-                                borderRadius: BorderRadius.circular(12),
-                              ),
-                              child: Text(
-                                _error!,
-                                style: AppTextStyles.small(
-                                  color: isDark ? Colors.red[300] : Colors.red[700],
-                                ),
-                                textAlign: TextAlign.center,
-                              ),
+                          // Error Alert Banner (Refined, modern with icon)
+                          AnimatedSwitcher(
+                            duration: const Duration(milliseconds: 250),
+                            transitionBuilder: (child, anim) => FadeTransition(
+                              opacity: anim,
+                              child: SizeTransition(sizeFactor: anim, child: child),
                             ),
-                            const SizedBox(height: 16),
-                          ],
+                            child: _error != null
+                                ? Container(
+                                    key: ValueKey<String>(_error!),
+                                    margin: const EdgeInsets.only(bottom: 18),
+                                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                                    decoration: BoxDecoration(
+                                      color: isDark
+                                          ? const Color(0xFF450A0A).withValues(alpha: 0.35)
+                                          : const Color(0xFFFEF2F2),
+                                      borderRadius: BorderRadius.circular(16),
+                                      border: Border.all(
+                                        color: isDark
+                                            ? const Color(0xFFDC2626).withValues(alpha: 0.35)
+                                            : const Color(0xFFFECACA),
+                                        width: 1.2,
+                                      ),
+                                      boxShadow: [
+                                        BoxShadow(
+                                          color: Colors.red.withValues(alpha: isDark ? 0.15 : 0.05),
+                                          blurRadius: 10,
+                                          offset: const Offset(0, 3),
+                                        ),
+                                      ],
+                                    ),
+                                    child: Row(
+                                      crossAxisAlignment: CrossAxisAlignment.center,
+                                      children: [
+                                        Container(
+                                          width: 30,
+                                          height: 30,
+                                          decoration: BoxDecoration(
+                                            color: Colors.red.withValues(alpha: 0.12),
+                                            shape: BoxShape.circle,
+                                          ),
+                                          child: const Center(
+                                            child: Icon(
+                                              Icons.error_outline_rounded,
+                                              color: Color(0xFFDC2626),
+                                              size: 17,
+                                            ),
+                                          ),
+                                        ),
+                                        const SizedBox(width: 12),
+                                        Expanded(
+                                          child: Text(
+                                            _error!,
+                                            style: GoogleFonts.plusJakartaSans(
+                                              fontSize: 12.5,
+                                              height: 1.45,
+                                              fontWeight: FontWeight.w600,
+                                              color: isDark ? const Color(0xFFFCA5A5) : const Color(0xFFB91C1C),
+                                            ),
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  )
+                                : const SizedBox.shrink(),
+                          ),
 
                           if (!_isLogin) ...[
                             CustomInput(
@@ -731,91 +776,92 @@ class _AuthPageState extends ConsumerState<AuthPage> {
                               ),
                             ),
                           ],
-                          const SizedBox(height: 20),
-
-                          // Mandatory Checkbox for Terms & Privacy
-                          InkWell(
-                            onTap: () {
-                              setState(() {
-                                _acceptedTerms = !_acceptedTerms;
-                                if (_acceptedTerms) _error = null;
-                              });
-                            },
-                            borderRadius: BorderRadius.circular(8),
-                            child: Padding(
-                              padding: const EdgeInsets.symmetric(vertical: 4.0),
-                              child: Row(
-                                crossAxisAlignment: CrossAxisAlignment.center,
-                                children: [
-                                  CustomCheckbox(
-                                    value: _acceptedTerms,
-                                    onChanged: (val) {
-                                      setState(() {
-                                        _acceptedTerms = val;
-                                        if (_acceptedTerms) _error = null;
-                                      });
-                                    },
-                                  ),
-                                  const SizedBox(width: 10),
-                                  Expanded(
-                                    child: Wrap(
-                                      crossAxisAlignment: WrapCrossAlignment.center,
-                                      children: [
-                                        Text(
-                                          '${ref.t('acceptTermsCheckbox')} ',
-                                          style: GoogleFonts.plusJakartaSans(
-                                            fontSize: 12,
-                                            color: isDark ? AppColors.textMutedDark : const Color(0xFF475569),
-                                          ),
-                                        ),
-                                        GestureDetector(
-                                          onTap: () => showLegalModal(
-                                            context,
-                                            title: ref.t('termsTitle'),
-                                            content: ref.t('termsContent'),
-                                            closeLabel: ref.t('close'),
-                                          ),
-                                          child: Text(
-                                            ref.t('terms'),
-                                            style: GoogleFonts.plusJakartaSans(
-                                              fontSize: 12,
-                                              fontWeight: FontWeight.w600,
-                                              color: const Color(0xFF2563EB),
-                                              decoration: TextDecoration.underline,
-                                            ),
-                                          ),
-                                        ),
-                                        Text(
-                                          ' ${ref.t('andOur')} ',
-                                          style: GoogleFonts.plusJakartaSans(
-                                            fontSize: 12,
-                                            color: isDark ? AppColors.textMutedDark : const Color(0xFF475569),
-                                          ),
-                                        ),
-                                        GestureDetector(
-                                          onTap: () => showLegalModal(
-                                            context,
-                                            title: ref.t('privacyTitle'),
-                                            content: ref.t('privacyContent'),
-                                            closeLabel: ref.t('close'),
-                                          ),
-                                          child: Text(
-                                            ref.t('privacyPolicy'),
-                                            style: GoogleFonts.plusJakartaSans(
-                                              fontSize: 12,
-                                              fontWeight: FontWeight.w600,
-                                              color: const Color(0xFF2563EB),
-                                              decoration: TextDecoration.underline,
-                                            ),
-                                          ),
-                                        ),
-                                      ],
+                          // Mandatory Checkbox for Terms & Privacy (Registration only)
+                          if (!_isLogin) ...[
+                            const SizedBox(height: 20),
+                            InkWell(
+                              onTap: () {
+                                setState(() {
+                                  _acceptedTerms = !_acceptedTerms;
+                                  if (_acceptedTerms) _error = null;
+                                });
+                              },
+                              borderRadius: BorderRadius.circular(8),
+                              child: Padding(
+                                padding: const EdgeInsets.symmetric(vertical: 4.0),
+                                child: Row(
+                                  crossAxisAlignment: CrossAxisAlignment.center,
+                                  children: [
+                                    CustomCheckbox(
+                                      value: _acceptedTerms,
+                                      onChanged: (val) {
+                                        setState(() {
+                                          _acceptedTerms = val;
+                                          if (_acceptedTerms) _error = null;
+                                        });
+                                      },
                                     ),
-                                  ),
-                                ],
+                                    const SizedBox(width: 10),
+                                    Expanded(
+                                      child: Wrap(
+                                        crossAxisAlignment: WrapCrossAlignment.center,
+                                        children: [
+                                          Text(
+                                            '${ref.t('acceptTermsCheckbox')} ',
+                                            style: GoogleFonts.plusJakartaSans(
+                                              fontSize: 12,
+                                              color: isDark ? AppColors.textMutedDark : const Color(0xFF475569),
+                                            ),
+                                          ),
+                                          GestureDetector(
+                                            onTap: () => showLegalModal(
+                                              context,
+                                              title: ref.t('termsTitle'),
+                                              content: ref.t('termsContent'),
+                                              closeLabel: ref.t('close'),
+                                            ),
+                                            child: Text(
+                                              ref.t('terms'),
+                                              style: GoogleFonts.plusJakartaSans(
+                                                fontSize: 12,
+                                                fontWeight: FontWeight.w600,
+                                                color: const Color(0xFF2563EB),
+                                                decoration: TextDecoration.underline,
+                                              ),
+                                            ),
+                                          ),
+                                          Text(
+                                            ' ${ref.t('andOur')} ',
+                                            style: GoogleFonts.plusJakartaSans(
+                                              fontSize: 12,
+                                              color: isDark ? AppColors.textMutedDark : const Color(0xFF475569),
+                                            ),
+                                          ),
+                                          GestureDetector(
+                                            onTap: () => showLegalModal(
+                                              context,
+                                              title: ref.t('privacyTitle'),
+                                              content: ref.t('privacyContent'),
+                                              closeLabel: ref.t('close'),
+                                            ),
+                                            child: Text(
+                                              ref.t('privacyPolicy'),
+                                              style: GoogleFonts.plusJakartaSans(
+                                                fontSize: 12,
+                                                fontWeight: FontWeight.w600,
+                                                color: const Color(0xFF2563EB),
+                                                decoration: TextDecoration.underline,
+                                              ),
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                  ],
+                                ),
                               ),
                             ),
-                          ),
+                          ],
                           const SizedBox(height: 20),
 
                           // Submit Action CTA Button
@@ -878,7 +924,7 @@ class _AuthPageState extends ConsumerState<AuthPage> {
                                                   ? null
                                                   : [
                                                       BoxShadow(
-                                                        color: Colors.black.withOpacity(0.08),
+                                                        color: Colors.black.withValues(alpha: 0.08),
                                                         blurRadius: 6,
                                                         offset: const Offset(0, 2),
                                                       ),
@@ -918,7 +964,7 @@ class _AuthPageState extends ConsumerState<AuthPage> {
                                         ? null
                                         : [
                                             BoxShadow(
-                                              color: Colors.black.withOpacity(0.06),
+                                              color: Colors.black.withValues(alpha: 0.06),
                                               blurRadius: 6,
                                               offset: const Offset(0, 2),
                                             ),
