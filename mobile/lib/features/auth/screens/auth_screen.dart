@@ -14,6 +14,7 @@ import '../../../core/widgets/responsive_layout.dart';
 import '../../../shared/utils/localization.dart';
 import '../../../shared/widgets/button.dart';
 import '../../../shared/widgets/card.dart';
+import '../../../shared/widgets/custom_checkbox.dart';
 import '../../../shared/widgets/google_logo.dart';
 import '../../../shared/widgets/input.dart';
 import '../../../shared/widgets/legal_modal.dart';
@@ -746,22 +747,14 @@ class _AuthPageState extends ConsumerState<AuthPage> {
                               child: Row(
                                 crossAxisAlignment: CrossAxisAlignment.center,
                                 children: [
-                                  SizedBox(
-                                    width: 24,
-                                    height: 24,
-                                    child: Checkbox(
-                                      value: _acceptedTerms,
-                                      activeColor: const Color(0xFF2563EB),
-                                      shape: RoundedRectangleBorder(
-                                        borderRadius: BorderRadius.circular(5),
-                                      ),
-                                      onChanged: (val) {
-                                        setState(() {
-                                          _acceptedTerms = val ?? false;
-                                          if (_acceptedTerms) _error = null;
-                                        });
-                                      },
-                                    ),
+                                  CustomCheckbox(
+                                    value: _acceptedTerms,
+                                    onChanged: (val) {
+                                      setState(() {
+                                        _acceptedTerms = val;
+                                        if (_acceptedTerms) _error = null;
+                                      });
+                                    },
                                   ),
                                   const SizedBox(width: 10),
                                   Expanded(
