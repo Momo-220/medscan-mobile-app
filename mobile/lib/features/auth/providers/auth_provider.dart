@@ -121,10 +121,16 @@ class AuthNotifier extends Notifier<AsyncValue<User?>> {
         } else {
           try {
             final doc = await FirebaseFirestore.instance.collection('users').doc(credential.user!.uid).get();
-            final firestorePhoto = doc.data()?['photo_url'] as String?;
+            final data = doc.data();
+            final firestorePhoto = data?['photo_url'] as String?;
             if (firestorePhoto != null && firestorePhoto.isNotEmpty) {
               await prefs.setLocalAvatar(firestorePhoto);
               await prefs.setAvatarCompleted(true);
+            }
+            final doctorId = data?['doctor_id'] as String?;
+            if (doctorId != null && doctorId.isNotEmpty) {
+              await prefs.setSelectedDoctorId(doctorId);
+              await prefs.setDoctorCompleted(true);
             }
           } catch (_) {}
         }
@@ -297,16 +303,23 @@ class AuthNotifier extends Notifier<AsyncValue<User?>> {
         if (photoUrl != null && photoUrl.isNotEmpty) {
           await prefs.setLocalAvatar(photoUrl);
           await prefs.setAvatarCompleted(true);
-        } else {
-          try {
-            final doc = await FirebaseFirestore.instance.collection('users').doc(gUser.uid).get();
-            final firestorePhoto = doc.data()?['photo_url'] as String?;
+        }
+        try {
+          final doc = await FirebaseFirestore.instance.collection('users').doc(gUser.uid).get();
+          final data = doc.data();
+          if (data != null) {
+            final firestorePhoto = data['photo_url'] as String?;
             if (firestorePhoto != null && firestorePhoto.isNotEmpty) {
               await prefs.setLocalAvatar(firestorePhoto);
               await prefs.setAvatarCompleted(true);
             }
-          } catch (_) {}
-        }
+            final doctorId = data['doctor_id'] as String?;
+            if (doctorId != null && doctorId.isNotEmpty) {
+              await prefs.setSelectedDoctorId(doctorId);
+              await prefs.setDoctorCompleted(true);
+            }
+          }
+        } catch (_) {}
       }
       await _saveToken();
       state = AsyncValue.data(userCredential.user);
@@ -458,16 +471,23 @@ class AuthNotifier extends Notifier<AsyncValue<User?>> {
         if (photoUrl != null && photoUrl.isNotEmpty) {
           await prefs.setLocalAvatar(photoUrl);
           await prefs.setAvatarCompleted(true);
-        } else {
-          try {
-            final doc = await FirebaseFirestore.instance.collection('users').doc(firebaseUser.uid).get();
-            final firestorePhoto = doc.data()?['photo_url'] as String?;
+        }
+        try {
+          final doc = await FirebaseFirestore.instance.collection('users').doc(firebaseUser.uid).get();
+          final data = doc.data();
+          if (data != null) {
+            final firestorePhoto = data['photo_url'] as String?;
             if (firestorePhoto != null && firestorePhoto.isNotEmpty) {
               await prefs.setLocalAvatar(firestorePhoto);
               await prefs.setAvatarCompleted(true);
             }
-          } catch (_) {}
-        }
+            final doctorId = data['doctor_id'] as String?;
+            if (doctorId != null && doctorId.isNotEmpty) {
+              await prefs.setSelectedDoctorId(doctorId);
+              await prefs.setDoctorCompleted(true);
+            }
+          }
+        } catch (_) {}
 
         // 7. Sauvegarde locale des identifiants Apple (sub & transfer_sub)
         if (appleSub != null) {

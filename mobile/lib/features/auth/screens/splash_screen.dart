@@ -1,11 +1,13 @@
 import 'dart:async';
 import 'dart:math';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../core/di/providers.dart';
+import '../../chat/providers/doctor_provider.dart';
 
 class SplashPage extends ConsumerStatefulWidget {
   const SplashPage({super.key});
@@ -69,12 +71,10 @@ class _SplashPageState extends ConsumerState<SplashPage>
     User? user;
     try {
       user = FirebaseAuth.instance.currentUser;
-      if (user == null) {
-        user = await FirebaseAuth.instance
-            .authStateChanges()
-            .first
-            .timeout(const Duration(milliseconds: 1500), onTimeout: () => FirebaseAuth.instance.currentUser);
-      }
+      user ??= await FirebaseAuth.instance
+          .authStateChanges()
+          .first
+          .timeout(const Duration(milliseconds: 1500), onTimeout: () => FirebaseAuth.instance.currentUser);
     } catch (e) {
       debugPrint('Firebase Auth check failed: $e');
     }
@@ -147,22 +147,36 @@ class _SplashPageState extends ConsumerState<SplashPage>
         });
       }
 
-      // Si l'utilisateur est connecté avec un compte réel mais n'a pas encore choisi d'avatar,
-      // on lui propose l'écran des avatars
-      final avatarCompleted = prefs.isAvatarCompleted();
-      final localAvatar = prefs.getLocalAvatar();
-      final hasAvatar = (localAvatar != null && localAvatar.isNotEmpty) ||
-          (user?.photoURL != null && user!.photoURL!.contains('avatar'));
+      // Silently sync doctor and avatar in background if missing locally
+      if (user != null) {
+        FirebaseFirestore.instance.collection('users').doc(user.uid).get().then((doc) {
+          final data = doc.data();
+          if (data != null) {
+            final fDoctor = data['doctor_id'] as String?;
+            if (fDoctor != null && fDoctor.isNotEmpty) {
+              prefs.setSelectedDoctorId(fDoctor);
+              prefs.setDoctorCompleted(true);
+              try {
+                ref.read(doctorProvider.notifier).refreshFromPrefs();
+              } catch (_) {}
+            }
+            final fAvatar = data['photo_url'] as String?;
+            if (fAvatar != null && fAvatar.isNotEmpty) {
+              prefs.setLocalAvatar(fAvatar);
+              prefs.setAvatarCompleted(true);
+            }
+          }
+        }).catchError((err) {
+          debugPrint('Silent profile sync error in splash: $err');
+        });
+      }
+
+      // Mark completed for existing users so they are never prompted again
+      await prefs.setAvatarCompleted(true);
+      await prefs.setDoctorCompleted(true);
 
       if (!mounted) return;
-
-      if (user != null && !hasTrialToken && (!avatarCompleted || !hasAvatar)) {
-        context.go('/choose-avatar');
-      } else if (user != null && !hasTrialToken && !prefs.isDoctorCompleted()) {
-        context.go('/choose-doctor');
-      } else {
-        context.go('/home');
-      }
+      context.go('/home');
     } else {
       if (!mounted) return;
       // User has no active session: check onboarding

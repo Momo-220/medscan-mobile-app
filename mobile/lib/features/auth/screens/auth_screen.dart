@@ -20,6 +20,7 @@ import '../../../shared/widgets/input.dart';
 import '../../../shared/widgets/legal_modal.dart';
 import '../../../shared/services/username_service.dart';
 import '../../../shared/utils/email_validator.dart';
+import '../../chat/providers/doctor_provider.dart';
 import '../providers/auth_provider.dart';
 
 class AuthPage extends ConsumerStatefulWidget {
@@ -273,42 +274,55 @@ class _AuthPageState extends ConsumerState<AuthPage> {
     final user = FirebaseAuth.instance.currentUser;
     final prefs = ref.read(sharedPrefsServiceProvider);
 
-    // 1. Check if user already has an avatar (locally or in Firebase Auth)
-    final localAvatar = prefs.getLocalAvatar();
-    final firebaseAvatar = user?.photoURL;
-    String? existingAvatar = (localAvatar != null && localAvatar.isNotEmpty)
-        ? localAvatar
-        : (firebaseAvatar != null && firebaseAvatar.isNotEmpty ? firebaseAvatar : null);
-
-    // 2. If missing, look up from Firestore user document
-    if ((existingAvatar == null || existingAvatar.isEmpty) && user != null) {
-      try {
-        final doc = await FirebaseFirestore.instance.collection('users').doc(user.uid).get();
-        final firestoreAvatar = doc.data()?['photo_url'] as String?;
-        if (firestoreAvatar != null && firestoreAvatar.isNotEmpty) {
-          existingAvatar = firestoreAvatar;
-        }
-      } catch (_) {}
+    String? existingAvatar = prefs.getLocalAvatar();
+    if (existingAvatar == null || existingAvatar.isEmpty) {
+      existingAvatar = user?.photoURL;
     }
 
-    if (existingAvatar != null && existingAvatar.isNotEmpty) {
-      await prefs.setLocalAvatar(existingAvatar);
-      await prefs.setAvatarCompleted(true);
-      if (mounted) {
-        if (!prefs.isDoctorCompleted()) {
-          context.go('/choose-doctor');
-        } else {
-          context.go('/home');
+    String? existingDoctorId = prefs.getSelectedDoctorId();
+
+    // 1. Restore from Firestore if user document exists
+    if (user != null) {
+      try {
+        final doc = await FirebaseFirestore.instance.collection('users').doc(user.uid).get();
+        final data = doc.data();
+        if (data != null) {
+          final firestoreAvatar = data['photo_url'] as String?;
+          if (firestoreAvatar != null && firestoreAvatar.isNotEmpty) {
+            existingAvatar = firestoreAvatar;
+            await prefs.setLocalAvatar(firestoreAvatar);
+            await prefs.setAvatarCompleted(true);
+          }
+          final firestoreDoctor = data['doctor_id'] as String?;
+          if (firestoreDoctor != null && firestoreDoctor.isNotEmpty) {
+            existingDoctorId = firestoreDoctor;
+            await prefs.setSelectedDoctorId(firestoreDoctor);
+            await prefs.setDoctorCompleted(true);
+            try {
+              ref.read(doctorProvider.notifier).refreshFromPrefs();
+            } catch (_) {}
+          }
         }
+      } catch (e) {
+        debugPrint('Error restoring user profile from Firestore: $e');
       }
-    } else if (isNewRegistration) {
-      if (mounted) {
-        context.go('/choose-avatar');
-      }
+    }
+
+    if (!mounted) return;
+
+    // RÈGLE : On ne demande le choix d'avatar et de médecin QU'AUX utilisateurs qui s'inscrivent
+    // pour la première fois.
+    // Pour ceux qui se connectent (ou qui ont déjà choisi auparavant) : direct vers l'accueil !
+    if (isNewRegistration && (existingAvatar == null || existingAvatar.isEmpty)) {
+      context.go('/choose-avatar');
+    } else if (isNewRegistration && (existingDoctorId == null || existingDoctorId.isEmpty)) {
+      context.go('/choose-doctor');
     } else {
-      // User logged in but has no avatar chosen yet
+      // Utilisateur existant qui se connecte : on marque les étapes complétées et on va à l'accueil
+      await prefs.setAvatarCompleted(true);
+      await prefs.setDoctorCompleted(true);
       if (mounted) {
-        context.go('/choose-avatar');
+        context.go('/home');
       }
     }
   }
@@ -331,7 +345,7 @@ class _AuthPageState extends ConsumerState<AuthPage> {
       if (mounted) {
         final user = FirebaseAuth.instance.currentUser;
         if (user != null) {
-          await _navigateAfterAuth(isNewRegistration: false);
+          await _navigateAfterAuth(isNewRegistration: !_isLogin);
         } else {
           setState(() {
             _loading = false;
@@ -364,7 +378,7 @@ class _AuthPageState extends ConsumerState<AuthPage> {
       if (mounted) {
         final user = FirebaseAuth.instance.currentUser;
         if (user != null) {
-          await _navigateAfterAuth(isNewRegistration: false);
+          await _navigateAfterAuth(isNewRegistration: !_isLogin);
         } else {
           setState(() { _loading = false; });
         }
