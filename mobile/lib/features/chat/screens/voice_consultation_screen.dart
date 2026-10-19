@@ -25,7 +25,12 @@ import '../providers/doctor_provider.dart';
 /// 5. Text-only AI response with song lyrics / karaoke typing (zero TTS / audio playback).
 /// 6. Immediate manual finish button and multi-language support (French, English, Turkish).
 class VoiceConsultationScreen extends ConsumerStatefulWidget {
-  const VoiceConsultationScreen({super.key});
+  final String? mode;
+
+  const VoiceConsultationScreen({
+    super.key,
+    this.mode,
+  });
 
   @override
   ConsumerState<VoiceConsultationScreen> createState() => _VoiceConsultationScreenState();
@@ -33,6 +38,9 @@ class VoiceConsultationScreen extends ConsumerStatefulWidget {
 
 class _VoiceConsultationScreenState extends ConsumerState<VoiceConsultationScreen>
     with TickerProviderStateMixin {
+  String get activeMode => widget.mode ?? ref.read(chatProvider.notifier).mode;
+  bool get isConsultation => activeMode == 'consultation';
+
   // Service abstraction for speech recognition (10-second silence detection)
   final SpeechRecognitionService _speechService = SpeechRecognitionService(
     silenceDuration: const Duration(seconds: 10),
@@ -70,6 +78,12 @@ class _VoiceConsultationScreenState extends ConsumerState<VoiceConsultationScree
   @override
   void initState() {
     super.initState();
+
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (widget.mode != null && widget.mode != ref.read(chatProvider.notifier).mode) {
+        ref.read(chatProvider.notifier).setMode(widget.mode!);
+      }
+    });
 
     // Pulse animation for the sphere while idle/listening
     _spherePulseController = AnimationController(
@@ -256,14 +270,17 @@ class _VoiceConsultationScreenState extends ConsumerState<VoiceConsultationScree
         'contraindications': s.contraindications,
       }).toList();
 
+      final medCtx = ref.read(chatProvider.notifier).medicationContext;
+
       final client = ref.read(apiClientProvider);
       final response = await client.post(
         '/assistant/chat',
         data: {
           'message': queryText,
           'language': lang,
-          'mode': 'consultation',
+          'mode': activeMode,
           'include_history': false,
+          if (medCtx != null && medCtx.isNotEmpty) 'medication_context': medCtx,
           if (localScans.isNotEmpty) 'local_scans': localScans,
         },
       );
@@ -278,11 +295,41 @@ class _VoiceConsultationScreenState extends ConsumerState<VoiceConsultationScree
         recommendedMed = rec;
       }
     } catch (_) {
-      doctorReply = _getClinicalFallback(queryText, lang);
+      doctorReply = _getFallbackReply(queryText, lang);
     }
 
     if (doctorReply.isEmpty) {
-      doctorReply = _getClinicalFallback(queryText, lang);
+      doctorReply = _getFallbackReply(queryText, lang);
+    }
+
+    if (recommendedMed == null && !isConsultation) {
+      final pharmacy = ref.read(pharmacyProvider);
+      final q = queryText.toLowerCase();
+      RecentScan? matchingScan;
+      try {
+        matchingScan = pharmacy.allScans.firstWhere(
+          (s) {
+            final n = s.medicationName.toLowerCase();
+            final ind = (s.analysisData?['indications'] ?? '').toString().toLowerCase();
+            return q.contains(n) ||
+                (q.contains('tête') && (n.contains('doliprane') || n.contains('paracétamol') || n.contains('paracetamol') || n.contains('ibuprof') || ind.contains('douleur') || ind.contains('céphalée') || ind.contains('tête'))) ||
+                (q.contains('estomac') && (n.contains('gaviscon') || n.contains('pantoprazole') || n.contains('oméprazole') || ind.contains('estomac') || ind.contains('brûlure')));
+          },
+        );
+      } catch (_) {
+        matchingScan = null;
+      }
+      if (matchingScan != null) {
+        recommendedMed = {
+          'id': matchingScan.scanId.isNotEmpty ? matchingScan.scanId : matchingScan.id,
+          'scan_id': matchingScan.scanId.isNotEmpty ? matchingScan.scanId : matchingScan.id,
+          'medication_name': matchingScan.medicationName,
+          'dosage': matchingScan.dosage ?? '',
+          'form': matchingScan.form ?? '',
+          'category': matchingScan.category,
+          'image_url': matchingScan.imageUrl,
+        };
+      }
     }
 
     if (mounted) {
@@ -432,6 +479,69 @@ class _VoiceConsultationScreenState extends ConsumerState<VoiceConsultationScree
     }
   }
 
+  String _getFallbackReply(String query, String lang) {
+    if (isConsultation) {
+      return _getClinicalFallback(query, lang);
+    }
+    return _getChatFallback(query, lang);
+  }
+
+  String _getChatFallback(String query, String lang) {
+    final q = query.toLowerCase();
+    final isFrench = lang == 'fr';
+    final isTurkish = lang == 'tr';
+
+    final pharmacy = ref.read(pharmacyProvider);
+    final headacheMeds = pharmacy.allScans.where((s) {
+      final name = s.medicationName.toLowerCase();
+      final ind = (s.analysisData?['indications'] ?? '').toString().toLowerCase();
+      return name.contains('doliprane') ||
+          name.contains('paracétamol') ||
+          name.contains('paracetamol') ||
+          name.contains('ibuprof') ||
+          name.contains('aspirin') ||
+          name.contains('advil') ||
+          name.contains('dafalgan') ||
+          name.contains('efferalgan') ||
+          ind.contains('douleur') ||
+          ind.contains('céphalée') ||
+          ind.contains('tête') ||
+          ind.contains('pain') ||
+          ind.contains('headache');
+    }).toList();
+
+    if (headacheMeds.isNotEmpty && (q.contains('tête') || q.contains('mal') || q.contains('migraine') || q.contains('douleur') || q.contains('headache') || q.contains('pain'))) {
+      final med = headacheMeds.first;
+      final dosageStr = (med.dosage != null && med.dosage!.isNotEmpty) ? ' (${med.dosage})' : '';
+      if (isFrench) {
+        return 'Dans votre pharmacie, vous disposez de ${med.medicationName}$dosageStr. C\'est adapté pour soulager les maux de tête en respectant un intervalle de 4 à 6 heures entre les prises.';
+      } else if (isTurkish) {
+        return 'İlaç dolabınızda ${med.medicationName}$dosageStr bulunmaktadır. Baş ağrısını dindirmek için uygundur.';
+      } else {
+        return 'In your medicine cabinet, you have ${med.medicationName}$dosageStr, which is suitable for headaches with 4 to 6 hours between doses.';
+      }
+    }
+
+    if (isFrench) {
+      if (q.contains('tête') || q.contains('migraine') || q.contains('mal')) {
+        return 'Pour soulager un mal de tête, le paracétamol est généralement recommandé en première intention (1g par prise, espacé de 4 à 6 heures, max 3g/jour). Hydratez-vous bien et reposez-vous.';
+      } else if (q.contains('estomac') || q.contains('ventre') || q.contains('brûlure')) {
+        return 'Pour les brûlures d\'estomac, un antiacide ou protecteur gastrique peut aider. Évitez les repas trop gras, le café et les anti-inflammatoires.';
+      }
+      return 'J\'ai bien noté votre demande. Veillez à toujours respecter la posologie indiquée sur vos boîtes de médicaments et demandez conseil à votre pharmacien.';
+    } else if (isTurkish) {
+      if (q.contains('baş') || q.contains('ağrı')) {
+        return 'Baş ağrısı için parasetamol genellikle ilk seçenek olarak önerilir. Bol su için ve dinlenin.';
+      }
+      return 'Sorunuzu kaydettim. İlaçlarınızı her zaman kutudaki talimatlara uygun şekilde kullanınız.';
+    } else {
+      if (q.contains('headache') || q.contains('migraine') || q.contains('pain')) {
+        return 'For headaches, paracetamol is generally recommended first-line (spaced 4 to 6 hours apart). Stay hydrated and rest in a quiet space.';
+      }
+      return 'I have noted your pharmaceutical question. Always follow the dosage instructions on your packaging.';
+    }
+  }
+
   String _getClinicalFallback(String query, String lang) {
     final q = query.toLowerCase();
     if (lang == 'fr') {
@@ -497,9 +607,13 @@ class _VoiceConsultationScreenState extends ConsumerState<VoiceConsultationScree
                 ),
                 const SizedBox(height: 16),
                 Text(
-                  isFrench
-                      ? 'Écrire vos symptômes'
-                      : (isTurkish ? 'Belirtilerinizi yazın' : 'Type your symptoms'),
+                  isConsultation
+                      ? (isFrench
+                          ? 'Écrire vos symptômes'
+                          : (isTurkish ? 'Belirtilerinizi yazın' : 'Type your symptoms'))
+                      : (isFrench
+                          ? 'Poser votre question'
+                          : (isTurkish ? 'Sorunuzu yazın' : 'Ask your question')),
                   style: GoogleFonts.plusJakartaSans(
                     fontSize: 16,
                     fontWeight: FontWeight.w700,
@@ -516,9 +630,13 @@ class _VoiceConsultationScreenState extends ConsumerState<VoiceConsultationScree
                     color: isDark ? Colors.white : const Color(0xFF0F172A),
                   ),
                   decoration: InputDecoration(
-                    hintText: isFrench
-                        ? 'Décrivez vos symptômes ou votre question...'
-                        : (isTurkish ? 'Semptomlarınızı veya sorunuzu açıklayın...' : 'Describe your symptoms or question...'),
+                    hintText: isConsultation
+                        ? (isFrench
+                            ? 'Décrivez vos symptômes ou votre question...'
+                            : (isTurkish ? 'Semptomlarınızı veya sorunuzu açıklayın...' : 'Describe your symptoms or question...'))
+                        : (isFrench
+                            ? 'Demandez un conseil, un médicament...'
+                            : (isTurkish ? 'Bir ilaç veya tavsiye sorun...' : 'Ask about a medicine, dosage...')),
                     hintStyle: GoogleFonts.plusJakartaSans(
                       fontSize: 14,
                       color: isDark ? const Color(0xFF64748B) : const Color(0xFF94A3B8),
@@ -533,7 +651,10 @@ class _VoiceConsultationScreenState extends ConsumerState<VoiceConsultationScree
                     ),
                     focusedBorder: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(16),
-                      borderSide: const BorderSide(color: Color(0xFF10B981), width: 1.5),
+                      borderSide: BorderSide(
+                        color: isConsultation ? const Color(0xFF10B981) : const Color(0xFF2563EB),
+                        width: 1.5,
+                      ),
                     ),
                   ),
                 ),
@@ -567,7 +688,7 @@ class _VoiceConsultationScreenState extends ConsumerState<VoiceConsultationScree
                     Expanded(
                       child: ElevatedButton(
                         style: ElevatedButton.styleFrom(
-                          backgroundColor: const Color(0xFF10B981),
+                          backgroundColor: isConsultation ? const Color(0xFF10B981) : const Color(0xFF2563EB),
                           foregroundColor: Colors.white,
                           padding: const EdgeInsets.symmetric(vertical: 14),
                           elevation: 0,
@@ -581,7 +702,9 @@ class _VoiceConsultationScreenState extends ConsumerState<VoiceConsultationScree
                           }
                         },
                         child: Text(
-                          isFrench ? 'Consulter' : (isTurkish ? 'Danış' : 'Consult'),
+                          isConsultation
+                              ? (isFrench ? 'Consulter' : (isTurkish ? 'Danış' : 'Consult'))
+                              : (isFrench ? 'Envoyer' : (isTurkish ? 'Gönder' : 'Send')),
                           style: GoogleFonts.plusJakartaSans(
                             fontWeight: FontWeight.w700,
                           ),
@@ -665,12 +788,18 @@ class _VoiceConsultationScreenState extends ConsumerState<VoiceConsultationScree
                               : Colors.white,
                           borderRadius: BorderRadius.circular(999),
                           border: Border.all(
-                            color: const Color(0xFF10B981).withValues(alpha: 0.25),
+                            color: (isConsultation
+                                    ? const Color(0xFF10B981)
+                                    : const Color(0xFF2563EB))
+                                .withValues(alpha: 0.25),
                             width: 1,
                           ),
                           boxShadow: [
                             BoxShadow(
-                              color: const Color(0xFF10B981).withValues(alpha: 0.08),
+                              color: (isConsultation
+                                      ? const Color(0xFF10B981)
+                                      : const Color(0xFF2563EB))
+                                  .withValues(alpha: 0.08),
                               blurRadius: 10,
                               offset: const Offset(0, 2),
                             ),
@@ -704,10 +833,31 @@ class _VoiceConsultationScreenState extends ConsumerState<VoiceConsultationScree
                               ),
                             ),
                             const SizedBox(width: 6),
-                            const Icon(
-                              CupertinoIcons.checkmark_seal_fill,
-                              color: Color(0xFF10B981),
-                              size: 14,
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+                              decoration: BoxDecoration(
+                                color: (isConsultation
+                                        ? const Color(0xFF10B981)
+                                        : const Color(0xFF2563EB))
+                                    .withValues(alpha: 0.12),
+                                borderRadius: BorderRadius.circular(999),
+                              ),
+                              child: Text(
+                                isConsultation
+                                    ? (lang == 'fr'
+                                        ? 'Consultation'
+                                        : (lang == 'tr' ? 'Konsültasyon' : 'Consultation'))
+                                    : (lang == 'fr'
+                                        ? 'Pharmacie'
+                                        : (lang == 'tr' ? 'Eczane' : 'Pharmacy')),
+                                style: GoogleFonts.plusJakartaSans(
+                                  fontSize: 10,
+                                  fontWeight: FontWeight.w700,
+                                  color: isConsultation
+                                      ? const Color(0xFF10B981)
+                                      : const Color(0xFF2563EB),
+                                ),
+                              ),
                             ),
                           ],
                         ),
@@ -797,7 +947,7 @@ class _VoiceConsultationScreenState extends ConsumerState<VoiceConsultationScree
                                   return Center(
                                     child: Icon(
                                       CupertinoIcons.mic_fill,
-                                      color: const Color(0xFF10B981),
+                                      color: isConsultation ? const Color(0xFF10B981) : const Color(0xFF2563EB),
                                       size: effectiveSize * 0.4,
                                     ),
                                   );
@@ -900,9 +1050,10 @@ class _VoiceConsultationScreenState extends ConsumerState<VoiceConsultationScree
   }
 
   Color _getStatusDotColor() {
+    final primary = isConsultation ? const Color(0xFF10B981) : const Color(0xFF2563EB);
     switch (_speechService.state) {
       case SpeechState.listening:
-        return const Color(0xFF10B981);
+        return primary;
       case SpeechState.detectingSpeech:
         return const Color(0xFFEF4444);
       case SpeechState.silenceConfirmation:
@@ -910,7 +1061,7 @@ class _VoiceConsultationScreenState extends ConsumerState<VoiceConsultationScree
       case SpeechState.processing:
         return const Color(0xFFF59E0B);
       case SpeechState.responseReady:
-        return const Color(0xFF10B981);
+        return primary;
       case SpeechState.error:
         return const Color(0xFFF97316);
       default:
@@ -952,9 +1103,13 @@ class _VoiceConsultationScreenState extends ConsumerState<VoiceConsultationScree
         break;
       case SpeechState.processing:
         final docShort = ref.watch(doctorProvider).shortName;
-        label = isFrench
-            ? '$docShort analyse...'
-            : (isTurkish ? '$docShort analiz ediyor...' : '$docShort analyzing...');
+        label = isConsultation
+            ? (isFrench
+                ? '$docShort analyse vos symptômes...'
+                : (isTurkish ? '$docShort semptomları inceliyor...' : '$docShort analyzing symptoms...'))
+            : (isFrench
+                ? '$docShort consulte votre pharmacie...'
+                : (isTurkish ? '$docShort eczanenize bakıyor...' : '$docShort checking pharmacy...'));
         color = const Color(0xFFF59E0B);
         icon = CupertinoIcons.hourglass;
         break;
@@ -1041,9 +1196,13 @@ class _VoiceConsultationScreenState extends ConsumerState<VoiceConsultationScree
                 Text(
                   hasSpeech
                       ? '« $text »'
-                      : (isFrench
-                          ? 'Parlez, je vous écoute...'
-                          : (isTurkish ? 'Konuşun, dinliyorum...' : 'Speak, I am listening...')),
+                      : (isConsultation
+                          ? (isFrench
+                              ? 'Décrivez ce que vous ressentez...'
+                              : (isTurkish ? 'Nasıl hissettiğinizi anlatın...' : 'Describe how you feel...'))
+                          : (isFrench
+                              ? 'Posez votre question ou demandez un médicament...'
+                              : (isTurkish ? 'Sorunuzu veya ilacınızı sorun...' : 'Ask your question or search a medication...'))),
                   textAlign: TextAlign.center,
                   style: GoogleFonts.plusJakartaSans(
                     fontSize: 18,
@@ -1051,7 +1210,7 @@ class _VoiceConsultationScreenState extends ConsumerState<VoiceConsultationScree
                     height: 1.35,
                     letterSpacing: -0.2,
                     color: hasSpeech
-                        ? const Color(0xFF2563EB)
+                        ? (isConsultation ? const Color(0xFF10B981) : const Color(0xFF2563EB))
                         : (isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B)),
                   ),
                 ),
@@ -1060,7 +1219,7 @@ class _VoiceConsultationScreenState extends ConsumerState<VoiceConsultationScree
                   // Immediate Manual Finish Button
                   ElevatedButton.icon(
                     style: ElevatedButton.styleFrom(
-                      backgroundColor: const Color(0xFF10B981),
+                      backgroundColor: isConsultation ? const Color(0xFF10B981) : const Color(0xFF2563EB),
                       foregroundColor: Colors.white,
                       elevation: 0,
                       padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 10),
@@ -1121,13 +1280,13 @@ class _VoiceConsultationScreenState extends ConsumerState<VoiceConsultationScree
                   height: 24,
                   decoration: BoxDecoration(
                     shape: BoxShape.circle,
-                    color: const Color(0xFF10B981).withValues(alpha: 0.15),
+                    color: (isConsultation ? const Color(0xFF10B981) : const Color(0xFF2563EB)).withValues(alpha: 0.15),
                   ),
-                  child: const Center(
+                  child: Center(
                     child: Icon(
                       CupertinoIcons.waveform_path,
                       size: 13,
-                      color: Color(0xFF10B981),
+                      color: isConsultation ? const Color(0xFF10B981) : const Color(0xFF2563EB),
                     ),
                   ),
                 ),
@@ -1150,9 +1309,13 @@ class _VoiceConsultationScreenState extends ConsumerState<VoiceConsultationScree
                 const SizedBox(width: 10),
                 Flexible(
                   child: Text(
-                    isFrench
-                        ? 'Analyse de vos symptômes...'
-                        : (isTurkish ? 'Semptomlarınız analiz ediliyor...' : 'Analyzing your symptoms...'),
+                    isConsultation
+                        ? (isFrench
+                            ? 'Analyse de vos symptômes...'
+                            : (isTurkish ? 'Semptomlarınız analiz ediliyor...' : 'Analyzing your symptoms...'))
+                        : (isFrench
+                            ? 'Recherche dans votre pharmacie...'
+                            : (isTurkish ? 'İlaç dolabınız inceleniyor...' : 'Checking your pharmacy...')),
                     style: GoogleFonts.plusJakartaSans(
                       fontSize: 14,
                       fontWeight: FontWeight.w500,
@@ -1472,13 +1635,13 @@ class _VoiceConsultationScreenState extends ConsumerState<VoiceConsultationScree
                           height: 24,
                           decoration: BoxDecoration(
                             shape: BoxShape.circle,
-                            color: const Color(0xFF10B981).withValues(alpha: 0.15),
+                            color: (isConsultation ? const Color(0xFF10B981) : const Color(0xFF2563EB)).withValues(alpha: 0.15),
                           ),
-                          child: const Center(
+                          child: Center(
                             child: Icon(
                               CupertinoIcons.waveform_path,
                               size: 13,
-                              color: Color(0xFF10B981),
+                              color: isConsultation ? const Color(0xFF10B981) : const Color(0xFF2563EB),
                             ),
                           ),
                         ),
@@ -1543,10 +1706,10 @@ class _VoiceConsultationScreenState extends ConsumerState<VoiceConsultationScree
                         ),
                         children: [
                           if (showCursor)
-                            const TextSpan(
+                            TextSpan(
                               text: ' ▍',
                               style: TextStyle(
-                                color: Color(0xFF10B981),
+                                color: isConsultation ? const Color(0xFF10B981) : const Color(0xFF2563EB),
                                 fontSize: 13,
                               ),
                             ),
@@ -1592,18 +1755,20 @@ class _VoiceConsultationScreenState extends ConsumerState<VoiceConsultationScree
     final state = _speechService.state;
     final isSilenceConfirm = state == SpeechState.silenceConfirmation;
     final isDetecting = state == SpeechState.detectingSpeech;
+    final primaryColor = isConsultation ? const Color(0xFF10B981) : const Color(0xFF2563EB);
+    final detectingColor = isConsultation ? const Color(0xFF059669) : const Color(0xFF1D4ED8);
 
-    Color buttonColor = const Color(0xFF10B981);
+    Color buttonColor = primaryColor;
     IconData icon = CupertinoIcons.mic_fill;
 
     if (isSilenceConfirm) {
       buttonColor = const Color(0xFF06B6D4);
       icon = CupertinoIcons.checkmark_alt;
     } else if (isDetecting) {
-      buttonColor = const Color(0xFF059669);
+      buttonColor = detectingColor;
       icon = CupertinoIcons.waveform;
     } else if (state == SpeechState.listening) {
-      buttonColor = const Color(0xFF10B981);
+      buttonColor = primaryColor;
       icon = CupertinoIcons.mic_fill;
     }
 

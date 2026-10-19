@@ -2379,7 +2379,11 @@ class _ChatPageState extends ConsumerState<ChatPage>
                           ? _handleSend
                           : () async {
                               HapticFeedback.mediumImpact();
-                              final returnedText = await context.push<String>('/voice-consultation');
+                              final currentMode = _currentMode();
+                              final returnedText = await context.push<String>(
+                                '/voice-consultation',
+                                extra: currentMode,
+                              );
                               if (returnedText != null && returnedText.isNotEmpty && mounted) {
                                 _messageController.text = returnedText;
                                 setState(() {});

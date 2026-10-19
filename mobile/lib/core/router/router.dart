@@ -129,10 +129,18 @@ final GoRouter _router = GoRouter(
     ),
     GoRoute(
       path: '/voice-consultation',
-      pageBuilder: (context, state) => _buildSmoothPage(
-        child: const VoiceConsultationScreen(),
-        state: state,
-      ),
+      pageBuilder: (context, state) {
+        String mode = 'chat';
+        if (state.extra is String) {
+          mode = state.extra as String;
+        } else if (state.extra is Map<String, dynamic>) {
+          mode = (state.extra as Map<String, dynamic>)['mode'] ?? 'chat';
+        }
+        return _buildSmoothPage(
+          child: VoiceConsultationScreen(mode: mode),
+          state: state,
+        );
+      },
     ),
 
     // ShellRoute for Bottom Nav Tabs (Fluid, smooth transitions without sliding)
