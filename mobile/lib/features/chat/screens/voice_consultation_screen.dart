@@ -1072,11 +1072,12 @@ class _VoiceConsultationScreenState extends ConsumerState<VoiceConsultationScree
   // ── Status Chip Builder ────────────────────────────────────────────────────
 
   Widget _buildStatusChip(bool isDark, String lang) {
-    // Hide status chip during listening, speech detection, response, or idle (clean per user request)
+    // Hide status chip during listening, speech detection, response, idle, or error
     if (_speechService.state == SpeechState.responseReady ||
         _speechService.state == SpeechState.listening ||
         _speechService.state == SpeechState.detectingSpeech ||
-        _speechService.state == SpeechState.idle) {
+        _speechService.state == SpeechState.idle ||
+        _speechService.state == SpeechState.error) {
       return const SizedBox.shrink();
     }
 
@@ -1175,12 +1176,7 @@ class _VoiceConsultationScreenState extends ConsumerState<VoiceConsultationScree
       return _buildSilenceConfirmationCard(isDark, lang, textColor);
     }
 
-    // 4. Error State
-    if (_speechService.state == SpeechState.error) {
-      return _buildErrorCard(isDark, lang, textColor);
-    }
-
-    // 5. Active Voice Transcription (listening or detecting speech)
+    // 4. Active Voice Transcription (listening or detecting speech or idle/fallback)
     return ValueListenableBuilder<String>(
       valueListenable: _speechService.transcriptNotifier,
       builder: (context, transcriptText, _) {
@@ -1452,112 +1448,6 @@ class _VoiceConsultationScreenState extends ConsumerState<VoiceConsultationScree
                           : (isTurkish ? 'Tamamla' : 'Finish'),
                       style: GoogleFonts.plusJakartaSans(
                         fontSize: 13,
-                        fontWeight: FontWeight.w700,
-                      ),
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  // ── Error Card ─────────────────────────────────────────────────────────────
-
-  Widget _buildErrorCard(bool isDark, String lang, Color textColor) {
-    final isFrench = lang == 'fr';
-    final isTurkish = lang == 'tr';
-    final errorText = _speechService.errorMessage ??
-        (isFrench ? 'Erreur de reconnaissance vocale' : 'Speech recognition error');
-
-    return Center(
-      child: Container(
-        margin: const EdgeInsets.symmetric(vertical: 8),
-        padding: const EdgeInsets.all(20),
-        decoration: BoxDecoration(
-          color: isDark ? const Color(0xFF1E293B) : const Color(0xFFFFFBEB),
-          borderRadius: BorderRadius.circular(22),
-          border: Border.all(
-            color: const Color(0xFFF59E0B).withValues(alpha: 0.35),
-            width: 1,
-          ),
-        ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            Row(
-              children: [
-                const Icon(
-                  CupertinoIcons.info_circle_fill,
-                  color: Color(0xFFF59E0B),
-                  size: 22,
-                ),
-                const SizedBox(width: 10),
-                Expanded(
-                  child: Text(
-                    isFrench
-                        ? 'Information Microphone'
-                        : (isTurkish ? 'Mikrofon Bilgisi' : 'Microphone Notice'),
-                    style: GoogleFonts.plusJakartaSans(
-                      fontSize: 15,
-                      fontWeight: FontWeight.w700,
-                      color: isDark ? Colors.white : const Color(0xFF0F172A),
-                    ),
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 12),
-            Text(
-              errorText,
-              style: GoogleFonts.plusJakartaSans(
-                fontSize: 13,
-                height: 1.4,
-                color: isDark ? const Color(0xFFCBD5E1) : const Color(0xFF475569),
-              ),
-            ),
-            const SizedBox(height: 18),
-            Row(
-              children: [
-                Expanded(
-                  child: OutlinedButton(
-                    style: OutlinedButton.styleFrom(
-                      padding: const EdgeInsets.symmetric(vertical: 12),
-                      side: BorderSide(
-                        color: isDark ? Colors.white24 : const Color(0xFFCBD5E1),
-                      ),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-                    ),
-                    onPressed: () => _openKeyboardModal(isDark, lang),
-                    child: Text(
-                      isFrench ? 'Écrire au clavier' : (isTurkish ? 'Klavye kullan' : 'Use keyboard'),
-                      style: GoogleFonts.plusJakartaSans(
-                        fontSize: 12.5,
-                        fontWeight: FontWeight.w600,
-                        color: isDark ? Colors.white70 : const Color(0xFF475569),
-                      ),
-                    ),
-                  ),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: ElevatedButton(
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: const Color(0xFF10B981),
-                      foregroundColor: Colors.white,
-                      elevation: 0,
-                      padding: const EdgeInsets.symmetric(vertical: 12),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-                    ),
-                    onPressed: _initAndStartVoice,
-                    child: Text(
-                      isFrench ? 'Réessayer' : (isTurkish ? 'Tekrar dene' : 'Retry'),
-                      style: GoogleFonts.plusJakartaSans(
-                        fontSize: 12.5,
                         fontWeight: FontWeight.w700,
                       ),
                     ),

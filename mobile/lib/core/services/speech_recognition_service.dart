@@ -293,11 +293,8 @@ class SpeechRecognitionService {
     // Detect iOS error 300 / Simulator / Dictation unavailable
     if (errorMsg.contains('300') ||
         errorMsg.contains('error_unknown') ||
-        errorMsg.contains('error_speech_timeout') && Platform.isIOS && !kReleaseMode) {
-      // Clear explanation for iOS Simulator limitation
-      _setError(
-        'La reconnaissance vocale native Apple nécessite un appareil physique avec micro configuré (non supporté sur simulateur). Vous pouvez utiliser le clavier ci-dessous.',
-      );
+        (errorMsg.contains('error_speech_timeout') && Platform.isIOS && !kReleaseMode)) {
+      _setState(SpeechState.idle);
       return;
     }
 
