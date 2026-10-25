@@ -269,16 +269,19 @@ class _ChooseDoctorPageState extends ConsumerState<ChooseDoctorPage> {
                                             // Doctor Name (Clean & prominent, without subtitle badge)
                                             Padding(
                                               padding: const EdgeInsets.only(bottom: 4),
-                                              child: Text(
-                                                doctor.name,
-                                                style: GoogleFonts.outfit(
-                                                  fontSize: 15,
-                                                  fontWeight: FontWeight.w700,
-                                                  color: isDark ? Colors.white : const Color(0xFF0F172A),
+                                              child: FittedBox(
+                                                fit: BoxFit.scaleDown,
+                                                child: Text(
+                                                  doctor.name,
+                                                  style: GoogleFonts.outfit(
+                                                    fontSize: 14.5,
+                                                    fontWeight: FontWeight.w700,
+                                                    letterSpacing: -0.2,
+                                                    color: isDark ? Colors.white : const Color(0xFF0F172A),
+                                                  ),
+                                                  textAlign: TextAlign.center,
+                                                  maxLines: 1,
                                                 ),
-                                                textAlign: TextAlign.center,
-                                                maxLines: 1,
-                                                overflow: TextOverflow.ellipsis,
                                               ),
                                             ),
                                           ],
@@ -319,16 +322,25 @@ class _ChooseDoctorPageState extends ConsumerState<ChooseDoctorPage> {
                           ),
                           const SizedBox(height: 32),
 
-                          // Confirm Button (Matching reminder action button style)
+                          // Confirm Button (Flexible & Responsive on all screen sizes)
                           GestureDetector(
                             onTap: _loading ? null : _handleConfirm,
                             behavior: HitTestBehavior.opaque,
                             child: Container(
                               width: double.infinity,
-                              height: 50,
+                              constraints: const BoxConstraints(minHeight: 52),
+                              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
                               decoration: BoxDecoration(
                                 color: isDark ? const Color(0xFF3B82F6) : const Color(0xFF0F172A),
                                 borderRadius: BorderRadius.circular(999),
+                                boxShadow: [
+                                  BoxShadow(
+                                    color: (isDark ? const Color(0xFF3B82F6) : const Color(0xFF0F172A))
+                                        .withValues(alpha: 0.22),
+                                    blurRadius: 14,
+                                    offset: const Offset(0, 4),
+                                  ),
+                                ],
                               ),
                               child: Center(
                                 child: _loading
@@ -340,24 +352,30 @@ class _ChooseDoctorPageState extends ConsumerState<ChooseDoctorPage> {
                                           strokeWidth: 2.2,
                                         ),
                                       )
-                                    : Row(
-                                        mainAxisAlignment: MainAxisAlignment.center,
-                                        children: [
-                                          Text(
-                                            '${ref.t('chooseDoctorConfirm')} (${selectedDoctor.shortName})',
-                                            style: GoogleFonts.plusJakartaSans(
-                                              fontSize: 14.5,
-                                              fontWeight: FontWeight.w600,
-                                              color: Colors.white,
+                                    : FittedBox(
+                                        fit: BoxFit.scaleDown,
+                                        child: Row(
+                                          mainAxisSize: MainAxisSize.min,
+                                          mainAxisAlignment: MainAxisAlignment.center,
+                                          children: [
+                                            Text(
+                                              '${ref.t('chooseDoctorConfirm')} (${selectedDoctor.shortName})',
+                                              style: GoogleFonts.plusJakartaSans(
+                                                fontSize: 14.5,
+                                                fontWeight: FontWeight.w600,
+                                                color: Colors.white,
+                                                letterSpacing: -0.2,
+                                              ),
+                                              maxLines: 1,
                                             ),
-                                          ),
-                                          const SizedBox(width: 8),
-                                          const Icon(
-                                            Icons.arrow_forward_rounded,
-                                            color: Colors.white,
-                                            size: 16,
-                                          ),
-                                        ],
+                                            const SizedBox(width: 8),
+                                            const Icon(
+                                              Icons.arrow_forward_rounded,
+                                              color: Colors.white,
+                                              size: 16,
+                                            ),
+                                          ],
+                                        ),
                                       ),
                               ),
                             ),
