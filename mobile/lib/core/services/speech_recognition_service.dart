@@ -42,8 +42,6 @@ class SpeechRecognitionService {
 
   // Internal tracking
   String _confirmedPrefix = '';
-  int _consecutiveErrorCount = 0;
-  static const int _maxRetries = 2;
   bool _isDisposed = false;
   bool _isInitialized = false;
 
@@ -146,8 +144,8 @@ class SpeechRecognitionService {
         onSoundLevelChange: _handleSoundLevelChange,
         listenOptions: SpeechListenOptions(
           localeId: localeId,
-          listenMode: ListenMode.confirmation,
-          cancelOnError: true,
+          listenMode: ListenMode.dictation,
+          cancelOnError: false,
           partialResults: true,
         ),
       );
@@ -169,7 +167,6 @@ class SpeechRecognitionService {
         : words;
 
     transcriptNotifier.value = combined;
-    _consecutiveErrorCount = 0; // Reset error counter on valid speech
 
     if (state != SpeechState.detectingSpeech) {
       _setState(SpeechState.detectingSpeech);
@@ -286,37 +283,16 @@ class SpeechRecognitionService {
 
     _cancelSilenceTimer();
     soundLevelNotifier.value = 0.0;
-    _consecutiveErrorCount++;
 
-    final errorMsg = error.errorMsg.toLowerCase();
-
-    // Detect iOS error 300 / Simulator / Dictation unavailable
-    if (errorMsg.contains('300') ||
-        errorMsg.contains('error_unknown') ||
-        (errorMsg.contains('error_speech_timeout') && Platform.isIOS && !kReleaseMode)) {
-      _setState(SpeechState.idle);
+    // 1. If we already captured speech from the user, NEVER lose it due to interruption or pause!
+    if (transcript.trim().isNotEmpty) {
+      _setState(SpeechState.silenceConfirmation);
       return;
     }
 
-    if (errorMsg.contains('error_no_match') || errorMsg.contains('no speech')) {
-      if (transcript.isNotEmpty) {
-        _setState(SpeechState.silenceConfirmation);
-      } else {
-        _setState(SpeechState.idle);
-      }
-      return;
-    }
-
-    if (errorMsg.contains('permission')) {
-      _setError('Permission d\'enregistrement vocal refusée.');
-      return;
-    }
-
-    if (_consecutiveErrorCount >= _maxRetries) {
-      _setError('Échec de la reconnaissance vocale (${error.errorMsg}). Veuillez réessayer.');
-    } else {
-      _setState(SpeechState.idle);
-    }
+    // 2. Silently reset to idle state so user can speak again or use keyboard.
+    // Zero technical vocabulary or error codes (like connection_interrupted) on the UI.
+    _setState(SpeechState.idle);
   }
 
   /// Maps language codes to platform locale identifiers

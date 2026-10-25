@@ -1114,13 +1114,6 @@ class _VoiceConsultationScreenState extends ConsumerState<VoiceConsultationScree
         color = const Color(0xFFF59E0B);
         icon = CupertinoIcons.hourglass;
         break;
-      case SpeechState.error:
-        label = isFrench
-            ? 'Information vocale'
-            : (isTurkish ? 'Sesli bilgi' : 'Voice status');
-        color = const Color(0xFFF97316);
-        icon = CupertinoIcons.exclamationmark_triangle_fill;
-        break;
       default:
         return const SizedBox.shrink();
     }
