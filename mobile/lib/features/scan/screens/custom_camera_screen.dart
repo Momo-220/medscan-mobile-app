@@ -1,11 +1,9 @@
 import 'dart:math' as math;
 import 'package:camera/camera.dart';
 import 'package:flutter/material.dart';
-import 'package:go_router/go_router.dart';
 import 'package:image_picker/image_picker.dart';
 
 import '../../../core/constants/colors.dart';
-import '../../../core/constants/text_styles.dart';
 import '../../../shared/utils/localization.dart';
 
 class CustomCameraPage extends StatefulWidget {
@@ -189,7 +187,7 @@ class _CustomCameraPageState extends State<CustomCameraPage> with WidgetsBinding
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
                   decoration: BoxDecoration(
-                    color: Colors.black.withOpacity(0.5),
+                    color: Colors.black.withValues(alpha: 0.5),
                     borderRadius: BorderRadius.circular(12),
                   ),
                   child: Text(
@@ -222,7 +220,7 @@ class _CustomCameraPageState extends State<CustomCameraPage> with WidgetsBinding
               child: Container(
                 padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
                 decoration: BoxDecoration(
-                  color: Colors.black.withOpacity(0.6),
+                  color: Colors.black.withValues(alpha: 0.6),
                   borderRadius: BorderRadius.circular(20),
                 ),
                 child: Text(
@@ -254,7 +252,7 @@ class _CustomCameraPageState extends State<CustomCameraPage> with WidgetsBinding
                       width: 52,
                       height: 52,
                       decoration: BoxDecoration(
-                        color: Colors.white.withOpacity(0.2),
+                        color: Colors.white.withValues(alpha: 0.2),
                         shape: BoxShape.circle,
                         border: Border.all(color: Colors.white24),
                       ),
@@ -315,92 +313,97 @@ class _CustomCameraPageState extends State<CustomCameraPage> with WidgetsBinding
 class CameraOverlayPainter extends CustomPainter {
   @override
   void paint(Canvas canvas, Size size) {
-    final paint = Paint()
-      ..color = Colors.black.withOpacity(0.65)
+    // 1. Dark semi-transparent background around the cutout
+    final backdropPaint = Paint()
+      ..color = Colors.black.withValues(alpha: 0.62)
       ..style = PaintingStyle.fill;
 
-    // Define the scanning rectangle container shape
-    // On tablet / iPad, limit rectWidth to max 440 and keep realistic box aspect ratio (approx 1.5 : 1)
-    final double rectWidth = math.min(size.width * 0.82, 440.0);
-    final double rectHeight = math.min(rectWidth * 0.65, size.height * 0.38);
+    // Proportions équilibrées pour boîtes, flacons et plaquettes de médicaments (ratio ~1.38:1)
+    final double rectWidth = math.min(size.width * 0.84, 420.0);
+    final double rectHeight = math.min(rectWidth * 0.72, size.height * 0.42);
     final double left = (size.width - rectWidth) / 2;
-    final double top = (size.height - rectHeight) / 2;
+    final double top = (size.height - rectHeight) / 2 - 16; // Légèrement rehaussé pour le confort visuel
 
+    const double cornerRadius = 24.0;
     final RRect rrect = RRect.fromRectAndRadius(
       Rect.fromLTWH(left, top, rectWidth, rectHeight),
-      const Radius.circular(24),
+      const Radius.circular(cornerRadius),
     );
 
-    // Draw opaque mask around the card frame
+    // Découpe centrale transparente (hole cutout)
     canvas.drawPath(
       Path.combine(
         PathOperation.difference,
         Path()..addRect(Rect.fromLTWH(0, 0, size.width, size.height)),
         Path()..addRRect(rrect),
       ),
-      paint,
+      backdropPaint,
     );
 
-    // Draw elegant neon border around card frame
+    // 2. Cadre complet délicat et semi-transparent
     final borderPaint = Paint()
-      ..color = Colors.white.withOpacity(0.4)
+      ..color = Colors.white.withValues(alpha: 0.25)
       ..style = PaintingStyle.stroke
       ..strokeWidth = 1.5;
     canvas.drawRRect(rrect, borderPaint);
 
-    // Draw highlighted neon corner accents
+    // 3. Coins de visée néon continus et parfaitement raccordés
     final cornerPaint = Paint()
       ..color = AppColors.primary
       ..style = PaintingStyle.stroke
-      ..strokeWidth = 4.5
-      ..strokeCap = StrokeCap.round;
+      ..strokeWidth = 4.0
+      ..strokeCap = StrokeCap.round
+      ..strokeJoin = StrokeJoin.round;
 
-    const double cornerLen = 28.0;
-    const double radiusOffset = 24.0;
+    const double armLength = 40.0; // Longueur de chaque branche (horizontale et verticale)
 
-    // Top-Left
-    canvas.drawPath(
-      Path()
-        ..moveTo(left + radiusOffset, top)
-        ..lineTo(left + cornerLen, top)
-        ..moveTo(left, top + radiusOffset)
-        ..lineTo(left, top + cornerLen)
-        ..arcToPoint(Offset(left + radiusOffset, top), radius: const Radius.circular(radiusOffset)),
-      cornerPaint,
-    );
+    // ── Coin Supérieur Gauche (Top-Left)
+    final pathTL = Path()
+      ..moveTo(left + armLength, top)
+      ..lineTo(left + cornerRadius, top)
+      ..arcToPoint(
+        Offset(left, top + cornerRadius),
+        radius: const Radius.circular(cornerRadius),
+        clockwise: false,
+      )
+      ..lineTo(left, top + armLength);
+    canvas.drawPath(pathTL, cornerPaint);
 
-    // Top-Right
-    canvas.drawPath(
-      Path()
-        ..moveTo(left + rectWidth - radiusOffset, top)
-        ..lineTo(left + rectWidth - cornerLen, top)
-        ..moveTo(left + rectWidth, top + radiusOffset)
-        ..lineTo(left + rectWidth, top + cornerLen)
-        ..arcToPoint(Offset(left + rectWidth, top + radiusOffset), radius: const Radius.circular(radiusOffset), rotation: 90, clockwise: false),
-      cornerPaint,
-    );
+    // ── Coin Supérieur Droit (Top-Right)
+    final pathTR = Path()
+      ..moveTo(left + rectWidth - armLength, top)
+      ..lineTo(left + rectWidth - cornerRadius, top)
+      ..arcToPoint(
+        Offset(left + rectWidth, top + cornerRadius),
+        radius: const Radius.circular(cornerRadius),
+        clockwise: true,
+      )
+      ..lineTo(left + rectWidth, top + armLength);
+    canvas.drawPath(pathTR, cornerPaint);
 
-    // Bottom-Left
-    canvas.drawPath(
-      Path()
-        ..moveTo(left + radiusOffset, top + rectHeight)
-        ..lineTo(left + cornerLen, top + rectHeight)
-        ..moveTo(left, top + rectHeight - radiusOffset)
-        ..lineTo(left, top + rectHeight - cornerLen)
-        ..arcToPoint(Offset(left, top + rectHeight - radiusOffset), radius: const Radius.circular(radiusOffset), clockwise: false),
-      cornerPaint,
-    );
+    // ── Coin Inférieur Gauche (Bottom-Left)
+    final pathBL = Path()
+      ..moveTo(left, top + rectHeight - armLength)
+      ..lineTo(left, top + rectHeight - cornerRadius)
+      ..arcToPoint(
+        Offset(left + cornerRadius, top + rectHeight),
+        radius: const Radius.circular(cornerRadius),
+        clockwise: false,
+      )
+      ..lineTo(left + armLength, top + rectHeight);
+    canvas.drawPath(pathBL, cornerPaint);
 
-    // Bottom-Right
-    canvas.drawPath(
-      Path()
-        ..moveTo(left + rectWidth - radiusOffset, top + rectHeight)
-        ..lineTo(left + rectWidth - cornerLen, top + rectHeight)
-        ..moveTo(left + rectWidth, top + rectHeight - radiusOffset)
-        ..lineTo(left + rectWidth, top + rectHeight - cornerLen)
-        ..arcToPoint(Offset(left + rectWidth - radiusOffset, top + rectHeight), radius: const Radius.circular(radiusOffset)),
-      cornerPaint,
-    );
+    // ── Coin Inférieur Droit (Bottom-Right)
+    final pathBR = Path()
+      ..moveTo(left + rectWidth, top + rectHeight - armLength)
+      ..lineTo(left + rectWidth, top + rectHeight - cornerRadius)
+      ..arcToPoint(
+        Offset(left + rectWidth - cornerRadius, top + rectHeight),
+        radius: const Radius.circular(cornerRadius),
+        clockwise: true,
+      )
+      ..lineTo(left + rectWidth - armLength, top + rectHeight);
+    canvas.drawPath(pathBR, cornerPaint);
   }
 
   @override
